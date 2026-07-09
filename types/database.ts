@@ -89,6 +89,81 @@ export interface TimetableEntry {
   room: string | null;
 }
 
+export interface TeacherProfile {
+  id: string;
+  staff_id: string | null;
+  subjects_taught: string[] | null;
+  hire_date: string | null;
+}
+
+export interface Lesson {
+  id: string;
+  timetable_entry_id: string | null;
+  topic_id: string | null;
+  class_id: string;
+  teacher_id: string;
+  lesson_date: string;
+  objectives: string | null;
+  homework: string | null;
+}
+
+export interface Attendance {
+  id: string;
+  lesson_id: string;
+  student_id: string;
+  status: AttendanceStatus;
+  marked_by: string | null;
+}
+
+export interface Assessment {
+  id: string;
+  subject_id: string;
+  class_id: string;
+  title: string;
+  max_score: number;
+  weight_percent: number | null;
+  term: number;
+  academic_year: string;
+  created_by: string | null;
+}
+
+export interface Grade {
+  id: string;
+  assessment_id: string;
+  student_id: string;
+  score: number;
+  remark: string | null;
+  graded_by: string | null;
+}
+
+export interface StudentNote {
+  id: string;
+  student_id: string;
+  author_id: string | null;
+  note_type: "behavioral" | "academic" | "commendation" | "disciplinary";
+  content: string;
+  visible_to_student: boolean;
+}
+
+export interface Announcement {
+  id: string;
+  author_id: string | null;
+  title: string;
+  content: string;
+  audience: "all" | "students" | "teachers" | "class";
+  class_id: string | null;
+}
+
+// Database type so @supabase/ssr's generics are satisfied.
+// IMPORTANT: @supabase/supabase-js's generic constraint requires Tables, Views,
+// Functions, Enums, and CompositeTypes to all be present on the schema object —
+// even if empty. Omitting any of them causes TypeScript to silently fail the
+// generic constraint check and collapse every Row type to `never`, which shows
+// up as "Property 'x' does not exist on type 'never'" on every query result.
+//
+// Expand the Tables below with `supabase gen types typescript --linked` once
+// the project is linked to your Supabase instance, for a fully accurate,
+// auto-generated version of this file.
 export interface Database {
   public: {
     Tables: {
@@ -100,6 +175,13 @@ export interface Database {
       topic_notes: { Row: TopicNote; Insert: Partial<TopicNote>; Update: Partial<TopicNote>; Relationships: [] };
       topic_resources: { Row: TopicResource; Insert: Partial<TopicResource>; Update: Partial<TopicResource>; Relationships: [] };
       timetable_entries: { Row: TimetableEntry; Insert: Partial<TimetableEntry>; Update: Partial<TimetableEntry>; Relationships: [] };
+      teacher_profiles: { Row: TeacherProfile; Insert: Partial<TeacherProfile>; Update: Partial<TeacherProfile>; Relationships: [] };
+      lessons: { Row: Lesson; Insert: Partial<Lesson>; Update: Partial<Lesson>; Relationships: [] };
+      attendance: { Row: Attendance; Insert: Partial<Attendance>; Update: Partial<Attendance>; Relationships: [] };
+      assessments: { Row: Assessment; Insert: Partial<Assessment>; Update: Partial<Assessment>; Relationships: [] };
+      grades: { Row: Grade; Insert: Partial<Grade>; Update: Partial<Grade>; Relationships: [] };
+      student_notes: { Row: StudentNote; Insert: Partial<StudentNote>; Update: Partial<StudentNote>; Relationships: [] };
+      announcements: { Row: Announcement; Insert: Partial<Announcement>; Update: Partial<Announcement>; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
