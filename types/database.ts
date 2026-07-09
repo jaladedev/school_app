@@ -89,19 +89,21 @@ export interface TimetableEntry {
   room: string | null;
 }
 
-// Minimal Database type so @supabase/ssr's generics are satisfied.
-// Expand with `supabase gen types typescript` once the project is linked.
 export interface Database {
   public: {
     Tables: {
-      profiles: { Row: Profile; Insert: Partial<Profile>; Update: Partial<Profile> };
-      student_profiles: { Row: StudentProfile; Insert: Partial<StudentProfile>; Update: Partial<StudentProfile> };
-      classes: { Row: ClassRow; Insert: Partial<ClassRow>; Update: Partial<ClassRow> };
-      subjects: { Row: Subject; Insert: Partial<Subject>; Update: Partial<Subject> };
-      curriculum_topics: { Row: CurriculumTopic; Insert: Partial<CurriculumTopic>; Update: Partial<CurriculumTopic> };
-      topic_notes: { Row: TopicNote; Insert: Partial<TopicNote>; Update: Partial<TopicNote> };
-      topic_resources: { Row: TopicResource; Insert: Partial<TopicResource>; Update: Partial<TopicResource> };
-      timetable_entries: { Row: TimetableEntry; Insert: Partial<TimetableEntry>; Update: Partial<TimetableEntry> };
+      profiles: { Row: Profile; Insert: Partial<Profile>; Update: Partial<Profile>; Relationships: [] };
+      student_profiles: { Row: StudentProfile; Insert: Partial<StudentProfile>; Update: Partial<StudentProfile>; Relationships: [] };
+      classes: { Row: ClassRow; Insert: Partial<ClassRow>; Update: Partial<ClassRow>; Relationships: [] };
+      subjects: { Row: Subject; Insert: Partial<Subject>; Update: Partial<Subject>; Relationships: [] };
+      curriculum_topics: { Row: CurriculumTopic; Insert: Partial<CurriculumTopic>; Update: Partial<CurriculumTopic>; Relationships: [] };
+      topic_notes: { Row: TopicNote; Insert: Partial<TopicNote>; Update: Partial<TopicNote>; Relationships: [] };
+      topic_resources: { Row: TopicResource; Insert: Partial<TopicResource>; Update: Partial<TopicResource>; Relationships: [] };
+      timetable_entries: { Row: TimetableEntry; Insert: Partial<TimetableEntry>; Update: Partial<TimetableEntry>; Relationships: [] };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 }
