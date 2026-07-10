@@ -19,7 +19,7 @@ type GenericRelationship = {
   referencedColumns: string[];
 };
 
-export interface Profile {
+export type Profile = {
   id: string;
   role: UserRole;
   full_name: string;
@@ -27,25 +27,25 @@ export interface Profile {
   phone: string | null;
   avatar_url: string | null;
   created_at: string;
-}
+};
 
-export interface StudentProfile {
+export type StudentProfile = {
   id: string;
   admission_no: string | null;
   date_of_birth: string | null;
   guardian_name: string | null;
   guardian_phone: string | null;
   class_id: string | null;
-}
+};
 
-export interface TeacherProfile {
+export type TeacherProfile = {
   id: string;
   staff_id: string | null;
   subjects_taught: string[] | null;
   hire_date: string | null;
-}
+};
 
-export interface ClassRow {
+export type ClassRow = {
   id: string;
   name: string;
   arm: string | null;
@@ -53,27 +53,27 @@ export interface ClassRow {
   class_teacher_id: string | null;
   academic_year: string;
   created_at: string;
-}
+};
 
-export interface Enrollment {
+export type Enrollment = {
   id: string;
   student_id: string;
   class_id: string;
   academic_year: string;
   term: number;
   enrolled_at: string;
-}
+};
 
-export interface Subject {
+export type Subject = {
   id: string;
   name: string;
   code: string | null;
   min_grade_level: number | null;
   max_grade_level: number | null;
   description: string | null;
-}
+};
 
-export interface CurriculumTopic {
+export type CurriculumTopic = {
   id: string;
   subject_id: string;
   grade_level: number;
@@ -83,9 +83,9 @@ export interface CurriculumTopic {
   sequence_order: number;
   created_by: string | null;
   created_at: string;
-}
+};
 
-export interface TopicNote {
+export type TopicNote = {
   id: string;
   topic_id: string;
   author_id: string | null;
@@ -94,9 +94,9 @@ export interface TopicNote {
   version: number;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface TopicResource {
+export type TopicResource = {
   id: string;
   topic_id: string;
   note_id: string | null;
@@ -107,9 +107,9 @@ export interface TopicResource {
   sequence_order: number;
   uploaded_by: string | null;
   created_at: string;
-}
+};
 
-export interface TimetableEntry {
+export type TimetableEntry = {
   id: string;
   class_id: string;
   subject_id: string;
@@ -121,9 +121,9 @@ export interface TimetableEntry {
   room: string | null;
   academic_year: string;
   term: number;
-}
+};
 
-export interface Lesson {
+export type Lesson = {
   id: string;
   timetable_entry_id: string | null;
   topic_id: string | null;
@@ -133,18 +133,18 @@ export interface Lesson {
   objectives: string | null;
   homework: string | null;
   created_at: string;
-}
+};
 
-export interface Attendance {
+export type Attendance = {
   id: string;
   lesson_id: string;
   student_id: string;
   status: AttendanceStatus;
   marked_by: string | null;
   marked_at: string;
-}
+};
 
-export interface Assessment {
+export type Assessment = {
   id: string;
   subject_id: string;
   class_id: string;
@@ -154,9 +154,9 @@ export interface Assessment {
   term: number;
   academic_year: string;
   created_by: string | null;
-}
+};
 
-export interface Grade {
+export type Grade = {
   id: string;
   assessment_id: string;
   student_id: string;
@@ -164,9 +164,9 @@ export interface Grade {
   remark: string | null;
   graded_by: string | null;
   graded_at: string;
-}
+};
 
-export interface StudentNote {
+export type StudentNote = {
   id: string;
   student_id: string;
   author_id: string | null;
@@ -174,9 +174,9 @@ export interface StudentNote {
   content: string;
   visible_to_student: boolean;
   created_at: string;
-}
+};
 
-export interface Announcement {
+export type Announcement = {
   id: string;
   author_id: string | null;
   title: string;
@@ -184,18 +184,18 @@ export interface Announcement {
   audience: AnnouncementAudience;
   class_id: string | null;
   created_at: string;
-}
+};
 
-export interface Message {
+export type Message = {
   id: string;
   sender_id: string;
   recipient_id: string;
   content: string;
   read: boolean;
   sent_at: string;
-}
+};
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       profiles: {
@@ -304,4 +304,4 @@ export interface Database {
     Views: Record<string, never>;
     Functions: Record<string, never>;
   };
-}
+};
