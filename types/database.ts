@@ -26,6 +26,7 @@ export type Profile = {
   email: string;
   phone: string | null;
   avatar_url: string | null;
+  must_change_password: boolean;
   created_at: string;
 };
 
