@@ -1,6 +1,8 @@
 export type UserRole = "student" | "teacher" | "admin";
 export type NoteStatus = "draft" | "published" | "archived";
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
+export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disciplinary";
+export type AnnouncementAudience = "all" | "students" | "teachers" | "class";
 export type ResourceType =
   | "image"
   | "diagram_mermaid"
@@ -8,6 +10,14 @@ export type ResourceType =
   | "pdf"
   | "link"
   | "audio";
+
+type GenericRelationship = {
+  foreignKeyName: string;
+  columns: string[];
+  isOneToOne?: boolean;
+  referencedRelation: string;
+  referencedColumns: string[];
+};
 
 export interface Profile {
   id: string;
@@ -28,6 +38,13 @@ export interface StudentProfile {
   class_id: string | null;
 }
 
+export interface TeacherProfile {
+  id: string;
+  staff_id: string | null;
+  subjects_taught: string[] | null;
+  hire_date: string | null;
+}
+
 export interface ClassRow {
   id: string;
   name: string;
@@ -35,6 +52,16 @@ export interface ClassRow {
   grade_level: number;
   class_teacher_id: string | null;
   academic_year: string;
+  created_at: string;
+}
+
+export interface Enrollment {
+  id: string;
+  student_id: string;
+  class_id: string;
+  academic_year: string;
+  term: number;
+  enrolled_at: string;
 }
 
 export interface Subject {
@@ -54,6 +81,8 @@ export interface CurriculumTopic {
   title: string;
   description: string | null;
   sequence_order: number;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface TopicNote {
@@ -63,6 +92,7 @@ export interface TopicNote {
   content: string;
   status: NoteStatus;
   version: number;
+  created_at: string;
   updated_at: string;
 }
 
@@ -75,6 +105,8 @@ export interface TopicResource {
   content: string | null;
   file_url: string | null;
   sequence_order: number;
+  uploaded_by: string | null;
+  created_at: string;
 }
 
 export interface TimetableEntry {
@@ -87,13 +119,8 @@ export interface TimetableEntry {
   start_time: string;
   end_time: string;
   room: string | null;
-}
-
-export interface TeacherProfile {
-  id: string;
-  staff_id: string | null;
-  subjects_taught: string[] | null;
-  hire_date: string | null;
+  academic_year: string;
+  term: number;
 }
 
 export interface Lesson {
@@ -105,6 +132,7 @@ export interface Lesson {
   lesson_date: string;
   objectives: string | null;
   homework: string | null;
+  created_at: string;
 }
 
 export interface Attendance {
@@ -113,6 +141,7 @@ export interface Attendance {
   student_id: string;
   status: AttendanceStatus;
   marked_by: string | null;
+  marked_at: string;
 }
 
 export interface Assessment {
@@ -134,15 +163,17 @@ export interface Grade {
   score: number;
   remark: string | null;
   graded_by: string | null;
+  graded_at: string;
 }
 
 export interface StudentNote {
   id: string;
   student_id: string;
   author_id: string | null;
-  note_type: "behavioral" | "academic" | "commendation" | "disciplinary";
+  note_type: StudentNoteType;
   content: string;
   visible_to_student: boolean;
+  created_at: string;
 }
 
 export interface Announcement {
@@ -150,42 +181,127 @@ export interface Announcement {
   author_id: string | null;
   title: string;
   content: string;
-  audience: "all" | "students" | "teachers" | "class";
+  audience: AnnouncementAudience;
   class_id: string | null;
+  created_at: string;
 }
 
-// Database type so @supabase/ssr's generics are satisfied.
-// IMPORTANT: @supabase/supabase-js's generic constraint requires Tables, Views,
-// Functions, Enums, and CompositeTypes to all be present on the schema object —
-// even if empty. Omitting any of them causes TypeScript to silently fail the
-// generic constraint check and collapse every Row type to `never`, which shows
-// up as "Property 'x' does not exist on type 'never'" on every query result.
-//
-// Expand the Tables below with `supabase gen types typescript --linked` once
-// the project is linked to your Supabase instance, for a fully accurate,
-// auto-generated version of this file.
+export interface Message {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  content: string;
+  read: boolean;
+  sent_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
-      profiles: { Row: Profile; Insert: Partial<Profile>; Update: Partial<Profile>; Relationships: [] };
-      student_profiles: { Row: StudentProfile; Insert: Partial<StudentProfile>; Update: Partial<StudentProfile>; Relationships: [] };
-      classes: { Row: ClassRow; Insert: Partial<ClassRow>; Update: Partial<ClassRow>; Relationships: [] };
-      subjects: { Row: Subject; Insert: Partial<Subject>; Update: Partial<Subject>; Relationships: [] };
-      curriculum_topics: { Row: CurriculumTopic; Insert: Partial<CurriculumTopic>; Update: Partial<CurriculumTopic>; Relationships: [] };
-      topic_notes: { Row: TopicNote; Insert: Partial<TopicNote>; Update: Partial<TopicNote>; Relationships: [] };
-      topic_resources: { Row: TopicResource; Insert: Partial<TopicResource>; Update: Partial<TopicResource>; Relationships: [] };
-      timetable_entries: { Row: TimetableEntry; Insert: Partial<TimetableEntry>; Update: Partial<TimetableEntry>; Relationships: [] };
-      teacher_profiles: { Row: TeacherProfile; Insert: Partial<TeacherProfile>; Update: Partial<TeacherProfile>; Relationships: [] };
-      lessons: { Row: Lesson; Insert: Partial<Lesson>; Update: Partial<Lesson>; Relationships: [] };
-      attendance: { Row: Attendance; Insert: Partial<Attendance>; Update: Partial<Attendance>; Relationships: [] };
-      assessments: { Row: Assessment; Insert: Partial<Assessment>; Update: Partial<Assessment>; Relationships: [] };
-      grades: { Row: Grade; Insert: Partial<Grade>; Update: Partial<Grade>; Relationships: [] };
-      student_notes: { Row: StudentNote; Insert: Partial<StudentNote>; Update: Partial<StudentNote>; Relationships: [] };
-      announcements: { Row: Announcement; Insert: Partial<Announcement>; Update: Partial<Announcement>; Relationships: [] };
+      profiles: {
+        Row: Profile;
+        Insert: Partial<Profile>;
+        Update: Partial<Profile>;
+        Relationships: GenericRelationship[];
+      };
+      student_profiles: {
+        Row: StudentProfile;
+        Insert: Partial<StudentProfile>;
+        Update: Partial<StudentProfile>;
+        Relationships: GenericRelationship[];
+      };
+      teacher_profiles: {
+        Row: TeacherProfile;
+        Insert: Partial<TeacherProfile>;
+        Update: Partial<TeacherProfile>;
+        Relationships: GenericRelationship[];
+      };
+      classes: {
+        Row: ClassRow;
+        Insert: Partial<ClassRow>;
+        Update: Partial<ClassRow>;
+        Relationships: GenericRelationship[];
+      };
+      enrollments: {
+        Row: Enrollment;
+        Insert: Partial<Enrollment>;
+        Update: Partial<Enrollment>;
+        Relationships: GenericRelationship[];
+      };
+      subjects: {
+        Row: Subject;
+        Insert: Partial<Subject>;
+        Update: Partial<Subject>;
+        Relationships: GenericRelationship[];
+      };
+      curriculum_topics: {
+        Row: CurriculumTopic;
+        Insert: Partial<CurriculumTopic>;
+        Update: Partial<CurriculumTopic>;
+        Relationships: GenericRelationship[];
+      };
+      topic_notes: {
+        Row: TopicNote;
+        Insert: Partial<TopicNote>;
+        Update: Partial<TopicNote>;
+        Relationships: GenericRelationship[];
+      };
+      topic_resources: {
+        Row: TopicResource;
+        Insert: Partial<TopicResource>;
+        Update: Partial<TopicResource>;
+        Relationships: GenericRelationship[];
+      };
+      timetable_entries: {
+        Row: TimetableEntry;
+        Insert: Partial<TimetableEntry>;
+        Update: Partial<TimetableEntry>;
+        Relationships: GenericRelationship[];
+      };
+      lessons: {
+        Row: Lesson;
+        Insert: Partial<Lesson>;
+        Update: Partial<Lesson>;
+        Relationships: GenericRelationship[];
+      };
+      attendance: {
+        Row: Attendance;
+        Insert: Partial<Attendance>;
+        Update: Partial<Attendance>;
+        Relationships: GenericRelationship[];
+      };
+      assessments: {
+        Row: Assessment;
+        Insert: Partial<Assessment>;
+        Update: Partial<Assessment>;
+        Relationships: GenericRelationship[];
+      };
+      grades: {
+        Row: Grade;
+        Insert: Partial<Grade>;
+        Update: Partial<Grade>;
+        Relationships: GenericRelationship[];
+      };
+      student_notes: {
+        Row: StudentNote;
+        Insert: Partial<StudentNote>;
+        Update: Partial<StudentNote>;
+        Relationships: GenericRelationship[];
+      };
+      announcements: {
+        Row: Announcement;
+        Insert: Partial<Announcement>;
+        Update: Partial<Announcement>;
+        Relationships: GenericRelationship[];
+      };
+      messages: {
+        Row: Message;
+        Insert: Partial<Message>;
+        Update: Partial<Message>;
+        Relationships: GenericRelationship[];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
   };
 }
