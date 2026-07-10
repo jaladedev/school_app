@@ -6,18 +6,21 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "My subjects", href: "/dashboard/student" },
     { label: "Timetable", href: "/dashboard/student/timetable" },
     { label: "Grades", href: "/dashboard/student/grades" },
+    { label: "Announcements", href: "/dashboard/announcements" },
   ],
   teacher: [
     { label: "My classes", href: "/dashboard/teacher" },
     { label: "Timetable", href: "/dashboard/teacher/timetable" },
     { label: "Attendance", href: "/dashboard/teacher/attendance" },
     { label: "Grades", href: "/dashboard/teacher/grades" },
+    { label: "Announcements", href: "/dashboard/announcements" },
   ],
   admin: [
     { label: "Overview", href: "/dashboard/admin" },
     { label: "Classes", href: "/dashboard/admin/classes" },
     { label: "Timetables", href: "/dashboard/admin/timetables" },
     { label: "Staff", href: "/dashboard/admin/staff" },
+    { label: "Announcements", href: "/dashboard/announcements" },
   ],
 };
 
