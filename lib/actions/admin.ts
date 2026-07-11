@@ -12,9 +12,6 @@ async function assertIsAdmin() {
 }
 
 function generateTempPassword() {
-  // Simple readable temp password: e.g. "river-42-otter". Good enough to
-  // hand to a student/parent verbally or on a printed slip; they should
-  // change it after first login if you add that flow later.
   const words = ["river", "otter", "cedar", "maple", "coral", "amber", "birch", "delta"];
   const word = words[Math.floor(Math.random() * words.length)];
   const num = Math.floor(10 + Math.random() * 89);
@@ -79,6 +76,14 @@ export async function createStudentAccount(input: {
   guardianPhone?: string;
 }) {
   await assertIsAdmin();
+
+  // Guard against an empty classId reaching Postgres as "" — that fails
+  // with a cryptic "invalid input syntax for type uuid" instead of a
+  // useful message. Catch it here instead.
+  if (!input.classId) {
+    throw new Error("Please select a class before creating the student.");
+  }
+
   const admin = createAdminClient();
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -145,6 +150,11 @@ export async function createStudentsBulk(input: {
   sharedPassword?: string;
 }): Promise<BulkStudentResult[]> {
   await assertIsAdmin();
+
+  if (!input.classId) {
+    throw new Error("Please select a class before creating students.");
+  }
+
   const admin = createAdminClient();
 
   if (
@@ -156,9 +166,6 @@ export async function createStudentsBulk(input: {
 
   const results: BulkStudentResult[] = [];
 
-  // Sequential, not Promise.all — the Admin API can rate-limit bursts of
-  // createUser calls, and sequential also makes partial-failure results
-  // easier to reason about (each row's error is independent and clear).
   for (const row of input.students) {
     const password =
       input.passwordStrategy === "shared" ? input.sharedPassword! : generateTempPassword();
@@ -241,6 +248,11 @@ export async function createStudentsBulk(input: {
 
 export async function reassignStudentClass(studentId: string, classId: string) {
   await assertIsAdmin();
+
+  if (!classId) {
+    throw new Error("Please select a valid class.");
+  }
+
   const admin = createAdminClient();
 
   const { error } = await admin

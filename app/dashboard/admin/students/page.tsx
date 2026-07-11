@@ -13,7 +13,8 @@ export default async function AdminStudentsPage() {
   const { data: classes } = await supabase
     .from("classes")
     .select("id, name, arm")
-    .order("grade_level", { ascending: true });
+    .order("education_level", { ascending: true })
+    .order("level_number", { ascending: true });
 
   return (
     <div>

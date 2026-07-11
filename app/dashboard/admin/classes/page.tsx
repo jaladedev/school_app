@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateClassForm } from "@/components/CreateClassForm";
+import { formatLevel } from "@/types/database";
 
 export default async function AdminClassesPage() {
   const supabase = createClient();
@@ -8,7 +9,8 @@ export default async function AdminClassesPage() {
   const { data: classes } = await supabase
     .from("classes")
     .select("*")
-    .order("grade_level", { ascending: true })
+    .order("education_level", { ascending: true })
+    .order("level_number", { ascending: true })
     .order("arm", { ascending: true });
 
   const { data: studentCounts } = await supabase
@@ -27,7 +29,7 @@ export default async function AdminClassesPage() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Classes</h1>
           <p className="text-sm text-ink-soft">
-            {classes?.length ?? 0} classes across all grade levels.
+            {classes?.length ?? 0} classes across Primary, JSS and SS.
           </p>
         </div>
         <CreateClassForm />
@@ -44,7 +46,7 @@ export default async function AdminClassesPage() {
                 {cls.name} {cls.arm}
               </p>
               <p className="text-sm text-ink-soft">
-                Grade {cls.grade_level} · {cls.academic_year} ·{" "}
+                {formatLevel(cls.education_level, cls.level_number)} · {cls.academic_year} ·{" "}
                 {countByClass.get(cls.id) ?? 0} students
               </p>
             </div>

@@ -18,6 +18,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
   admin: [
     { label: "Overview", href: "/dashboard/admin" },
     { label: "Classes", href: "/dashboard/admin/classes" },
+    { label: "Students", href: "/dashboard/admin/students" },
     { label: "Timetables", href: "/dashboard/admin/timetables" },
     { label: "Staff", href: "/dashboard/admin/staff" },
     { label: "Announcements", href: "/dashboard/announcements" },

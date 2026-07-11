@@ -11,6 +11,16 @@ export type ResourceType =
   | "link"
   | "audio";
 
+export type EducationLevel = "primary" | "jss" | "sss";
+
+// Human-readable label for a stage + level_number, e.g. ("primary", 4)
+// -> "Primary 4", ("jss", 2) -> "JSS 2", ("sss", 3) -> "SS 3".
+export function formatLevel(level: EducationLevel, levelNumber: number): string {
+  if (level === "primary") return `Primary ${levelNumber}`;
+  if (level === "jss") return `JSS ${levelNumber}`;
+  return `SS ${levelNumber}`;
+}
+
 type GenericRelationship = {
   foreignKeyName: string;
   columns: string[];
@@ -50,7 +60,8 @@ export type ClassRow = {
   id: string;
   name: string;
   arm: string | null;
-  grade_level: number;
+  education_level: EducationLevel;
+  level_number: number;
   class_teacher_id: string | null;
   academic_year: string;
   created_at: string;
@@ -69,15 +80,17 @@ export type Subject = {
   id: string;
   name: string;
   code: string | null;
-  min_grade_level: number | null;
-  max_grade_level: number | null;
+  education_level: EducationLevel;
+  min_level_number: number;
+  max_level_number: number;
   description: string | null;
 };
 
 export type CurriculumTopic = {
   id: string;
   subject_id: string;
-  grade_level: number;
+  education_level: EducationLevel;
+  level_number: number;
   term: number;
   title: string;
   description: string | null;

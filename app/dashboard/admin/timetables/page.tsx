@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { formatLevel } from "@/types/database";
 
 export default async function AdminTimetablesPage() {
   const supabase = createClient();
@@ -7,7 +8,8 @@ export default async function AdminTimetablesPage() {
   const { data: classes } = await supabase
     .from("classes")
     .select("*")
-    .order("grade_level", { ascending: true })
+    .order("education_level", { ascending: true })
+    .order("level_number", { ascending: true })
     .order("arm", { ascending: true });
 
   return (
@@ -30,7 +32,7 @@ export default async function AdminTimetablesPage() {
               {cls.name} {cls.arm}
             </p>
             <p className="mt-1 text-sm text-ink-soft">
-              Grade {cls.grade_level} · {cls.academic_year}
+              {formatLevel(cls.education_level, cls.level_number)} · {cls.academic_year}
             </p>
           </Link>
         ))}

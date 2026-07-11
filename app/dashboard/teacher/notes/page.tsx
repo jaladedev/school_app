@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { formatLevel } from "@/types/database";
 
 export default async function TeacherNotesPage() {
   const profile = await getCurrentProfile();
@@ -17,7 +18,8 @@ export default async function TeacherNotesPage() {
     .from("curriculum_topics")
     .select("*, subjects(name)")
     .in("subject_id", subjectIds.length ? subjectIds : ["00000000-0000-0000-0000-000000000000"])
-    .order("grade_level", { ascending: true })
+    .order("education_level", { ascending: true })
+    .order("level_number", { ascending: true })
     .order("term", { ascending: true })
     .order("sequence_order", { ascending: true });
 
@@ -51,7 +53,9 @@ export default async function TeacherNotesPage() {
               <div>
                 <p className="text-ink">{topic.title}</p>
                 <p className="text-xs text-ink-soft">
-                  {(topic as any).subjects?.name} · Primary {topic.grade_level} · Term {topic.term}
+                  {(topic as any).subjects?.name} ·{" "}
+                  {formatLevel(topic.education_level, topic.level_number)} · Term{" "}
+                  {topic.term}
                 </p>
               </div>
               <span

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { formatLevel } from "@/types/database";
 
 export default async function StudentHome() {
   const profile = await getCurrentProfile();
@@ -13,15 +14,16 @@ export default async function StudentHome() {
 
   const { data: classRow } = await supabase
     .from("classes")
-    .select("grade_level, name")
+    .select("education_level, level_number, name")
     .eq("id", studentProfile?.class_id ?? "")
     .single();
 
   const { data: subjects } = await supabase
     .from("subjects")
     .select("*")
-    .lte("min_grade_level", classRow?.grade_level ?? 0)
-    .gte("max_grade_level", classRow?.grade_level ?? 0);
+    .eq("education_level", classRow?.education_level ?? "primary")
+    .lte("min_level_number", classRow?.level_number ?? 0)
+    .gte("max_level_number", classRow?.level_number ?? 0);
 
   return (
     <div>
@@ -29,7 +31,10 @@ export default async function StudentHome() {
         My subjects
       </h1>
       <p className="mb-6 text-sm text-ink-soft">
-        {classRow?.name ?? "Your class"} — pick a subject to browse topics and notes.
+        {classRow
+          ? `${classRow.name} (${formatLevel(classRow.education_level, classRow.level_number)})`
+          : "Your class"}{" "}
+        — pick a subject to browse topics and notes.
       </p>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">

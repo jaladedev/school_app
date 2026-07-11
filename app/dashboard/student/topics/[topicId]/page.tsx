@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { TopicContent } from "@/components/TopicContent";
+import { formatLevel } from "@/types/database";
 
 export default async function TopicPage({
   params,
@@ -43,7 +44,8 @@ export default async function TopicPage({
         {topic?.title}
       </h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Term {topic?.term} · Primary {topic?.grade_level}
+        Term {topic?.term} ·{" "}
+        {topic && formatLevel(topic.education_level, topic.level_number)}
       </p>
 
       {note ? (

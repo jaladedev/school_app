@@ -1,5 +1,6 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { NoteEditor } from "@/components/NoteEditor";
+import { formatLevel } from "@/types/database";
 
 export default async function TeacherNoteEditPage({
   params,
@@ -15,7 +16,6 @@ export default async function TeacherNoteEditPage({
     .eq("id", params.topicId)
     .single();
 
-  // A teacher editing sees their own draft/published note, preferring their own authored one.
   const { data: note } = await supabase
     .from("topic_notes")
     .select("*")
@@ -27,7 +27,9 @@ export default async function TeacherNoteEditPage({
   return (
     <div>
       <p className="mb-1 text-xs uppercase tracking-wide text-leaf">
-        {(topic as any)?.subjects?.name} · Primary {topic?.grade_level} · Term {topic?.term}
+        {(topic as any)?.subjects?.name} ·{" "}
+        {topic && formatLevel(topic.education_level, topic.level_number)} · Term{" "}
+        {topic?.term}
       </p>
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">
         {topic?.title}

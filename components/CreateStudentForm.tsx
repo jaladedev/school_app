@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createStudentAccount } from "@/lib/actions/admin";
 
 export function CreateStudentForm({
@@ -19,6 +19,17 @@ export function CreateStudentForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!classes.length) {
+      if (classId !== "") setClassId("");
+      return;
+    }
+    const stillValid = classes.some((c) => c.id === classId);
+    if (!stillValid) {
+      setClassId(classes[0].id);
+    }
+  }, [classes, classId]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -98,6 +109,7 @@ export function CreateStudentForm({
         onChange={(e) => setClassId(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm"
       >
+        {!classes.length && <option value="">No classes available</option>}
         {classes.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name} {c.arm}
@@ -129,7 +141,7 @@ export function CreateStudentForm({
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={isPending || !classes.length}
+          disabled={isPending || !classes.length || !classId}
           className="rounded-lg bg-leaf px-3 py-2 text-sm font-medium text-white hover:bg-leaf/90 disabled:opacity-60"
         >
           {isPending ? "Creating…" : "Create account"}

@@ -17,7 +17,7 @@ export default async function SubjectTopicsPage({
 
   const { data: classRow } = await supabase
     .from("classes")
-    .select("grade_level")
+    .select("education_level, level_number")
     .eq("id", studentProfile?.class_id ?? "")
     .single();
 
@@ -31,7 +31,8 @@ export default async function SubjectTopicsPage({
     .from("curriculum_topics")
     .select("*")
     .eq("subject_id", params.subjectId)
-    .eq("grade_level", classRow?.grade_level ?? 0)
+    .eq("education_level", classRow?.education_level ?? "primary")
+    .eq("level_number", classRow?.level_number ?? 0)
     .order("term", { ascending: true })
     .order("sequence_order", { ascending: true });
 
