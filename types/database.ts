@@ -13,8 +13,6 @@ export type ResourceType =
 
 export type EducationLevel = "primary" | "jss" | "sss";
 
-// Human-readable label for a stage + level_number, e.g. ("primary", 4)
-// -> "Primary 4", ("jss", 2) -> "JSS 2", ("sss", 3) -> "SS 3".
 export function formatLevel(level: EducationLevel, levelNumber: number): string {
   if (level === "primary") return `Primary ${levelNumber}`;
   if (level === "jss") return `JSS ${levelNumber}`;
@@ -209,6 +207,17 @@ export type Message = {
   sent_at: string;
 };
 
+export type ReportCardRemark = {
+  id: string;
+  student_id: string;
+  term: number;
+  academic_year: string;
+  class_teacher_remark: string | null;
+  admin_remark: string | null;
+  updated_by: string | null;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -312,6 +321,12 @@ export type Database = {
         Row: Message;
         Insert: Partial<Message>;
         Update: Partial<Message>;
+        Relationships: GenericRelationship[];
+      };
+      report_card_remarks: {
+        Row: ReportCardRemark;
+        Insert: Partial<ReportCardRemark>;
+        Update: Partial<ReportCardRemark>;
         Relationships: GenericRelationship[];
       };
     };

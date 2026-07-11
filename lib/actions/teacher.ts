@@ -48,6 +48,37 @@ export async function saveGrade(
 
   const supabase = createClient();
 
+  // Friendly pre-check before hitting RLS: confirm this teacher is
+  // actually assigned (via timetable_entries) to teach the assessment's
+  // subject for its class. Without this, an unauthorized attempt would
+  // still be blocked, but with a raw Postgres RLS error instead of a
+  // clear message.
+  const { data: assessment } = await supabase
+    .from("assessments")
+    .select("subject_id, class_id, subjects(name), classes(name, arm)")
+    .eq("id", assessmentId)
+    .single();
+
+  if (!assessment) {
+    throw new Error("Assessment not found.");
+  }
+
+  const { data: assignment } = await supabase
+    .from("timetable_entries")
+    .select("id")
+    .eq("teacher_id", profile.id)
+    .eq("subject_id", assessment.subject_id)
+    .eq("class_id", assessment.class_id)
+    .maybeSingle();
+
+  if (!assignment) {
+    const subjectName = (assessment as any).subjects?.name ?? "this subject";
+    const className = (assessment as any).classes?.name ?? "this class";
+    throw new Error(
+      `You aren't assigned to teach ${subjectName} for ${className}, so you can't enter grades for it.`
+    );
+  }
+
   const { error } = await supabase.from("grades").upsert(
     {
       assessment_id: assessmentId,

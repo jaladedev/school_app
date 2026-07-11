@@ -6,6 +6,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "My subjects", href: "/dashboard/student" },
     { label: "Timetable", href: "/dashboard/student/timetable" },
     { label: "Grades", href: "/dashboard/student/grades" },
+    { label: "Report Card", href: "/dashboard/student/report-card" },
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
   teacher: [
@@ -29,7 +30,7 @@ export function Sidebar({ role, fullName }: { role: UserRole; fullName: string }
   const items = NAV_BY_ROLE[role];
 
   return (
-    <aside className="flex h-screen w-56 flex-col justify-between border-r border-rule bg-paper px-4 py-6">
+    <aside className="flex h-screen w-56 flex-col justify-between border-r border-rule bg-paper px-4 py-6 print:hidden">
       <div>
         <div className="mb-8 px-2">
           <p className="font-display text-lg font-semibold text-ink">School</p>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateStudentForm } from "@/components/CreateStudentForm";
 import { BulkCreateStudentsForm } from "@/components/BulkCreateStudentsForm";
@@ -47,9 +48,17 @@ export default async function AdminStudentsPage() {
                   <p className="text-xs text-ink-soft">Admission no. {s.admission_no}</p>
                 )}
               </div>
-              <span className="rounded-full bg-leaf-soft px-3 py-1 text-sm font-medium text-leaf">
-                {cls ? `${cls.name} ${cls.arm ?? ""}` : "Unassigned"}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="rounded-full bg-leaf-soft px-3 py-1 text-sm font-medium text-leaf">
+                  {cls ? `${cls.name} ${cls.arm ?? ""}` : "Unassigned"}
+                </span>
+                <Link
+                  href={`/dashboard/admin/students/${s.id}/report-card`}
+                  className="text-sm font-medium text-leaf hover:underline"
+                >
+                  Report card →
+                </Link>
+              </div>
             </div>
           );
         })}
