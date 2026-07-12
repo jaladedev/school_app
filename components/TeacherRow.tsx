@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { EditTeacherSubjectsForm } from "@/components/EditTeacherSubjectsForm";
+import { ResetPasswordButton } from "@/components/ResetPasswordButton";
 
 export function TeacherRow({
   teacherId,
@@ -30,12 +31,15 @@ export function TeacherRow({
             {subjectNames.length ? subjectNames.join(", ") : "No subjects assigned"}
           </p>
         </div>
-        <button
-          onClick={() => setEditing((prev) => !prev)}
-          className="text-sm font-medium text-leaf hover:underline"
-        >
-          {editing ? "Close" : "Edit subjects"}
-        </button>
+        <div className="flex items-center gap-3">
+          <ResetPasswordButton userId={teacherId} />
+          <button
+            onClick={() => setEditing((prev) => !prev)}
+            className="text-sm font-medium text-leaf hover:underline"
+          >
+            {editing ? "Close" : "Edit subjects"}
+          </button>
+        </div>
       </div>
 
       {editing && (

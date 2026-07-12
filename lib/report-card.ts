@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { AttendanceStatus } from "@/types/database";
+import { scoreToLetterGrade, type GradeScaleEntry, type AttendanceStatus } from "@/types/database";
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -7,8 +7,6 @@ function ordinal(n: number): string {
   return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
 }
 
-// Standard "competition ranking": tied scores share the same position,
-// and the next distinct score skips ahead accordingly (1, 1, 3, 4...).
 function rankDescending(values: number[]): number[] {
   const sorted = [...values].sort((a, b) => b - a);
   return values.map((v) => sorted.indexOf(v) + 1);
@@ -18,6 +16,7 @@ export type SubjectResult = {
   subjectId: string;
   subjectName: string;
   scorePercent: number | null;
+  letterGrade: string | null;
   position: string | null;
   classSize: number;
 };
@@ -27,11 +26,58 @@ export type ReportCardData = {
   className: string;
   term: number;
   academicYear: string;
+  schoolName: string;
+  schoolMotto: string | null;
   subjects: SubjectResult[];
-  overall: { averagePercent: number | null; position: string | null; classSize: number };
+  overall: {
+    averagePercent: number | null;
+    letterGrade: string | null;
+    position: string | null;
+    classSize: number;
+  };
   attendance: { present: number; absent: number; late: number; excused: number; total: number };
   remark: { classTeacherRemark: string | null; adminRemark: string | null } | null;
 };
+
+// Computes one student's percentage for a subject from their assessment
+// scores. If EVERY assessment in the subject has a weight_percent set,
+// scores are weighted accordingly (score/max_score * weight_percent,
+// summed). Otherwise falls back to sum(score)/sum(max_score) * 100 —
+// this covers subjects where weights haven't been configured yet
+// without producing a nonsensical result.
+function computeSubjectPercent(
+  studentId: string,
+  assessmentIds: string[],
+  maxScores: Map<string, number>,
+  weights: Map<string, number | null>,
+  grades: { assessment_id: string; student_id: string; score: number }[]
+): number | null {
+  const relevantGrades = assessmentIds
+    .map((aid) => grades.find((g) => g.assessment_id === aid && g.student_id === studentId))
+    .filter((g): g is NonNullable<typeof g> => !!g);
+
+  if (!relevantGrades.length) return null;
+
+  const allWeighted = assessmentIds.every((aid) => weights.get(aid) != null);
+
+  if (allWeighted) {
+    let total = 0;
+    for (const g of relevantGrades) {
+      const max = maxScores.get(g.assessment_id) ?? 0;
+      const weight = weights.get(g.assessment_id) ?? 0;
+      if (max > 0) total += (g.score / max) * weight;
+    }
+    return total;
+  }
+
+  let scoreSum = 0;
+  let maxSum = 0;
+  for (const g of relevantGrades) {
+    scoreSum += g.score;
+    maxSum += maxScores.get(g.assessment_id) ?? 0;
+  }
+  return maxSum > 0 ? (scoreSum / maxSum) * 100 : null;
+}
 
 export async function getReportCardData(
   studentId: string,
@@ -39,6 +85,14 @@ export async function getReportCardData(
   academicYear: string
 ): Promise<ReportCardData | null> {
   const supabase = createClient();
+
+  const { data: settings } = await supabase
+    .from("school_settings")
+    .select("name, motto, grade_scale")
+    .eq("id", 1)
+    .single();
+
+  const gradeScale: GradeScaleEntry[] = settings?.grade_scale ?? [];
 
   const { data: studentProfile } = await supabase
     .from("student_profiles")
@@ -56,7 +110,6 @@ export async function getReportCardData(
     .eq("id", classId)
     .single();
 
-  // Everyone in the class — needed to compute rank, not just the target student.
   const { data: classmates } = await supabase
     .from("student_profiles")
     .select("id")
@@ -66,7 +119,7 @@ export async function getReportCardData(
 
   const { data: assessments } = await supabase
     .from("assessments")
-    .select("id, subject_id, max_score, subjects(name)")
+    .select("id, subject_id, max_score, weight_percent, subjects(name)")
     .eq("class_id", classId)
     .eq("term", term)
     .eq("academic_year", academicYear);
@@ -80,20 +133,32 @@ export async function getReportCardData(
         .in("assessment_id", assessmentIds)
     : { data: [] };
 
-  // Group assessments by subject.
-  const subjectMap = new Map<string, { name: string; assessmentIds: string[]; maxScores: Map<string, number> }>();
+  const subjectMap = new Map<
+    string,
+    {
+      name: string;
+      assessmentIds: string[];
+      maxScores: Map<string, number>;
+      weights: Map<string, number | null>;
+    }
+  >();
+
   for (const a of assessments ?? []) {
     const subjectName = (a as any).subjects?.name ?? "Unknown";
     if (!subjectMap.has(a.subject_id)) {
-      subjectMap.set(a.subject_id, { name: subjectName, assessmentIds: [], maxScores: new Map() });
+      subjectMap.set(a.subject_id, {
+        name: subjectName,
+        assessmentIds: [],
+        maxScores: new Map(),
+        weights: new Map(),
+      });
     }
     const entry = subjectMap.get(a.subject_id)!;
     entry.assessmentIds.push(a.id);
     entry.maxScores.set(a.id, a.max_score);
+    entry.weights.set(a.id, a.weight_percent);
   }
 
-  // For each subject, compute every classmate's percentage:
-  // sum(score) / sum(max_score) * 100 across that subject's assessments.
   const subjects: SubjectResult[] = [];
   const overallPercentByStudent = new Map<string, { sum: number; count: number }>();
 
@@ -101,19 +166,15 @@ export async function getReportCardData(
     const percentByStudent = new Map<string, number>();
 
     for (const sid of classmateIds) {
-      let scoreSum = 0;
-      let maxSum = 0;
-      for (const aid of info.assessmentIds) {
-        const grade = (allGrades ?? []).find((g) => g.assessment_id === aid && g.student_id === sid);
-        if (grade) {
-          scoreSum += grade.score;
-          maxSum += info.maxScores.get(aid) ?? 0;
-        }
-      }
-      if (maxSum > 0) {
-        const percent = (scoreSum / maxSum) * 100;
+      const percent = computeSubjectPercent(
+        sid,
+        info.assessmentIds,
+        info.maxScores,
+        info.weights,
+        allGrades ?? []
+      );
+      if (percent !== null) {
         percentByStudent.set(sid, percent);
-
         const overall = overallPercentByStudent.get(sid) ?? { sum: 0, count: 0 };
         overall.sum += percent;
         overall.count += 1;
@@ -133,6 +194,10 @@ export async function getReportCardData(
       subjectId,
       subjectName: info.name,
       scorePercent: targetPercent !== null ? Math.round(targetPercent * 10) / 10 : null,
+      letterGrade:
+        targetPercent !== null && gradeScale.length
+          ? scoreToLetterGrade(targetPercent, gradeScale)
+          : null,
       position: targetRank !== null ? ordinal(targetRank) : null,
       classSize: rankedIds.length,
     });
@@ -140,8 +205,6 @@ export async function getReportCardData(
 
   subjects.sort((a, b) => a.subjectName.localeCompare(b.subjectName));
 
-  // Overall average + position, based on each student's average percent
-  // across all subjects they have any grade in.
   const overallIds = [...overallPercentByStudent.keys()];
   const overallAverages = overallIds.map((id) => {
     const { sum, count } = overallPercentByStudent.get(id)!;
@@ -153,16 +216,16 @@ export async function getReportCardData(
   const overallAverage = overallIndex >= 0 ? overallAverages[overallIndex] : null;
   const overallRank = overallIndex >= 0 ? overallRanks[overallIndex] : null;
 
-  // Attendance: lessons for this class whose timetable entry matches the
-  // requested term/academic year (lessons without a linked timetable
-  // entry are excluded — no reliable term to attribute them to).
   const { data: lessons } = await supabase
     .from("lessons")
     .select("id, timetable_entry_id, timetable_entries(term, academic_year)")
     .eq("class_id", classId);
 
   const relevantLessonIds = (lessons ?? [])
-    .filter((l: any) => l.timetable_entries?.term === term && l.timetable_entries?.academic_year === academicYear)
+    .filter(
+      (l: any) =>
+        l.timetable_entries?.term === term && l.timetable_entries?.academic_year === academicYear
+    )
     .map((l) => l.id);
 
   const { data: attendanceRows } = relevantLessonIds.length
@@ -173,18 +236,18 @@ export async function getReportCardData(
         .in("lesson_id", relevantLessonIds)
     : { data: [] };
 
-const attendance: Record<AttendanceStatus, number> & { total: number } = {
-  present: 0,
-  absent: 0,
-  late: 0,
-  excused: 0,
-  total: 0,
-};
-for (const row of attendanceRows ?? []) {
-  const status = row.status as AttendanceStatus;
-  attendance[status] += 1;
-  attendance.total += 1;
-}
+  const attendance: Record<AttendanceStatus, number> & { total: number } = {
+    present: 0,
+    absent: 0,
+    late: 0,
+    excused: 0,
+    total: 0,
+  };
+  for (const row of attendanceRows ?? []) {
+    const status = row.status as AttendanceStatus;
+    attendance[status] += 1;
+    attendance.total += 1;
+  }
 
   const { data: remark } = await supabase
     .from("report_card_remarks")
@@ -203,9 +266,15 @@ for (const row of attendanceRows ?? []) {
     className: `${classRow?.name ?? ""} ${classRow?.arm ?? ""}`.trim(),
     term,
     academicYear,
+    schoolName: settings?.name ?? "School Name",
+    schoolMotto: settings?.motto ?? null,
     subjects,
     overall: {
       averagePercent: overallAverage !== null ? Math.round(overallAverage * 10) / 10 : null,
+      letterGrade:
+        overallAverage !== null && gradeScale.length
+          ? scoreToLetterGrade(overallAverage, gradeScale)
+          : null,
       position: overallRank !== null ? ordinal(overallRank) : null,
       classSize: overallIds.length,
     },

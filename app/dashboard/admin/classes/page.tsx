@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateClassForm } from "@/components/CreateClassForm";
+import { AssignClassTeacherSelect } from "@/components/AssignClassTeacherSelect";
 import { formatLevel } from "@/types/database";
 
 export default async function AdminClassesPage() {
@@ -22,6 +23,15 @@ export default async function AdminClassesPage() {
     if (!row.class_id) continue;
     countByClass.set(row.class_id, (countByClass.get(row.class_id) ?? 0) + 1);
   }
+
+  const { data: teacherProfiles } = await supabase
+    .from("teacher_profiles")
+    .select("id, profiles(full_name)");
+
+  const teachers = (teacherProfiles ?? []).map((t: any) => ({
+    id: t.id,
+    full_name: t.profiles?.full_name ?? "Unknown",
+  }));
 
   return (
     <div>
@@ -50,12 +60,22 @@ export default async function AdminClassesPage() {
                 {countByClass.get(cls.id) ?? 0} students
               </p>
             </div>
-            <Link
-              href={`/dashboard/admin/timetables/${cls.id}`}
-              className="text-sm font-medium text-leaf hover:underline"
-            >
-              View timetable →
-            </Link>
+            <div className="flex items-center gap-4">
+              <div>
+                <p className="mb-1 text-xs text-ink-soft">Class teacher</p>
+                <AssignClassTeacherSelect
+                  classId={cls.id}
+                  currentTeacherId={cls.class_teacher_id}
+                  teachers={teachers}
+                />
+              </div>
+              <Link
+                href={`/dashboard/admin/timetables/${cls.id}`}
+                className="text-sm font-medium text-leaf hover:underline"
+              >
+                View timetable →
+              </Link>
+            </div>
           </div>
         ))}
 

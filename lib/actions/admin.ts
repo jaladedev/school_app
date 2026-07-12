@@ -18,6 +18,43 @@ function generateTempPassword() {
   return `${word}-${num}-${words[Math.floor(Math.random() * words.length)]}`;
 }
 
+// Reads the school's current term/year, used to timestamp every
+// enrollment row written below.
+async function getCurrentTermYear(admin: ReturnType<typeof createAdminClient>) {
+  const { data } = await admin
+    .from("school_settings")
+    .select("current_academic_year, current_term")
+    .eq("id", 1)
+    .single();
+
+  return {
+    academicYear: data?.current_academic_year ?? "unknown",
+    term: data?.current_term ?? 1,
+  };
+}
+
+// Records (or updates) an enrollment row for a student/class/term/year.
+// Upserted rather than plain-inserted since re-running this for the same
+// term (e.g. correcting a class right after creation) shouldn't create
+// duplicate history rows.
+async function recordEnrollment(
+  admin: ReturnType<typeof createAdminClient>,
+  studentId: string,
+  classId: string
+) {
+  const { academicYear, term } = await getCurrentTermYear(admin);
+
+  await admin.from("enrollments").upsert(
+    {
+      student_id: studentId,
+      class_id: classId,
+      academic_year: academicYear,
+      term,
+    },
+    { onConflict: "student_id,class_id,academic_year,term" }
+  );
+}
+
 export async function createTeacherAccount(input: {
   fullName: string;
   email: string;
@@ -77,9 +114,6 @@ export async function createStudentAccount(input: {
 }) {
   await assertIsAdmin();
 
-  // Guard against an empty classId reaching Postgres as "" — that fails
-  // with a cryptic "invalid input syntax for type uuid" instead of a
-  // useful message. Catch it here instead.
   if (!input.classId) {
     throw new Error("Please select a class before creating the student.");
   }
@@ -122,6 +156,8 @@ export async function createStudentAccount(input: {
     await admin.auth.admin.deleteUser(userId);
     throw new Error(studentError.message);
   }
+
+  await recordEnrollment(admin, userId, input.classId);
 
   revalidatePath("/dashboard/admin/students");
   return { userId };
@@ -226,6 +262,8 @@ export async function createStudentsBulk(input: {
         continue;
       }
 
+      await recordEnrollment(admin, userId, input.classId);
+
       results.push({
         email: row.email,
         fullName: row.fullName,
@@ -262,5 +300,98 @@ export async function reassignStudentClass(studentId: string, classId: string) {
 
   if (error) throw new Error(error.message);
 
+  await recordEnrollment(admin, studentId, classId);
+
   revalidatePath("/dashboard/admin/students");
+}
+
+// ---------- Promotion ----------
+
+export type PromotionOutcome = "promote" | "repeat" | "graduate";
+
+export async function promoteStudents(input: {
+  studentIds: string[];
+  targetClassId: string | null; // null when outcome is "graduate"
+  outcome: PromotionOutcome;
+}) {
+  await assertIsAdmin();
+  const admin = createAdminClient();
+
+  if (input.outcome !== "graduate" && !input.targetClassId) {
+    throw new Error("Select a target class for promotion or repeat.");
+  }
+
+  const { academicYear, term } = await getCurrentTermYear(admin);
+
+  let succeeded = 0;
+  const errors: string[] = [];
+
+  for (const studentId of input.studentIds) {
+    if (input.outcome === "graduate") {
+      const { error } = await admin
+        .from("student_profiles")
+        .update({ class_id: null })
+        .eq("id", studentId);
+      if (error) {
+        errors.push(`${studentId}: ${error.message}`);
+        continue;
+      }
+      succeeded += 1;
+      continue;
+    }
+
+    const { error: updateError } = await admin
+      .from("student_profiles")
+      .update({ class_id: input.targetClassId })
+      .eq("id", studentId);
+
+    if (updateError) {
+      errors.push(`${studentId}: ${updateError.message}`);
+      continue;
+    }
+
+    await admin.from("enrollments").upsert(
+      {
+        student_id: studentId,
+        class_id: input.targetClassId!,
+        academic_year: academicYear,
+        term,
+      },
+      { onConflict: "student_id,class_id,academic_year,term" }
+    );
+
+    succeeded += 1;
+  }
+
+  revalidatePath("/dashboard/admin/classes");
+  revalidatePath("/dashboard/admin/students");
+
+  return { succeeded, failed: errors.length, errors };
+}
+
+// ---------- Password reset ----------
+
+export async function resetUserPassword(userId: string): Promise<{ password: string }> {
+  await assertIsAdmin();
+  const admin = createAdminClient();
+
+  const newPassword = generateTempPassword();
+
+  const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
+    password: newPassword,
+  });
+
+  if (updateError) throw new Error(updateError.message);
+
+  const { error: profileError } = await admin
+    .from("profiles")
+    .update({ must_change_password: true })
+    .eq("id", userId);
+
+  if (profileError) throw new Error(profileError.message);
+
+  revalidatePath("/dashboard/admin/staff");
+  revalidatePath("/dashboard/admin/students");
+
+  return { password: newPassword };
 }

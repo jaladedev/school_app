@@ -4,6 +4,61 @@ import { revalidatePath } from "next/cache";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import type { AttendanceStatus } from "@/types/database";
 
+// ---------- Lessons ----------
+
+export async function createLesson(input: {
+  timetableEntryId: string;
+  classId: string;
+  lessonDate: string;
+  topicId?: string;
+  objectives?: string;
+  homework?: string;
+}) {
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== "teacher") {
+    throw new Error("Only teachers can log lessons.");
+  }
+
+  const supabase = createClient();
+
+  // Confirm this teacher actually owns the timetable slot being logged
+  // against — same pre-check pattern as grades/attendance.
+  const { data: entry } = await supabase
+    .from("timetable_entries")
+    .select("teacher_id, class_id, classes(name, arm)")
+    .eq("id", input.timetableEntryId)
+    .single();
+
+  if (!entry) {
+    throw new Error("Timetable entry not found.");
+  }
+
+  if (entry.teacher_id !== profile.id) {
+    const className = (entry as any).classes?.name ?? "this class";
+    throw new Error(`You aren't assigned to this period for ${className}.`);
+  }
+
+  const { data: lesson, error } = await supabase
+    .from("lessons")
+    .insert({
+      timetable_entry_id: input.timetableEntryId,
+      class_id: input.classId,
+      teacher_id: profile.id,
+      lesson_date: input.lessonDate,
+      topic_id: input.topicId || null,
+      objectives: input.objectives || null,
+      homework: input.homework || null,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/teacher");
+  revalidatePath("/dashboard/teacher/attendance");
+  return { lessonId: lesson.id };
+}
+
 // ---------- Attendance ----------
 
 export async function markAttendance(
@@ -16,6 +71,21 @@ export async function markAttendance(
   }
 
   const supabase = createClient();
+
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("teacher_id, classes(name, arm)")
+    .eq("id", lessonId)
+    .single();
+
+  if (!lesson) {
+    throw new Error("Lesson not found.");
+  }
+
+  if (lesson.teacher_id !== profile.id) {
+    const className = (lesson as any).classes?.name ?? "this class";
+    throw new Error(`You aren't the teacher assigned to this lesson for ${className}.`);
+  }
 
   const rows = records.map((r) => ({
     lesson_id: lessonId,
@@ -48,11 +118,6 @@ export async function saveGrade(
 
   const supabase = createClient();
 
-  // Friendly pre-check before hitting RLS: confirm this teacher is
-  // actually assigned (via timetable_entries) to teach the assessment's
-  // subject for its class. Without this, an unauthorized attempt would
-  // still be blocked, but with a raw Postgres RLS error instead of a
-  // clear message.
   const { data: assessment } = await supabase
     .from("assessments")
     .select("subject_id, class_id, subjects(name), classes(name, arm)")

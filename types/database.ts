@@ -218,6 +218,28 @@ export type ReportCardRemark = {
   updated_at: string;
 };
 
+export type GradeScaleEntry = { grade: string; min: number };
+
+export type SchoolSettings = {
+  id: number;
+  name: string;
+  logo_url: string | null;
+  motto: string | null;
+  address: string | null;
+  current_academic_year: string;
+  current_term: number;
+  grade_scale: GradeScaleEntry[];
+  updated_at: string;
+};
+
+export function scoreToLetterGrade(percent: number, scale: GradeScaleEntry[]): string {
+  const sorted = [...scale].sort((a, b) => b.min - a.min);
+  for (const entry of sorted) {
+    if (percent >= entry.min) return entry.grade;
+  }
+  return sorted[sorted.length - 1]?.grade ?? "—";
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -327,6 +349,12 @@ export type Database = {
         Row: ReportCardRemark;
         Insert: Partial<ReportCardRemark>;
         Update: Partial<ReportCardRemark>;
+        Relationships: GenericRelationship[];
+      };
+      school_settings: {
+        Row: SchoolSettings;
+        Insert: Partial<SchoolSettings>;
+        Update: Partial<SchoolSettings>;
         Relationships: GenericRelationship[];
       };
     };

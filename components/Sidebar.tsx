@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { UserRole } from "@/types/database";
+import { SignOutButton } from "@/components/SignOutButton";
 
 const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
   student: [
@@ -7,6 +8,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Timetable", href: "/dashboard/student/timetable" },
     { label: "Grades", href: "/dashboard/student/grades" },
     { label: "Report Card", href: "/dashboard/student/report-card" },
+    { label: "My Notes", href: "/dashboard/student/notes" },
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
   teacher: [
@@ -19,10 +21,13 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
   admin: [
     { label: "Overview", href: "/dashboard/admin" },
     { label: "Classes", href: "/dashboard/admin/classes" },
+    { label: "Promote Students", href: "/dashboard/admin/classes/promote" },
+    { label: "Subjects", href: "/dashboard/admin/subjects" },
     { label: "Students", href: "/dashboard/admin/students" },
     { label: "Timetables", href: "/dashboard/admin/timetables" },
     { label: "Staff", href: "/dashboard/admin/staff" },
     { label: "Announcements", href: "/dashboard/announcements" },
+    { label: "Settings", href: "/dashboard/admin/settings" },
   ],
 };
 
@@ -48,8 +53,9 @@ export function Sidebar({ role, fullName }: { role: UserRole; fullName: string }
           ))}
         </nav>
       </div>
-      <div className="border-t border-rule px-2 pt-4 text-sm text-ink-soft">
-        {fullName}
+      <div className="space-y-2 border-t border-rule px-2 pt-4">
+        <p className="text-sm text-ink-soft">{fullName}</p>
+        <SignOutButton />
       </div>
     </aside>
   );

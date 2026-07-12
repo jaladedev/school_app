@@ -1,14 +1,11 @@
-import { formatLevel } from "@/types/database";
 import type { ReportCardData } from "@/lib/report-card";
 import { PrintButton } from "@/components/PrintButton";
 
 export function ReportCardView({
   data,
-  schoolName = "School Name",
   editRemarkSlot,
 }: {
   data: ReportCardData;
-  schoolName?: string;
   editRemarkSlot?: React.ReactNode;
 }) {
   const attendancePercent =
@@ -28,7 +25,10 @@ export function ReportCardView({
       <div className="rounded-2xl border border-rule bg-white p-8 print:border-0 print:p-0 print:shadow-none">
         {/* Header */}
         <div className="mb-6 border-b-2 border-ink pb-4 text-center">
-          <h1 className="font-display text-2xl font-semibold text-ink">{schoolName}</h1>
+          <h1 className="font-display text-2xl font-semibold text-ink">{data.schoolName}</h1>
+          {data.schoolMotto && (
+            <p className="mt-1 text-xs italic text-ink-soft">{data.schoolMotto}</p>
+          )}
           <p className="mt-1 text-sm uppercase tracking-wide text-ink-soft">
             Termly Report Card
           </p>
@@ -62,6 +62,7 @@ export function ReportCardView({
             <tr className="border-b-2 border-ink text-left">
               <th className="py-2 pr-2">Subject</th>
               <th className="py-2 pr-2 text-right">Score (%)</th>
+              <th className="py-2 pr-2 text-right">Grade</th>
               <th className="py-2 pr-2 text-right">Position</th>
             </tr>
           </thead>
@@ -72,6 +73,9 @@ export function ReportCardView({
                 <td className="py-2 pr-2 text-right text-ink">
                   {s.scorePercent !== null ? `${s.scorePercent}%` : "—"}
                 </td>
+                <td className="py-2 pr-2 text-right font-medium text-ink">
+                  {s.letterGrade ?? "—"}
+                </td>
                 <td className="py-2 pr-2 text-right text-ink-soft">
                   {s.position ? `${s.position} of ${s.classSize}` : "—"}
                 </td>
@@ -79,7 +83,7 @@ export function ReportCardView({
             ))}
             {!data.subjects.length && (
               <tr>
-                <td colSpan={3} className="py-4 text-center text-ink-soft">
+                <td colSpan={4} className="py-4 text-center text-ink-soft">
                   No grades recorded for this term yet.
                 </td>
               </tr>
@@ -94,7 +98,9 @@ export function ReportCardView({
               Overall Average
             </p>
             <p className="font-display text-xl font-semibold text-ink">
-              {data.overall.averagePercent !== null ? `${data.overall.averagePercent}%` : "—"}
+              {data.overall.averagePercent !== null
+                ? `${data.overall.averagePercent}% (${data.overall.letterGrade ?? "—"})`
+                : "—"}
             </p>
             <p className="text-sm text-ink-soft">
               {data.overall.position

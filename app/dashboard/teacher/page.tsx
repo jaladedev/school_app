@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { LessonEntryRow } from "@/components/LessonEntryRow";
 
 const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -8,11 +9,12 @@ export default async function TeacherHome() {
   const supabase = createClient();
 
   const today = new Date();
-  const todayWeekday = today.getDay() === 0 ? 7 : today.getDay(); // 1=Mon..7=Sun
+  const todayWeekday = today.getDay() === 0 ? 7 : today.getDay();
+  const todayDate = today.toISOString().slice(0, 10);
 
   const { data: todaysEntries } = await supabase
     .from("timetable_entries")
-    .select("*, classes(name, arm), subjects(name)")
+    .select("*, classes(id, name, arm, education_level, level_number), subjects(id, name)")
     .eq("teacher_id", profile!.id)
     .eq("weekday", todayWeekday)
     .order("period_number", { ascending: true });
@@ -21,26 +23,48 @@ export default async function TeacherHome() {
     .from("lessons")
     .select("id, timetable_entry_id")
     .eq("teacher_id", profile!.id)
-    .eq("lesson_date", today.toISOString().slice(0, 10));
+    .eq("lesson_date", todayDate);
 
   const lessonByEntry = new Map(
     (lessons ?? []).map((l) => [l.timetable_entry_id, l.id])
   );
 
+  // Fetch curriculum topics for every (subject, education_level, level_number)
+  // combination appearing in today's schedule, so each row's "Log lesson"
+  // form can offer the right topic list without a query per row.
+  const topicsByKey = new Map<string, { id: string; title: string }[]>();
+  for (const entry of todaysEntries ?? []) {
+    const subj = (entry as any).subjects;
+    const cls = (entry as any).classes;
+    if (!subj || !cls) continue;
+    const key = `${subj.id}:${cls.education_level}:${cls.level_number}`;
+    if (topicsByKey.has(key)) continue;
+
+    const { data: topics } = await supabase
+      .from("curriculum_topics")
+      .select("id, title")
+      .eq("subject_id", subj.id)
+      .eq("education_level", cls.education_level)
+      .eq("level_number", cls.level_number)
+      .order("sequence_order", { ascending: true });
+
+    topicsByKey.set(key, topics ?? []);
+  }
+
   // Distinct classes taught, from timetable
   const { data: allEntries } = await supabase
     .from("timetable_entries")
-    .select("class_id, classes(name, arm, grade_level), subjects(name)")
+    .select("class_id, classes(name, arm, education_level, level_number), subjects(name)")
     .eq("teacher_id", profile!.id);
 
-  const classMap = new Map<string, { name: string; arm: string | null; grade_level: number; subjects: Set<string> }>();
+  const classMap = new Map<string, { name: string; arm: string | null; subjects: Set<string> }>();
   for (const e of allEntries ?? []) {
     const cls = (e as any).classes;
     const subj = (e as any).subjects;
     if (!cls) continue;
     const key = e.class_id;
     if (!classMap.has(key)) {
-      classMap.set(key, { name: cls.name, arm: cls.arm, grade_level: cls.grade_level, subjects: new Set() });
+      classMap.set(key, { name: cls.name, arm: cls.arm, subjects: new Set() });
     }
     if (subj?.name) classMap.get(key)!.subjects.add(subj.name);
   }
@@ -51,39 +75,29 @@ export default async function TeacherHome() {
         {WEEKDAY_NAMES[todayWeekday]}'s lessons
       </h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Mark attendance for a lesson, or jump to a class below.
+        Log a lesson to unlock attendance for that period, or jump to a class below.
       </p>
 
       <div className="mb-10 space-y-2">
         {todaysEntries?.map((entry) => {
-          const lessonId = lessonByEntry.get(entry.id);
-          const cls = (entry as any).classes;
           const subj = (entry as any).subjects;
+          const cls = (entry as any).classes;
+          const key = `${subj?.id}:${cls?.education_level}:${cls?.level_number}`;
+
           return (
-            <div
+            <LessonEntryRow
               key={entry.id}
-              className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3"
-            >
-              <div>
-                <p className="font-medium text-ink">
-                  {subj?.name} — {cls?.name} {cls?.arm}
-                </p>
-                <p className="text-sm text-ink-soft">
-                  Period {entry.period_number} · {entry.start_time}–{entry.end_time}
-                  {entry.room ? ` · Room ${entry.room}` : ""}
-                </p>
-              </div>
-              {lessonId ? (
-                <Link
-                  href={`/dashboard/teacher/attendance/${lessonId}`}
-                  className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark"
-                >
-                  Mark attendance
-                </Link>
-              ) : (
-                <span className="text-sm text-ink-soft">No lesson logged yet</span>
-              )}
-            </div>
+              entryId={entry.id}
+              classId={cls?.id}
+              subjectName={subj?.name ?? ""}
+              className={`${cls?.name ?? ""} ${cls?.arm ?? ""}`}
+              periodNumber={entry.period_number}
+              startTime={entry.start_time}
+              endTime={entry.end_time}
+              room={entry.room}
+              lessonId={lessonByEntry.get(entry.id) ?? null}
+              topics={topicsByKey.get(key) ?? []}
+            />
           );
         })}
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateStudentForm } from "@/components/CreateStudentForm";
 import { BulkCreateStudentsForm } from "@/components/BulkCreateStudentsForm";
+import { ResetPasswordButton } from "@/components/ResetPasswordButton";
 
 export default async function AdminStudentsPage() {
   const supabase = createClient();
@@ -52,6 +53,13 @@ export default async function AdminStudentsPage() {
                 <span className="rounded-full bg-leaf-soft px-3 py-1 text-sm font-medium text-leaf">
                   {cls ? `${cls.name} ${cls.arm ?? ""}` : "Unassigned"}
                 </span>
+                <ResetPasswordButton userId={s.id} />
+                <Link
+                  href={`/dashboard/admin/students/${s.id}/notes`}
+                  className="text-sm font-medium text-leaf hover:underline"
+                >
+                  Notes →
+                </Link>
                 <Link
                   href={`/dashboard/admin/students/${s.id}/report-card`}
                   className="text-sm font-medium text-leaf hover:underline"
