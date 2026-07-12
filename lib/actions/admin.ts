@@ -339,6 +339,49 @@ export async function updateStudentAccount(input: {
   revalidatePath("/dashboard/admin/students");
 }
 
+// ---------- Edit teacher ----------
+
+export async function updateTeacherAccount(input: { teacherId: string; fullName: string }) {
+  await assertIsAdmin();
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ full_name: input.fullName })
+    .eq("id", input.teacherId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/staff");
+}
+
+// ---------- Deactivation (any role) ----------
+
+export async function deactivateUser(userId: string, deactivate: boolean) {
+  await assertIsAdmin();
+  const admin = createAdminClient();
+
+  // ban_duration actually blocks sign-in at the auth level. "none" lifts
+  // an existing ban; a long duration ("87600h" ≈ 10 years) is Supabase's
+  // recommended way to represent an indefinite ban, since the API has no
+  // literal "forever" value.
+  const { error: authError } = await admin.auth.admin.updateUserById(userId, {
+    ban_duration: deactivate ? "87600h" : "none",
+  });
+
+  if (authError) throw new Error(authError.message);
+
+  const { error: profileError } = await admin
+    .from("profiles")
+    .update({ is_active: !deactivate })
+    .eq("id", userId);
+
+  if (profileError) throw new Error(profileError.message);
+
+  revalidatePath("/dashboard/admin/staff");
+  revalidatePath("/dashboard/admin/students");
+}
+
 // ---------- Promotion ----------
 
 export type PromotionOutcome = "promote" | "repeat" | "graduate";

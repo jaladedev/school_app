@@ -25,7 +25,7 @@ export default async function AdminStaffPage({
 
   let teacherQuery = supabase
     .from("teacher_profiles")
-    .select("*, profiles(full_name, email)")
+    .select("*, profiles(full_name, email, is_active)")
     .order("id");
 
   if (matchingIds !== null) {
@@ -70,6 +70,7 @@ export default async function AdminStaffPage({
               teacherId={teacher.id}
               fullName={profile?.full_name ?? "Unknown"}
               email={profile?.email ?? ""}
+              isActive={profile?.is_active ?? true}
               subjectNames={subjectIds.map((id: string) => subjectNameById.get(id) ?? "Unknown")}
               currentSubjectIds={subjectIds}
               allSubjects={subjects ?? []}

@@ -6,6 +6,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
   student: [
     { label: "My subjects", href: "/dashboard/student" },
     { label: "Timetable", href: "/dashboard/student/timetable" },
+    { label: "Homework", href: "/dashboard/student/homework" },
     { label: "Grades", href: "/dashboard/student/grades" },
     { label: "Report Card", href: "/dashboard/student/report-card" },
     { label: "My Notes", href: "/dashboard/student/notes" },
@@ -16,6 +17,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "My classes", href: "/dashboard/teacher" },
     { label: "Timetable", href: "/dashboard/teacher/timetable" },
     { label: "Attendance", href: "/dashboard/teacher/attendance" },
+    { label: "Homework", href: "/dashboard/teacher/homework" },
     { label: "Grades", href: "/dashboard/teacher/grades" },
     { label: "Messages", href: "/dashboard/messages" },
     { label: "Announcements", href: "/dashboard/announcements" },

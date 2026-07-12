@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CreateStudentForm } from "@/components/CreateStudentForm";
 import { BulkCreateStudentsForm } from "@/components/BulkCreateStudentsForm";
 import { ResetPasswordButton } from "@/components/ResetPasswordButton";
+import { DeactivateUserButton } from "@/components/DeactivateUserButton";
 import { SearchInput } from "@/components/SearchInput";
 
 const PAGE_SIZE = 25;
@@ -21,9 +22,6 @@ export default async function AdminStudentsPage({
   let matchingIds: string[] | null = null;
 
   if (q) {
-    // Two-step search: PostgREST can't filter a top-level table by a
-    // column on an embedded relation, so first find matching profile
-    // ids (name/email), then union with a direct admission_no match.
     const { data: matchingProfiles } = await supabase
       .from("profiles")
       .select("id")
@@ -45,7 +43,7 @@ export default async function AdminStudentsPage({
 
   let query = supabase
     .from("student_profiles")
-    .select("*, profiles(full_name, email), classes(name, arm)", { count: "exact" })
+    .select("*, profiles(full_name, email, is_active), classes(name, arm)", { count: "exact" })
     .order("admission_no", { ascending: true });
 
   if (matchingIds !== null) {
@@ -87,13 +85,19 @@ export default async function AdminStudentsPage({
         {students?.map((s) => {
           const profile = (s as any).profiles;
           const cls = (s as any).classes;
+          const isActive = profile?.is_active ?? true;
           return (
             <div
               key={s.id}
-              className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3"
+              className={`flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 ${
+                !isActive ? "opacity-60" : ""
+              }`}
             >
               <Link href={`/dashboard/admin/students/${s.id}`} className="flex-1 hover:opacity-80">
-                <p className="font-medium text-ink">{profile?.full_name}</p>
+                <p className="font-medium text-ink">
+                  {profile?.full_name}
+                  {!isActive && <span className="ml-2 text-xs font-normal text-clay">(deactivated)</span>}
+                </p>
                 <p className="text-sm text-ink-soft">{profile?.email}</p>
                 {s.admission_no && (
                   <p className="text-xs text-ink-soft">Admission no. {s.admission_no}</p>
@@ -104,6 +108,7 @@ export default async function AdminStudentsPage({
                   {cls ? `${cls.name} ${cls.arm ?? ""}` : "Unassigned"}
                 </span>
                 <ResetPasswordButton userId={s.id} />
+                <DeactivateUserButton userId={s.id} isActive={isActive} />
                 <Link
                   href={`/dashboard/admin/students/${s.id}`}
                   className="text-sm font-medium text-leaf hover:underline"
