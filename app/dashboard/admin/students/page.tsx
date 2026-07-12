@@ -3,24 +3,56 @@ import { createClient } from "@/lib/supabase/server";
 import { CreateStudentForm } from "@/components/CreateStudentForm";
 import { BulkCreateStudentsForm } from "@/components/BulkCreateStudentsForm";
 import { ResetPasswordButton } from "@/components/ResetPasswordButton";
+import { SearchInput } from "@/components/SearchInput";
 
 const PAGE_SIZE = 25;
 
 export default async function AdminStudentsPage({
   searchParams,
 }: {
-  searchParams: { page?: string };
+  searchParams: { page?: string; q?: string };
 }) {
   const supabase = createClient();
   const page = Math.max(1, Number(searchParams.page ?? 1));
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
+  const q = searchParams.q?.trim();
 
-  const { data: students, count } = await supabase
+  let matchingIds: string[] | null = null;
+
+  if (q) {
+    // Two-step search: PostgREST can't filter a top-level table by a
+    // column on an embedded relation, so first find matching profile
+    // ids (name/email), then union with a direct admission_no match.
+    const { data: matchingProfiles } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "student")
+      .or(`full_name.ilike.%${q}%,email.ilike.%${q}%`);
+
+    const { data: matchingByAdmission } = await supabase
+      .from("student_profiles")
+      .select("id")
+      .ilike("admission_no", `%${q}%`);
+
+    matchingIds = [
+      ...new Set([
+        ...(matchingProfiles ?? []).map((p) => p.id),
+        ...(matchingByAdmission ?? []).map((s) => s.id),
+      ]),
+    ];
+  }
+
+  let query = supabase
     .from("student_profiles")
     .select("*, profiles(full_name, email), classes(name, arm)", { count: "exact" })
-    .order("admission_no", { ascending: true })
-    .range(from, to);
+    .order("admission_no", { ascending: true });
+
+  if (matchingIds !== null) {
+    query = query.in("id", matchingIds.length ? matchingIds : ["00000000-0000-0000-0000-000000000000"]);
+  }
+
+  const { data: students, count } = await query.range(from, to);
 
   const { data: classes } = await supabase
     .from("classes")
@@ -37,13 +69,18 @@ export default async function AdminStudentsPage({
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Students</h1>
           <p className="text-sm text-ink-soft">
-            {count ?? 0} students enrolled · page {page} of {totalPages}
+            {count ?? 0} students{q ? ` matching "${q}"` : " enrolled"} · page {page} of{" "}
+            {totalPages}
           </p>
         </div>
         <div className="flex gap-2">
           <CreateStudentForm classes={classes ?? []} />
           <BulkCreateStudentsForm classes={classes ?? []} />
         </div>
+      </div>
+
+      <div className="mb-4">
+        <SearchInput placeholder="Search by name, email, or admission no." />
       </div>
 
       <div className="space-y-2">
@@ -79,14 +116,16 @@ export default async function AdminStudentsPage({
         })}
 
         {!students?.length && (
-          <p className="text-sm text-ink-soft">No students yet.</p>
+          <p className="text-sm text-ink-soft">
+            {q ? `No students match "${q}".` : "No students yet."}
+          </p>
         )}
       </div>
 
       {totalPages > 1 && (
         <div className="mt-6 flex items-center justify-center gap-3">
           <Link
-            href={`/dashboard/admin/students?page=${Math.max(1, page - 1)}`}
+            href={`/dashboard/admin/students?page=${Math.max(1, page - 1)}${q ? `&q=${q}` : ""}`}
             aria-disabled={page <= 1}
             className={`rounded-lg border border-rule px-3 py-1.5 text-sm ${
               page <= 1 ? "pointer-events-none opacity-40" : "text-ink hover:bg-white"
@@ -98,7 +137,7 @@ export default async function AdminStudentsPage({
             Page {page} of {totalPages}
           </span>
           <Link
-            href={`/dashboard/admin/students?page=${Math.min(totalPages, page + 1)}`}
+            href={`/dashboard/admin/students?page=${Math.min(totalPages, page + 1)}${q ? `&q=${q}` : ""}`}
             aria-disabled={page >= totalPages}
             className={`rounded-lg border border-rule px-3 py-1.5 text-sm ${
               page >= totalPages ? "pointer-events-none opacity-40" : "text-ink hover:bg-white"

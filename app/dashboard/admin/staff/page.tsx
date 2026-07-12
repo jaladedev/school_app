@@ -1,14 +1,41 @@
 import { createClient } from "@/lib/supabase/server";
 import { CreateTeacherForm } from "@/components/CreateTeacherForm";
 import { TeacherRow } from "@/components/TeacherRow";
+import { SearchInput } from "@/components/SearchInput";
 
-export default async function AdminStaffPage() {
+export default async function AdminStaffPage({
+  searchParams,
+}: {
+  searchParams: { q?: string };
+}) {
   const supabase = createClient();
+  const q = searchParams.q?.trim();
 
-  const { data: teachers } = await supabase
+  let matchingIds: string[] | null = null;
+
+  if (q) {
+    const { data: matchingProfiles } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "teacher")
+      .or(`full_name.ilike.%${q}%,email.ilike.%${q}%`);
+
+    matchingIds = (matchingProfiles ?? []).map((p) => p.id);
+  }
+
+  let teacherQuery = supabase
     .from("teacher_profiles")
     .select("*, profiles(full_name, email)")
     .order("id");
+
+  if (matchingIds !== null) {
+    teacherQuery = teacherQuery.in(
+      "id",
+      matchingIds.length ? matchingIds : ["00000000-0000-0000-0000-000000000000"]
+    );
+  }
+
+  const { data: teachers } = await teacherQuery;
 
   const { data: subjects } = await supabase
     .from("subjects")
@@ -23,10 +50,14 @@ export default async function AdminStaffPage() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Staff</h1>
           <p className="text-sm text-ink-soft">
-            {teachers?.length ?? 0} teachers on record.
+            {teachers?.length ?? 0} teachers{q ? ` matching "${q}"` : " on record"}.
           </p>
         </div>
         <CreateTeacherForm subjects={subjects ?? []} />
+      </div>
+
+      <div className="mb-4">
+        <SearchInput placeholder="Search by name or email" />
       </div>
 
       <div className="space-y-2">
@@ -47,7 +78,9 @@ export default async function AdminStaffPage() {
         })}
 
         {!teachers?.length && (
-          <p className="text-sm text-ink-soft">No teachers yet.</p>
+          <p className="text-sm text-ink-soft">
+            {q ? `No teachers match "${q}".` : "No teachers yet."}
+          </p>
         )}
       </div>
     </div>
