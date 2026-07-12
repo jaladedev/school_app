@@ -1,0 +1,81 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { AssignClassTeacherSelect } from "@/components/AssignClassTeacherSelect";
+import { EditClassForm } from "@/components/EditClassForm";
+import { formatLevel, type EducationLevel } from "@/types/database";
+
+export function ClassRow({
+  classId,
+  name,
+  arm,
+  educationLevel,
+  levelNumber,
+  academicYear,
+  isArchived,
+  studentCount,
+  currentTeacherId,
+  teachers,
+}: {
+  classId: string;
+  name: string;
+  arm: string | null;
+  educationLevel: EducationLevel;
+  levelNumber: number;
+  academicYear: string;
+  isArchived: boolean;
+  studentCount: number;
+  currentTeacherId: string | null;
+  teachers: { id: string; full_name: string }[];
+}) {
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <div className="rounded-lg border border-rule bg-white px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-medium text-ink">
+            {name} {arm}
+          </p>
+          <p className="text-sm text-ink-soft">
+            {formatLevel(educationLevel, levelNumber)} · {academicYear} · {studentCount} students
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div>
+            <p className="mb-1 text-xs text-ink-soft">Class teacher</p>
+            <AssignClassTeacherSelect
+              classId={classId}
+              currentTeacherId={currentTeacherId}
+              teachers={teachers}
+            />
+          </div>
+          <button
+            onClick={() => setEditing((prev) => !prev)}
+            className="text-sm font-medium text-leaf hover:underline"
+          >
+            {editing ? "Close" : "Edit"}
+          </button>
+          <Link
+            href={`/dashboard/admin/timetables/${classId}`}
+            className="text-sm font-medium text-leaf hover:underline"
+          >
+            View timetable →
+          </Link>
+        </div>
+      </div>
+
+      {editing && (
+        <EditClassForm
+          classId={classId}
+          currentName={name}
+          currentArm={arm}
+          currentAcademicYear={academicYear}
+          isArchived={isArchived}
+          onClose={() => setEditing(false)}
+        />
+      )}
+    </div>
+  );
+}

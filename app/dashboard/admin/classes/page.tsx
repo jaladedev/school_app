@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateClassForm } from "@/components/CreateClassForm";
-import { AssignClassTeacherSelect } from "@/components/AssignClassTeacherSelect";
-import { formatLevel } from "@/types/database";
+import { ClassRow } from "@/components/ClassRow";
 
 export default async function AdminClassesPage() {
   const supabase = createClient();
@@ -10,9 +9,15 @@ export default async function AdminClassesPage() {
   const { data: classes } = await supabase
     .from("classes")
     .select("*")
+    .eq("is_archived", false)
     .order("education_level", { ascending: true })
     .order("level_number", { ascending: true })
     .order("arm", { ascending: true });
+
+  const { count: archivedCount } = await supabase
+    .from("classes")
+    .select("id", { count: "exact", head: true })
+    .eq("is_archived", true);
 
   const { data: studentCounts } = await supabase
     .from("student_profiles")
@@ -39,7 +44,12 @@ export default async function AdminClassesPage() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Classes</h1>
           <p className="text-sm text-ink-soft">
-            {classes?.length ?? 0} classes across Primary, JSS and SS.
+            {classes?.length ?? 0} active classes.{" "}
+            {!!archivedCount && (
+              <Link href="/dashboard/admin/classes/archived" className="text-leaf hover:underline">
+                {archivedCount} archived →
+              </Link>
+            )}
           </p>
         </div>
         <CreateClassForm />
@@ -47,40 +57,23 @@ export default async function AdminClassesPage() {
 
       <div className="space-y-2">
         {classes?.map((cls) => (
-          <div
+          <ClassRow
             key={cls.id}
-            className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3"
-          >
-            <div>
-              <p className="font-medium text-ink">
-                {cls.name} {cls.arm}
-              </p>
-              <p className="text-sm text-ink-soft">
-                {formatLevel(cls.education_level, cls.level_number)} · {cls.academic_year} ·{" "}
-                {countByClass.get(cls.id) ?? 0} students
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div>
-                <p className="mb-1 text-xs text-ink-soft">Class teacher</p>
-                <AssignClassTeacherSelect
-                  classId={cls.id}
-                  currentTeacherId={cls.class_teacher_id}
-                  teachers={teachers}
-                />
-              </div>
-              <Link
-                href={`/dashboard/admin/timetables/${cls.id}`}
-                className="text-sm font-medium text-leaf hover:underline"
-              >
-                View timetable →
-              </Link>
-            </div>
-          </div>
+            classId={cls.id}
+            name={cls.name}
+            arm={cls.arm}
+            educationLevel={cls.education_level}
+            levelNumber={cls.level_number}
+            academicYear={cls.academic_year}
+            isArchived={cls.is_archived}
+            studentCount={countByClass.get(cls.id) ?? 0}
+            currentTeacherId={cls.class_teacher_id}
+            teachers={teachers}
+          />
         ))}
 
         {!classes?.length && (
-          <p className="text-sm text-ink-soft">No classes created yet.</p>
+          <p className="text-sm text-ink-soft">No active classes.</p>
         )}
       </div>
     </div>

@@ -62,6 +62,7 @@ export type ClassRow = {
   level_number: number;
   class_teacher_id: string | null;
   academic_year: string;
+  is_archived: boolean;
   created_at: string;
 };
 

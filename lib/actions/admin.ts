@@ -18,8 +18,6 @@ function generateTempPassword() {
   return `${word}-${num}-${words[Math.floor(Math.random() * words.length)]}`;
 }
 
-// Reads the school's current term/year, used to timestamp every
-// enrollment row written below.
 async function getCurrentTermYear(admin: ReturnType<typeof createAdminClient>) {
   const { data } = await admin
     .from("school_settings")
@@ -33,10 +31,6 @@ async function getCurrentTermYear(admin: ReturnType<typeof createAdminClient>) {
   };
 }
 
-// Records (or updates) an enrollment row for a student/class/term/year.
-// Upserted rather than plain-inserted since re-running this for the same
-// term (e.g. correcting a class right after creation) shouldn't create
-// duplicate history rows.
 async function recordEnrollment(
   admin: ReturnType<typeof createAdminClient>,
   studentId: string,
@@ -305,13 +299,53 @@ export async function reassignStudentClass(studentId: string, classId: string) {
   revalidatePath("/dashboard/admin/students");
 }
 
+// ---------- Edit student ----------
+
+export async function updateStudentAccount(input: {
+  studentId: string;
+  fullName: string;
+  admissionNo?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  classId?: string;
+}) {
+  await assertIsAdmin();
+  const admin = createAdminClient();
+
+  const { error: profileError } = await admin
+    .from("profiles")
+    .update({ full_name: input.fullName })
+    .eq("id", input.studentId);
+
+  if (profileError) throw new Error(profileError.message);
+
+  const { error: studentError } = await admin
+    .from("student_profiles")
+    .update({
+      admission_no: input.admissionNo || null,
+      guardian_name: input.guardianName || null,
+      guardian_phone: input.guardianPhone || null,
+      ...(input.classId ? { class_id: input.classId } : {}),
+    })
+    .eq("id", input.studentId);
+
+  if (studentError) throw new Error(studentError.message);
+
+  if (input.classId) {
+    await recordEnrollment(admin, input.studentId, input.classId);
+  }
+
+  revalidatePath(`/dashboard/admin/students/${input.studentId}`);
+  revalidatePath("/dashboard/admin/students");
+}
+
 // ---------- Promotion ----------
 
 export type PromotionOutcome = "promote" | "repeat" | "graduate";
 
 export async function promoteStudents(input: {
   studentIds: string[];
-  targetClassId: string | null; // null when outcome is "graduate"
+  targetClassId: string | null;
   outcome: PromotionOutcome;
 }) {
   await assertIsAdmin();
