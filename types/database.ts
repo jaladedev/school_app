@@ -3,6 +3,7 @@ export type NoteStatus = "draft" | "published" | "archived";
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disciplinary";
 export type AnnouncementAudience = "all" | "students" | "teachers" | "class";
+export type HomeworkStatus = "given" | "reviewed";
 export type ResourceType =
   | "image"
   | "diagram_mermaid"
@@ -146,6 +147,7 @@ export type Lesson = {
   lesson_date: string;
   objectives: string | null;
   homework: string | null;
+  homework_status: HomeworkStatus;
   created_at: string;
 };
 

@@ -12,7 +12,9 @@ export default async function StudentHomeworkPage() {
 
   const { data: lessons } = await supabase
     .from("lessons")
-    .select("id, lesson_date, homework, curriculum_topics(title, subject_id), timetable_entries(subjects(name))")
+    .select(
+      "id, lesson_date, homework, homework_status, curriculum_topics(title), timetable_entries(subjects(name))"
+    )
     .eq("class_id", studentProfile?.class_id ?? "")
     .not("homework", "is", null)
     .order("lesson_date", { ascending: false })
@@ -28,11 +30,22 @@ export default async function StudentHomeworkPage() {
       <div className="space-y-2">
         {lessons?.map((l: any) => (
           <div key={l.id} className="rounded-lg border border-rule bg-white p-4">
-            <div className="mb-1 flex items-center justify-between">
+            <div className="mb-1 flex items-center justify-between gap-3">
               <p className="font-medium text-ink">
                 {l.timetable_entries?.subjects?.name ?? "Lesson"}
               </p>
-              <span className="text-xs text-ink-soft">{l.lesson_date}</span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="text-xs text-ink-soft">{l.lesson_date}</span>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                    l.homework_status === "reviewed"
+                      ? "bg-leaf-soft text-leaf"
+                      : "bg-marigold/20 text-marigold-dark"
+                  }`}
+                >
+                  {l.homework_status === "reviewed" ? "Reviewed" : "Given"}
+                </span>
+              </div>
             </div>
             {l.curriculum_topics?.title && (
               <p className="mb-1 text-xs text-ink-soft">{l.curriculum_topics.title}</p>

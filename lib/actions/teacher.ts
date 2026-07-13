@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
-import type { AttendanceStatus } from "@/types/database";
+import type { AttendanceStatus, HomeworkStatus } from "@/types/database";
 
 // ---------- Lessons ----------
 
@@ -21,8 +21,6 @@ export async function createLesson(input: {
 
   const supabase = createClient();
 
-  // Confirm this teacher actually owns the timetable slot being logged
-  // against — same pre-check pattern as grades/attendance.
   const { data: entry } = await supabase
     .from("timetable_entries")
     .select("teacher_id, class_id, classes(name, arm)")
@@ -57,6 +55,34 @@ export async function createLesson(input: {
   revalidatePath("/dashboard/teacher");
   revalidatePath("/dashboard/teacher/attendance");
   return { lessonId: lesson.id };
+}
+
+export async function updateHomeworkStatus(lessonId: string, status: HomeworkStatus) {
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== "teacher") {
+    throw new Error("Only teachers can update homework status.");
+  }
+
+  const supabase = createClient();
+
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("teacher_id")
+    .eq("id", lessonId)
+    .single();
+
+  if (!lesson || lesson.teacher_id !== profile.id) {
+    throw new Error("You aren't the teacher assigned to this lesson.");
+  }
+
+  const { error } = await supabase
+    .from("lessons")
+    .update({ homework_status: status })
+    .eq("id", lessonId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/teacher/homework");
 }
 
 // ---------- Attendance ----------
