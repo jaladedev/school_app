@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateStudentForm } from "@/components/CreateStudentForm";
 import { BulkCreateStudentsForm } from "@/components/BulkCreateStudentsForm";
+import { ExportStudentsButton } from "@/components/ExportStudentsButton";
 import { ResetPasswordButton } from "@/components/ResetPasswordButton";
 import { DeactivateUserButton } from "@/components/DeactivateUserButton";
 import { SearchInput } from "@/components/SearchInput";
@@ -72,6 +73,7 @@ export default async function AdminStudentsPage({
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportStudentsButton />
           <CreateStudentForm classes={classes ?? []} />
           <BulkCreateStudentsForm classes={classes ?? []} />
         </div>

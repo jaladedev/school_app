@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { formatLevel } from "@/types/database";
+import { StudentDashboardCards } from "@/components/StudentDashboardCards";
 
 export default async function StudentHome() {
   const profile = await getCurrentProfile();
@@ -36,6 +37,8 @@ export default async function StudentHome() {
           : "Your class"}{" "}
         — pick a subject to browse topics and notes.
       </p>
+
+      <StudentDashboardCards />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {subjects?.map((subject) => (

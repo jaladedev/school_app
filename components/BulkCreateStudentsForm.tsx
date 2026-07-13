@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { createStudentsBulk, type BulkStudentResult } from "@/lib/actions/admin";
 
 type PasswordStrategy = "auto" | "shared";
@@ -31,9 +31,29 @@ export function BulkCreateStudentsForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<BulkStudentResult[] | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parsed = parseRows(raw);
   const invalidRows = parsed.filter((r) => !r.fullName || !r.email);
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      // A CSV export/file may have a header row ("Full Name,Email,...")
+      // — drop it if the first line doesn't look like a real email entry.
+      const lines = text.split("\n");
+      const looksLikeHeader = lines[0] && !lines[0].includes("@");
+      setRaw(looksLikeHeader ? lines.slice(1).join("\n") : text);
+    };
+    reader.readAsText(file);
+
+    // Reset so selecting the same file again still fires onChange.
+    e.target.value = "";
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,7 +61,7 @@ export function BulkCreateStudentsForm({
     setResults(null);
 
     if (!parsed.length) {
-      setError("Paste at least one student row first.");
+      setError("Paste at least one student row, or upload a CSV file.");
       return;
     }
     if (invalidRows.length) {
@@ -91,10 +111,26 @@ export function BulkCreateStudentsForm({
         </select>
 
         <div>
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            One student per line: Full Name, Email, Admission No (optional), Guardian
-            Name (optional), Guardian Phone (optional)
-          </p>
+          <div className="mb-1 flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+              One student per line: Full Name, Email, Admission No (optional), Guardian
+              Name (optional), Guardian Phone (optional)
+            </p>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="shrink-0 rounded-lg border border-rule px-2 py-1 text-xs font-medium text-ink hover:bg-paper"
+            >
+              Upload CSV
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </div>
           <textarea
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
