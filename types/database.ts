@@ -4,6 +4,8 @@ export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disciplinary";
 export type AnnouncementAudience = "all" | "students" | "teachers" | "class";
 export type HomeworkStatus = "given" | "reviewed";
+export type InvoiceStatus = "unpaid" | "partial" | "paid";
+export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
 export type ResourceType =
   | "image"
   | "diagram_mermaid"
@@ -18,6 +20,12 @@ export function formatLevel(level: EducationLevel, levelNumber: number): string 
   if (level === "primary") return `Primary ${levelNumber}`;
   if (level === "jss") return `JSS ${levelNumber}`;
   return `SS ${levelNumber}`;
+}
+
+// Kobo (integer) -> Naira display string, e.g. 1234500 -> "₦12,345.00"
+export function formatKobo(kobo: number): string {
+  const naira = kobo / 100;
+  return `₦${naira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 type GenericRelationship = {
@@ -244,6 +252,43 @@ export function scoreToLetterGrade(percent: number, scale: GradeScaleEntry[]): s
   return sorted[sorted.length - 1]?.grade ?? "—";
 }
 
+export type FeeStructure = {
+  id: string;
+  education_level: EducationLevel;
+  level_number: number;
+  term: number;
+  academic_year: string;
+  title: string;
+  amount_kobo: number;
+  due_date: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type Invoice = {
+  id: string;
+  student_id: string;
+  fee_structure_id: string;
+  term: number;
+  academic_year: string;
+  total_amount_kobo: number;
+  discount_kobo: number;
+  amount_paid_kobo: number;
+  status: InvoiceStatus;
+  created_at: string;
+};
+
+export type Payment = {
+  id: string;
+  invoice_id: string;
+  student_id: string;
+  amount_kobo: number;
+  method: PaymentMethod;
+  reference: string | null;
+  verified_by: string | null;
+  paid_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -359,6 +404,24 @@ export type Database = {
         Row: SchoolSettings;
         Insert: Partial<SchoolSettings>;
         Update: Partial<SchoolSettings>;
+        Relationships: GenericRelationship[];
+      };
+      fee_structures: {
+        Row: FeeStructure;
+        Insert: Partial<FeeStructure>;
+        Update: Partial<FeeStructure>;
+        Relationships: GenericRelationship[];
+      };
+      invoices: {
+        Row: Invoice;
+        Insert: Partial<Invoice>;
+        Update: Partial<Invoice>;
+        Relationships: GenericRelationship[];
+      };
+      payments: {
+        Row: Payment;
+        Insert: Partial<Payment>;
+        Update: Partial<Payment>;
         Relationships: GenericRelationship[];
       };
     };
