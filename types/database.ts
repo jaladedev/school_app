@@ -28,14 +28,6 @@ export function formatKobo(kobo: number): string {
   return `₦${naira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-type GenericRelationship = {
-  foreignKeyName: string;
-  columns: string[];
-  isOneToOne?: boolean;
-  referencedRelation: string;
-  referencedColumns: string[];
-};
-
 export type Profile = {
   id: string;
   role: UserRole;
@@ -297,133 +289,453 @@ export type Database = {
         Row: Profile;
         Insert: Partial<Profile>;
         Update: Partial<Profile>;
-        Relationships: GenericRelationship[];
+        Relationships: [];
       };
       student_profiles: {
         Row: StudentProfile;
         Insert: Partial<StudentProfile>;
         Update: Partial<StudentProfile>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "student_profiles_id_fkey";
+            columns: ["id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fk_student_class";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       teacher_profiles: {
         Row: TeacherProfile;
         Insert: Partial<TeacherProfile>;
         Update: Partial<TeacherProfile>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "teacher_profiles_id_fkey";
+            columns: ["id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       classes: {
         Row: ClassRow;
         Insert: Partial<ClassRow>;
         Update: Partial<ClassRow>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "classes_class_teacher_id_fkey";
+            columns: ["class_teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "teacher_profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       enrollments: {
         Row: Enrollment;
         Insert: Partial<Enrollment>;
         Update: Partial<Enrollment>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "enrollments_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "enrollments_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       subjects: {
         Row: Subject;
         Insert: Partial<Subject>;
         Update: Partial<Subject>;
-        Relationships: GenericRelationship[];
+        Relationships: [];
       };
       curriculum_topics: {
         Row: CurriculumTopic;
         Insert: Partial<CurriculumTopic>;
         Update: Partial<CurriculumTopic>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "curriculum_topics_subject_id_fkey";
+            columns: ["subject_id"];
+            isOneToOne: false;
+            referencedRelation: "subjects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "curriculum_topics_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       topic_notes: {
         Row: TopicNote;
         Insert: Partial<TopicNote>;
         Update: Partial<TopicNote>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "topic_notes_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "curriculum_topics";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "topic_notes_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       topic_resources: {
         Row: TopicResource;
         Insert: Partial<TopicResource>;
         Update: Partial<TopicResource>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "topic_resources_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "curriculum_topics";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "topic_resources_note_id_fkey";
+            columns: ["note_id"];
+            isOneToOne: false;
+            referencedRelation: "topic_notes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "topic_resources_uploaded_by_fkey";
+            columns: ["uploaded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       timetable_entries: {
         Row: TimetableEntry;
         Insert: Partial<TimetableEntry>;
         Update: Partial<TimetableEntry>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "timetable_entries_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "timetable_entries_subject_id_fkey";
+            columns: ["subject_id"];
+            isOneToOne: false;
+            referencedRelation: "subjects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "timetable_entries_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "teacher_profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       lessons: {
         Row: Lesson;
         Insert: Partial<Lesson>;
         Update: Partial<Lesson>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "lessons_timetable_entry_id_fkey";
+            columns: ["timetable_entry_id"];
+            isOneToOne: false;
+            referencedRelation: "timetable_entries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lessons_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "curriculum_topics";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lessons_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lessons_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "teacher_profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       attendance: {
         Row: Attendance;
         Insert: Partial<Attendance>;
         Update: Partial<Attendance>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "attendance_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: false;
+            referencedRelation: "lessons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_marked_by_fkey";
+            columns: ["marked_by"];
+            isOneToOne: false;
+            referencedRelation: "teacher_profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       assessments: {
         Row: Assessment;
         Insert: Partial<Assessment>;
         Update: Partial<Assessment>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "assessments_subject_id_fkey";
+            columns: ["subject_id"];
+            isOneToOne: false;
+            referencedRelation: "subjects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "assessments_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "assessments_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "teacher_profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       grades: {
         Row: Grade;
         Insert: Partial<Grade>;
         Update: Partial<Grade>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "grades_assessment_id_fkey";
+            columns: ["assessment_id"];
+            isOneToOne: false;
+            referencedRelation: "assessments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grades_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grades_graded_by_fkey";
+            columns: ["graded_by"];
+            isOneToOne: false;
+            referencedRelation: "teacher_profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       student_notes: {
         Row: StudentNote;
         Insert: Partial<StudentNote>;
         Update: Partial<StudentNote>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "student_notes_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_notes_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       announcements: {
         Row: Announcement;
         Insert: Partial<Announcement>;
         Update: Partial<Announcement>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "announcements_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "announcements_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       messages: {
         Row: Message;
         Insert: Partial<Message>;
         Update: Partial<Message>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "messages_sender_id_fkey";
+            columns: ["sender_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "messages_recipient_id_fkey";
+            columns: ["recipient_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       report_card_remarks: {
         Row: ReportCardRemark;
         Insert: Partial<ReportCardRemark>;
         Update: Partial<ReportCardRemark>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "report_card_remarks_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "report_card_remarks_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       school_settings: {
         Row: SchoolSettings;
         Insert: Partial<SchoolSettings>;
         Update: Partial<SchoolSettings>;
-        Relationships: GenericRelationship[];
+        Relationships: [];
       };
       fee_structures: {
         Row: FeeStructure;
         Insert: Partial<FeeStructure>;
         Update: Partial<FeeStructure>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "fee_structures_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       invoices: {
         Row: Invoice;
         Insert: Partial<Invoice>;
         Update: Partial<Invoice>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "invoices_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_fee_structure_id_fkey";
+            columns: ["fee_structure_id"];
+            isOneToOne: false;
+            referencedRelation: "fee_structures";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       payments: {
         Row: Payment;
         Insert: Partial<Payment>;
         Update: Partial<Payment>;
-        Relationships: GenericRelationship[];
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_verified_by_fkey";
+            columns: ["verified_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
     };
     Views: Record<string, never>;

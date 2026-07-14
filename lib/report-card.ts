@@ -40,6 +40,27 @@ export type ReportCardData = {
   remark: { classTeacherRemark: string | null; adminRemark: string | null } | null;
 };
 
+type StudentProfileWithProfile = {
+  id: string;
+  admission_no: string | null;
+  class_id: string | null;
+  profiles: { full_name: string } | null;
+};
+
+type AssessmentWithSubject = {
+  id: string;
+  subject_id: string;
+  max_score: number;
+  weight_percent: number | null;
+  subjects: { name: string } | null;
+};
+
+type LessonWithTimetableEntry = {
+  id: string;
+  timetable_entry_id: string;
+  timetable_entries: { term: number; academic_year: string } | null;
+};
+
 function computeSubjectPercent(
   studentId: string,
   assessmentIds: string[],
@@ -80,7 +101,7 @@ export async function getReportCardData(
   academicYear: string
 ): Promise<ReportCardData | null> {
   const supabase = createClient();
-  
+
   const admin = createAdminClient();
 
   const { data: settings } = await supabase
@@ -95,7 +116,8 @@ export async function getReportCardData(
     .from("student_profiles")
     .select("id, admission_no, class_id, profiles(full_name)")
     .eq("id", studentId)
-    .single();
+    .single()
+    .returns<StudentProfileWithProfile>();
 
   if (!studentProfile || !studentProfile.class_id) return null;
 
@@ -119,7 +141,8 @@ export async function getReportCardData(
     .select("id, subject_id, max_score, weight_percent, subjects(name)")
     .eq("class_id", classId)
     .eq("term", term)
-    .eq("academic_year", academicYear);
+    .eq("academic_year", academicYear)
+    .returns<AssessmentWithSubject[]>();
 
   const assessmentIds = (assessments ?? []).map((a) => a.id);
 
@@ -145,7 +168,7 @@ export async function getReportCardData(
   >();
 
   for (const a of assessments ?? []) {
-    const subjectName = (a as any).subjects?.name ?? "Unknown";
+    const subjectName = a.subjects?.name ?? "Unknown";
     if (!subjectMap.has(a.subject_id)) {
       subjectMap.set(a.subject_id, {
         name: subjectName,
@@ -220,11 +243,12 @@ export async function getReportCardData(
   const { data: lessons } = await admin
     .from("lessons")
     .select("id, timetable_entry_id, timetable_entries(term, academic_year)")
-    .eq("class_id", classId);
+    .eq("class_id", classId)
+    .returns<LessonWithTimetableEntry[]>();
 
   const relevantLessonIds = (lessons ?? [])
     .filter(
-      (l: any) =>
+      (l) =>
         l.timetable_entries?.term === term && l.timetable_entries?.academic_year === academicYear
     )
     .map((l) => l.id);
@@ -261,7 +285,7 @@ export async function getReportCardData(
   return {
     student: {
       id: studentId,
-      fullName: (studentProfile as any).profiles?.full_name ?? "Unknown",
+      fullName: studentProfile.profiles?.full_name ?? "Unknown",
       admissionNo: studentProfile.admission_no,
     },
     className: `${classRow?.name ?? ""} ${classRow?.arm ?? ""}`.trim(),
