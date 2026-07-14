@@ -1,6 +1,6 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
-import { formatKobo } from "@/types/database";
-import type { InvoiceStatus } from "@/types/database";
+import { formatKobo, type InvoiceStatus } from "@/types/database";
+import { PaystackPayButton } from "@/components/PaystackPayButton";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-leaf-soft text-leaf",
@@ -45,6 +45,7 @@ export default async function StudentFeesPage() {
           const feeStructure = (inv as any).fee_structures;
           const owed = inv.total_amount_kobo - inv.discount_kobo;
           const balance = owed - inv.amount_paid_kobo;
+          const status = inv.status as InvoiceStatus;
 
           return (
             <div key={inv.id} className="rounded-lg border border-rule bg-white p-4">
@@ -56,8 +57,8 @@ export default async function StudentFeesPage() {
                     {feeStructure?.due_date && ` · Due ${feeStructure.due_date}`}
                   </p>
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[inv.status as InvoiceStatus]}`}>
-                  {inv.status}
+                <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}>
+                  {status}
                 </span>
               </div>
               <div className="mt-2 flex items-center justify-between text-sm">
@@ -68,6 +69,15 @@ export default async function StudentFeesPage() {
                   <span className="font-medium text-clay">{formatKobo(balance)} due</span>
                 )}
               </div>
+              {balance > 0 && (
+                <div className="mt-3">
+                  <PaystackPayButton
+                    invoiceId={inv.id}
+                    email={profile!.email}
+                    amountKobo={balance}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -78,8 +88,8 @@ export default async function StudentFeesPage() {
       </div>
 
       <p className="mt-6 text-xs text-ink-soft">
-        Payments are recorded by the school office once received. Contact admin if a payment
-        you've made isn't reflected here.
+        You can pay online by card above, or at the school office by cash or bank transfer —
+        office payments are recorded by staff and will show here once entered.
       </p>
     </div>
   );

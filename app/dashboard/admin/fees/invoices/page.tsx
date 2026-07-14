@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { formatKobo } from "@/types/database";
+import { formatKobo, type InvoiceStatus } from "@/types/database";
 import { RecordPaymentForm } from "@/components/RecordPaymentForm";
-import type { InvoiceStatus } from "@/types/database";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-leaf-soft text-leaf",
@@ -28,7 +27,6 @@ export default async function AdminInvoicesPage({
 
   const { data: invoices } = await query;
 
-  // Collection summary across ALL invoices, not just the filtered view.
   const { data: allInvoices } = await supabase
     .from("invoices")
     .select("total_amount_kobo, discount_kobo, amount_paid_kobo, status");
@@ -47,7 +45,8 @@ export default async function AdminInvoicesPage({
         Invoices & Payments
       </h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Record payments as they come in — cash, bank transfer, or other offline methods.
+        Record payments as they come in — cash, bank transfer, or other offline methods. Card
+        payments made online through the student portal are recorded automatically once verified.
       </p>
 
       <div className="mb-6 grid grid-cols-4 gap-3">
@@ -96,6 +95,7 @@ export default async function AdminInvoicesPage({
           const cls = studentProfile?.classes;
           const owed = inv.total_amount_kobo - inv.discount_kobo;
           const balance = owed - inv.amount_paid_kobo;
+          const status = inv.status as InvoiceStatus;
 
           return (
             <div key={inv.id} className="rounded-lg border border-rule bg-white p-4">
@@ -107,8 +107,8 @@ export default async function AdminInvoicesPage({
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[inv.status as InvoiceStatus]}`}>
-                    {inv.status}
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}>
+                    {status}
                   </span>
                   <p className="mt-1 text-sm text-ink">
                     {formatKobo(inv.amount_paid_kobo)} / {formatKobo(owed)}
@@ -118,7 +118,7 @@ export default async function AdminInvoicesPage({
                   )}
                 </div>
               </div>
-              {inv.status !== "paid" && <RecordPaymentForm invoiceId={inv.id} />}
+              {status !== "paid" && <RecordPaymentForm invoiceId={inv.id} />}
             </div>
           );
         })}

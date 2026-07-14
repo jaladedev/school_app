@@ -48,10 +48,6 @@ export async function createFeeStructure(input: {
   revalidatePath("/dashboard/admin/fees");
 }
 
-// Generates one invoice per student in the given class for this fee
-// structure. Uses upsert on the (student_id, fee_structure_id) unique
-// constraint so re-running for a class that already has invoices
-// doesn't create duplicates or wipe out recorded payments.
 export async function generateInvoicesForClass(feeStructureId: string, classId: string) {
   await assertIsAdmin();
   const admin = createAdminClient();
@@ -170,4 +166,103 @@ export async function applyDiscount(invoiceId: string, discountKobo: number) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin/fees");
+}
+
+// ---------- Paystack (student-initiated, server-verified) ----------
+
+// Called from the browser AFTER Paystack's inline popup reports success.
+// The popup callback is NOT trusted on its own — this re-verifies the
+// transaction directly with Paystack's API using the secret key (which
+// never leaves the server), and only credits the invoice if that
+// server-side check actually confirms a successful, correctly-sized
+// payment. This is the same trust model a webhook would use, just
+// triggered by the client instead of by Paystack calling back to you.
+export async function verifyPaystackPayment(input: { reference: string; invoiceId: string }) {
+  const profile = await getCurrentProfile();
+  if (!profile) throw new Error("You must be signed in.");
+
+  const admin = createAdminClient();
+
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("*")
+    .eq("id", input.invoiceId)
+    .single();
+
+  if (!invoice) throw new Error("Invoice not found.");
+
+  // A student can only ever verify a payment against their OWN invoice —
+  // this check runs before touching Paystack or writing anything.
+  if (invoice.student_id !== profile.id && profile.role !== "admin") {
+    throw new Error("You can't pay an invoice that isn't yours.");
+  }
+
+  // Idempotency: if this reference was already recorded, don't credit
+  // the invoice twice (e.g. the browser tab retrying after a network
+  // blip, or the user re-triggering the same callback).
+  const { data: existingPayment } = await admin
+    .from("payments")
+    .select("id")
+    .eq("reference", input.reference)
+    .maybeSingle();
+
+  if (existingPayment) {
+    return { alreadyRecorded: true };
+  }
+
+  const secretKey = process.env.PAYSTACK_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error("Paystack isn't configured on the server yet.");
+  }
+
+  const verifyResponse = await fetch(
+    `https://api.paystack.co/transaction/verify/${encodeURIComponent(input.reference)}`,
+    {
+      headers: { Authorization: `Bearer ${secretKey}` },
+    }
+  );
+
+  const verifyData = await verifyResponse.json();
+
+  if (!verifyResponse.ok || verifyData?.data?.status !== "success") {
+    throw new Error("Payment could not be verified with Paystack.");
+  }
+
+  // Paystack amounts are already in kobo for NGN transactions, matching
+  // this schema's convention — no conversion needed either direction.
+  const paidAmountKobo: number = verifyData.data.amount;
+  const owed = invoice.total_amount_kobo - invoice.discount_kobo;
+  const currentBalance = owed - invoice.amount_paid_kobo;
+
+  if (paidAmountKobo > currentBalance + 100) {
+    // Small tolerance for rounding; otherwise reject amounts that don't
+    // make sense against the actual outstanding balance.
+    throw new Error("The verified payment amount doesn't match what's owed on this invoice.");
+  }
+
+  const { error: paymentError } = await admin.from("payments").insert({
+    invoice_id: input.invoiceId,
+    student_id: invoice.student_id,
+    amount_kobo: paidAmountKobo,
+    method: "card",
+    reference: input.reference,
+    verified_by: null, // system-verified via Paystack, not a staff member
+  });
+
+  if (paymentError) throw new Error(paymentError.message);
+
+  const newPaidKobo = invoice.amount_paid_kobo + paidAmountKobo;
+  const newStatus = computeStatus(invoice.total_amount_kobo, invoice.discount_kobo, newPaidKobo);
+
+  const { error: invoiceError } = await admin
+    .from("invoices")
+    .update({ amount_paid_kobo: newPaidKobo, status: newStatus })
+    .eq("id", input.invoiceId);
+
+  if (invoiceError) throw new Error(invoiceError.message);
+
+  revalidatePath("/dashboard/student/fees");
+  revalidatePath("/dashboard/admin/fees/invoices");
+
+  return { alreadyRecorded: false, amountKobo: paidAmountKobo };
 }

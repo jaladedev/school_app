@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { scoreToLetterGrade, type GradeScaleEntry, type AttendanceStatus } from "@/types/database";
 
 function ordinal(n: number): string {
@@ -39,12 +40,6 @@ export type ReportCardData = {
   remark: { classTeacherRemark: string | null; adminRemark: string | null } | null;
 };
 
-// Computes one student's percentage for a subject from their assessment
-// scores. If EVERY assessment in the subject has a weight_percent set,
-// scores are weighted accordingly (score/max_score * weight_percent,
-// summed). Otherwise falls back to sum(score)/sum(max_score) * 100 —
-// this covers subjects where weights haven't been configured yet
-// without producing a nonsensical result.
 function computeSubjectPercent(
   studentId: string,
   assessmentIds: string[],
@@ -85,6 +80,8 @@ export async function getReportCardData(
   academicYear: string
 ): Promise<ReportCardData | null> {
   const supabase = createClient();
+  
+  const admin = createAdminClient();
 
   const { data: settings } = await supabase
     .from("school_settings")
@@ -94,7 +91,7 @@ export async function getReportCardData(
 
   const gradeScale: GradeScaleEntry[] = settings?.grade_scale ?? [];
 
-  const { data: studentProfile } = await supabase
+  const { data: studentProfile } = await admin
     .from("student_profiles")
     .select("id, admission_no, class_id, profiles(full_name)")
     .eq("id", studentId)
@@ -104,20 +101,20 @@ export async function getReportCardData(
 
   const classId = studentProfile.class_id;
 
-  const { data: classRow } = await supabase
+  const { data: classRow } = await admin
     .from("classes")
     .select("name, arm")
     .eq("id", classId)
     .single();
 
-  const { data: classmates } = await supabase
+  const { data: classmates } = await admin
     .from("student_profiles")
     .select("id")
     .eq("class_id", classId);
 
   const classmateIds = (classmates ?? []).map((c) => c.id);
 
-  const { data: assessments } = await supabase
+  const { data: assessments } = await admin
     .from("assessments")
     .select("id, subject_id, max_score, weight_percent, subjects(name)")
     .eq("class_id", classId)
@@ -126,11 +123,15 @@ export async function getReportCardData(
 
   const assessmentIds = (assessments ?? []).map((a) => a.id);
 
+  // Only APPROVED grades count toward a report card — pending grades
+  // (not yet moderated) shouldn't affect an official document or a
+  // classmate's ranking.
   const { data: allGrades } = assessmentIds.length
-    ? await supabase
+    ? await admin
         .from("grades")
         .select("assessment_id, student_id, score")
         .in("assessment_id", assessmentIds)
+        .eq("moderation_status", "approved")
     : { data: [] };
 
   const subjectMap = new Map<
@@ -216,7 +217,7 @@ export async function getReportCardData(
   const overallAverage = overallIndex >= 0 ? overallAverages[overallIndex] : null;
   const overallRank = overallIndex >= 0 ? overallRanks[overallIndex] : null;
 
-  const { data: lessons } = await supabase
+  const { data: lessons } = await admin
     .from("lessons")
     .select("id, timetable_entry_id, timetable_entries(term, academic_year)")
     .eq("class_id", classId);
@@ -229,7 +230,7 @@ export async function getReportCardData(
     .map((l) => l.id);
 
   const { data: attendanceRows } = relevantLessonIds.length
-    ? await supabase
+    ? await admin
         .from("attendance")
         .select("status")
         .eq("student_id", studentId)
@@ -249,7 +250,7 @@ export async function getReportCardData(
     attendance.total += 1;
   }
 
-  const { data: remark } = await supabase
+  const { data: remark } = await admin
     .from("report_card_remarks")
     .select("class_teacher_remark, admin_remark")
     .eq("student_id", studentId)

@@ -6,6 +6,7 @@ export type AnnouncementAudience = "all" | "students" | "teachers" | "class";
 export type HomeworkStatus = "given" | "reviewed";
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
+export type GradeModerationStatus = "pending" | "approved";
 export type ResourceType =
   | "image"
   | "diagram_mermaid"
@@ -22,7 +23,6 @@ export function formatLevel(level: EducationLevel, levelNumber: number): string 
   return `SS ${levelNumber}`;
 }
 
-// Kobo (integer) -> Naira display string, e.g. 1234500 -> "₦12,345.00"
 export function formatKobo(kobo: number): string {
   const naira = kobo / 100;
   return `₦${naira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -188,6 +188,7 @@ export type Grade = {
   remark: string | null;
   graded_by: string | null;
   graded_at: string;
+  moderation_status: GradeModerationStatus;
 };
 
 export type StudentNote = {
