@@ -32,7 +32,7 @@ export default async function TeacherGradesPage() {
 
   const classMap = new Map<string, { id: string; name: string; arm: string | null }>();
   for (const entry of timetableEntries ?? []) {
-    const cls = (entry as any).classes;
+    const cls = entry.classes;
     if (cls) classMap.set(cls.id, cls);
   }
   const classes = [...classMap.values()];
@@ -63,8 +63,8 @@ export default async function TeacherGradesPage() {
             <div>
               <p className="text-ink">{a.title}</p>
               <p className="text-xs text-ink-soft">
-                {(a as any).subjects?.name} · {(a as any).classes?.name}{" "}
-                {(a as any).classes?.arm} · Term {a.term}
+                {a.subjects?.name} · {a.classes?.name}{" "}
+                {a.classes?.arm} · Term {a.term}
               </p>
             </div>
             <span className="text-sm text-ink-soft">Max {a.max_score}</span>

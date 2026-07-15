@@ -78,7 +78,7 @@ export function TimetableEntryForm({
       .maybeSingle();
 
     if (teacherClash) {
-      const clashClass = (teacherClash as any).classes;
+      const clashClass = teacherClash.classes;
       setSaving(false);
       setError(
         `This teacher is already scheduled for ${clashClass?.name ?? "another class"} ${

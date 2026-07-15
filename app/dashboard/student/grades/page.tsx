@@ -12,7 +12,7 @@ export default async function StudentGradesPage() {
 
   const bySubject = new Map<string, typeof grades>();
   for (const g of grades ?? []) {
-    const subjectName = (g as any).assessments?.subjects?.name ?? "Unknown subject";
+    const subjectName = g.assessments?.subjects?.name ?? "Unknown subject";
     bySubject.set(subjectName, [...(bySubject.get(subjectName) ?? []), g]);
   }
 

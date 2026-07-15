@@ -79,7 +79,7 @@ export default async function AnnouncementsPage() {
             </div>
             <p className="mb-2 text-sm text-ink">{a.content}</p>
             <p className="text-xs text-ink-soft">
-              {(a as any).profiles?.full_name ?? "School"} ·{" "}
+              {a.profiles?.full_name ?? "School"} ·{" "}
               {a.audience === "class" ? "This class" : a.audience}
             </p>
           </div>

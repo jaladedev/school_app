@@ -14,7 +14,7 @@ export default async function GradeEntryPage({
     .eq("id", params.assessmentId)
     .single();
 
-  const classId = (assessment as any)?.classes?.id;
+  const classId = assessment?.classes?.id;
 
   const { data: roster } = await supabase
     .from("student_profiles")
@@ -38,7 +38,7 @@ export default async function GradeEntryPage({
   return (
     <div className="max-w-xl">
       <p className="mb-1 text-xs uppercase tracking-wide text-leaf">
-        {(assessment as any)?.classes?.name} {(assessment as any)?.classes?.arm}
+        {assessment?.classes?.name} {assessment?.classes?.arm}
       </p>
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">
         {assessment?.title}{" "}

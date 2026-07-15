@@ -21,7 +21,7 @@ export default async function AdminStudentNotesPage({
     note_type: n.note_type,
     content: n.content,
     created_at: n.created_at,
-    author_name: (n as any).profiles?.full_name ?? null,
+    author_name: n.profiles?.full_name ?? null,
   }));
 
   return (

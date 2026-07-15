@@ -32,7 +32,7 @@ export async function createLesson(input: {
   }
 
   if (entry.teacher_id !== profile.id) {
-    const className = (entry as any).classes?.name ?? "this class";
+    const className = entry.classes?.name ?? "this class";
     throw new Error(`You aren't assigned to this period for ${className}.`);
   }
 
@@ -109,7 +109,7 @@ export async function markAttendance(
   }
 
   if (lesson.teacher_id !== profile.id) {
-    const className = (lesson as any).classes?.name ?? "this class";
+    const className = lesson.classes?.name ?? "this class";
     throw new Error(`You aren't the teacher assigned to this lesson for ${className}.`);
   }
 
@@ -163,8 +163,8 @@ export async function saveGrade(
     .maybeSingle();
 
   if (!assignment) {
-    const subjectName = (assessment as any).subjects?.name ?? "this subject";
-    const className = (assessment as any).classes?.name ?? "this class";
+    const subjectName = assessment.subjects?.name ?? "this subject";
+    const className = assessment.classes?.name ?? "this class";
     throw new Error(
       `You aren't assigned to teach ${subjectName} for ${className}, so you can't enter grades for it.`
     );

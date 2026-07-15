@@ -27,7 +27,7 @@ export default async function TeacherNoteEditPage({
   return (
     <div>
       <p className="mb-1 text-xs uppercase tracking-wide text-leaf">
-        {(topic as any)?.subjects?.name} ·{" "}
+        {topic?.subjects?.name} ·{" "}
         {topic && formatLevel(topic.education_level, topic.level_number)} · Term{" "}
         {topic?.term}
       </p>

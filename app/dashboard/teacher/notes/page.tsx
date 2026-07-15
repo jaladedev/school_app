@@ -53,7 +53,7 @@ export default async function TeacherNotesPage() {
               <div>
                 <p className="text-ink">{topic.title}</p>
                 <p className="text-xs text-ink-soft">
-                  {(topic as any).subjects?.name} ·{" "}
+                  {topic.subjects?.name} ·{" "}
                   {formatLevel(topic.education_level, topic.level_number)} · Term{" "}
                   {topic.term}
                 </p>

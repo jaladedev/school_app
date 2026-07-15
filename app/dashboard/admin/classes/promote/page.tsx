@@ -22,7 +22,7 @@ export default async function PromoteStudentsPage() {
     if (!studentsBySourceClass[s.class_id]) studentsBySourceClass[s.class_id] = [];
     studentsBySourceClass[s.class_id].push({
       id: s.id,
-      full_name: (s as any).profiles?.full_name ?? "Unknown",
+      full_name: s.profiles?.full_name ?? "Unknown",
     });
   }
 

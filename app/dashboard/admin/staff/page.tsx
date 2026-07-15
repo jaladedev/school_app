@@ -62,7 +62,7 @@ export default async function AdminStaffPage({
 
       <div className="space-y-2">
         {teachers?.map((teacher) => {
-          const profile = (teacher as any).profiles;
+          const profile = teacher.profiles;
           const subjectIds = teacher.subjects_taught ?? [];
           return (
             <TeacherRow

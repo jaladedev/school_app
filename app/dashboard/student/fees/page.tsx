@@ -42,7 +42,7 @@ export default async function StudentFeesPage() {
 
       <div className="space-y-2">
         {invoices?.map((inv) => {
-          const feeStructure = (inv as any).fee_structures;
+          const feeStructure = inv.fee_structures;
           const owed = inv.total_amount_kobo - inv.discount_kobo;
           const balance = owed - inv.amount_paid_kobo;
           const status = inv.status as InvoiceStatus;

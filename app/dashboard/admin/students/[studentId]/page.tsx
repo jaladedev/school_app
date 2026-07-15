@@ -23,8 +23,8 @@ export default async function StudentInfoPage({
     .order("education_level", { ascending: true })
     .order("level_number", { ascending: true });
 
-  const profile = (student as any)?.profiles;
-  const cls = (student as any)?.classes;
+  const profile = student?.profiles;
+  const cls = student?.classes;
 
   return (
     <div>

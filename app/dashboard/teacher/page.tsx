@@ -34,8 +34,8 @@ export default async function TeacherHome() {
   // form can offer the right topic list without a query per row.
   const topicsByKey = new Map<string, { id: string; title: string }[]>();
   for (const entry of todaysEntries ?? []) {
-    const subj = (entry as any).subjects;
-    const cls = (entry as any).classes;
+    const subj = entry.subjects;
+    const cls = entry.classes;
     if (!subj || !cls) continue;
     const key = `${subj.id}:${cls.education_level}:${cls.level_number}`;
     if (topicsByKey.has(key)) continue;
@@ -59,8 +59,8 @@ export default async function TeacherHome() {
 
   const classMap = new Map<string, { name: string; arm: string | null; subjects: Set<string> }>();
   for (const e of allEntries ?? []) {
-    const cls = (e as any).classes;
-    const subj = (e as any).subjects;
+    const cls = e.classes;
+    const subj = e.subjects;
     if (!cls) continue;
     const key = e.class_id;
     if (!classMap.has(key)) {
@@ -80,8 +80,8 @@ export default async function TeacherHome() {
 
       <div className="mb-10 space-y-2">
         {todaysEntries?.map((entry) => {
-          const subj = (entry as any).subjects;
-          const cls = (entry as any).classes;
+          const subj = entry.subjects;
+          const cls = entry.classes;
           const key = `${subj?.id}:${cls?.education_level}:${cls?.level_number}`;
 
           return (

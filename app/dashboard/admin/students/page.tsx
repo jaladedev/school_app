@@ -85,8 +85,8 @@ export default async function AdminStudentsPage({
 
       <div className="space-y-2">
         {students?.map((s) => {
-          const profile = (s as any).profiles;
-          const cls = (s as any).classes;
+          const profile = s.profiles;
+          const cls = s.classes;
           const isActive = profile?.is_active ?? true;
           return (
             <div

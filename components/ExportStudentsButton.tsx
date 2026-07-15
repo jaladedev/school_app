@@ -30,8 +30,8 @@ export function ExportStudentsButton() {
 
     const headers = ["Full Name", "Email", "Admission No", "Class", "Guardian Name", "Guardian Phone"];
     const rows = students.map((s) => {
-      const profile = (s as any).profiles;
-      const cls = (s as any).classes;
+      const profile = s.profiles;
+      const cls = s.classes;
       return [
         profile?.full_name ?? "",
         profile?.email ?? "",

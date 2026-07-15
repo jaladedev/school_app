@@ -49,8 +49,8 @@ export default async function AdminGradesModerationPage() {
               <div>
                 <p className="font-medium text-ink">{a.title}</p>
                 <p className="text-xs text-ink-soft">
-                  {(a as any).subjects?.name} · {(a as any).classes?.name}{" "}
-                  {(a as any).classes?.arm} · Term {a.term} · {a.academic_year}
+                  {a.subjects?.name} · {a.classes?.name}{" "}
+                  {a.classes?.arm} · Term {a.term} · {a.academic_year}
                 </p>
                 <p className="mt-1 text-xs text-ink-soft">
                   {stats.total - stats.pending} of {stats.total} approved

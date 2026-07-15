@@ -90,7 +90,7 @@ export default async function AdminInvoicesPage({
 
       <div className="space-y-2">
         {invoices?.map((inv) => {
-          const studentProfile = (inv as any).student_profiles;
+          const studentProfile = inv.student_profiles;
           const profile = studentProfile?.profiles;
           const cls = studentProfile?.classes;
           const owed = inv.total_amount_kobo - inv.discount_kobo;
@@ -103,7 +103,7 @@ export default async function AdminInvoicesPage({
                 <div>
                   <p className="font-medium text-ink">{profile?.full_name ?? "Unknown"}</p>
                   <p className="text-xs text-ink-soft">
-                    {cls?.name} {cls?.arm} · {(inv as any).fee_structures?.title}
+                    {cls?.name} {cls?.arm} · {inv.fee_structures?.title}
                   </p>
                 </div>
                 <div className="text-right">

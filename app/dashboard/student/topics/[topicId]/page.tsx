@@ -37,7 +37,7 @@ export default async function TopicPage({
         href={`/dashboard/student/subjects/${topic?.subject_id}`}
         className="mb-4 inline-block text-sm text-leaf hover:underline"
       >
-        ← Back to {(topic as any)?.subjects?.name ?? "subject"}
+        ← Back to {topic?.subjects?.name ?? "subject"}
       </Link>
 
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">

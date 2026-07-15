@@ -15,7 +15,7 @@ export default async function AttendancePage({
     .eq("id", params.lessonId)
     .single();
 
-  const classId = (lesson as any)?.classes?.id;
+  const classId = lesson?.classes?.id;
 
   const { data: roster } = await supabase
     .from("student_profiles")
@@ -40,7 +40,7 @@ export default async function AttendancePage({
     <div className="max-w-xl">
       <p className="mb-1 text-xs uppercase tracking-wide text-leaf">Attendance</p>
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">
-        {(lesson as any)?.classes?.name} {(lesson as any)?.classes?.arm}
+        {lesson?.classes?.name} {lesson?.classes?.arm}
       </h1>
 
       {students.length ? (
