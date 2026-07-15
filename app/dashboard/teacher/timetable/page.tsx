@@ -1,15 +1,20 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 export default async function TeacherTimetablePage() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const { data: entries } = await supabase
     .from("timetable_entries")
     .select("*, classes(name, arm), subjects(name)")
-    .eq("teacher_id", profile!.id)
+    .eq("teacher_id", profile.id)
     .order("weekday", { ascending: true })
     .order("period_number", { ascending: true });
 

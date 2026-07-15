@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { LessonEntryRow } from "@/components/LessonEntryRow";
+import { redirect } from "next/navigation";
 
 const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export default async function TeacherHome() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const today = new Date();
@@ -15,14 +20,14 @@ export default async function TeacherHome() {
   const { data: todaysEntries } = await supabase
     .from("timetable_entries")
     .select("*, classes(id, name, arm, education_level, level_number), subjects(id, name)")
-    .eq("teacher_id", profile!.id)
+    .eq("teacher_id", profile.id)
     .eq("weekday", todayWeekday)
     .order("period_number", { ascending: true });
 
   const { data: lessons } = await supabase
     .from("lessons")
     .select("id, timetable_entry_id")
-    .eq("teacher_id", profile!.id)
+    .eq("teacher_id", profile.id)
     .eq("lesson_date", todayDate);
 
   const lessonByEntry = new Map(
@@ -55,7 +60,7 @@ export default async function TeacherHome() {
   const { data: allEntries } = await supabase
     .from("timetable_entries")
     .select("class_id, classes(name, arm, education_level, level_number), subjects(name)")
-    .eq("teacher_id", profile!.id);
+    .eq("teacher_id", profile.id);
 
   const classMap = new Map<string, { name: string; arm: string | null; subjects: Set<string> }>();
   for (const e of allEntries ?? []) {

@@ -1,15 +1,20 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { formatLevel } from "@/types/database";
+import { redirect } from "next/navigation";
 
 export default async function TeacherNotesPage() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const { data: teacherProfile } = await supabase
     .from("teacher_profiles")
     .select("subjects_taught")
-    .eq("id", profile!.id)
+    .eq("id", profile.id)
     .single();
 
   const subjectIds = teacherProfile?.subjects_taught ?? [];

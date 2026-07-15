@@ -2,15 +2,20 @@ import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { formatLevel } from "@/types/database";
 import { StudentDashboardCards } from "@/components/StudentDashboardCards";
+import { redirect } from "next/navigation";
 
 export default async function StudentHome() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const { data: studentProfile } = await supabase
     .from("student_profiles")
     .select("class_id")
-    .eq("id", profile!.id)
+    .eq("id", profile.id)
     .single();
 
   const { data: classRow } = await supabase

@@ -1,16 +1,21 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export async function StudentDashboardCards() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const { data: studentProfile } = await supabase
     .from("student_profiles")
     .select("class_id")
-    .eq("id", profile!.id)
+    .eq("id", profile.id)
     .single();
 
   const classId = studentProfile?.class_id;
@@ -31,7 +36,7 @@ export async function StudentDashboardCards() {
   const { data: attendanceRows } = await supabase
     .from("attendance")
     .select("status")
-    .eq("student_id", profile!.id);
+    .eq("student_id", profile.id);
 
   const total = attendanceRows?.length ?? 0;
   const present = (attendanceRows ?? []).filter((r) => r.status === "present").length;

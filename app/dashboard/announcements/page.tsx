@@ -1,5 +1,6 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { AnnouncementForm } from "@/components/AnnouncementForm";
+import { redirect } from "next/navigation";
 
 function timeAgo(dateStr: string) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -11,6 +12,10 @@ function timeAgo(dateStr: string) {
 
 export default async function AnnouncementsPage() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const canPost = profile?.role === "admin" || profile?.role === "teacher";
@@ -67,7 +72,7 @@ export default async function AnnouncementsPage() {
             Updates from the school, relevant to you.
           </p>
         </div>
-        {canPost && <AnnouncementForm authorId={profile!.id} classes={classes ?? []} />}
+        {canPost && <AnnouncementForm authorId={profile.id} classes={classes ?? []} />}
       </div>
 
       <div className="space-y-3">

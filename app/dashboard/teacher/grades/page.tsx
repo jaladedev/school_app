@@ -1,22 +1,27 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { CreateAssessmentForm } from "@/components/CreateAssessmentForm";
+import { redirect } from "next/navigation";
 
 export default async function TeacherGradesPage() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const { data: assessments } = await supabase
     .from("assessments")
     .select("*, classes(name, arm), subjects(name)")
-    .eq("created_by", profile!.id)
+    .eq("created_by", profile.id)
     .order("academic_year", { ascending: false })
     .order("term", { ascending: false });
 
   const { data: teacherProfile } = await supabase
     .from("teacher_profiles")
     .select("subjects_taught")
-    .eq("id", profile!.id)
+    .eq("id", profile.id)
     .single();
 
   const subjectIds = teacherProfile?.subjects_taught ?? [];
@@ -28,7 +33,7 @@ export default async function TeacherGradesPage() {
   const { data: timetableEntries } = await supabase
     .from("timetable_entries")
     .select("class_id, classes(id, name, arm)")
-    .eq("teacher_id", profile!.id);
+    .eq("teacher_id", profile.id);
 
   const classMap = new Map<string, { id: string; name: string; arm: string | null }>();
   for (const entry of timetableEntries ?? []) {
@@ -47,7 +52,7 @@ export default async function TeacherGradesPage() {
           </p>
         </div>
         <CreateAssessmentForm
-          teacherId={profile!.id}
+          teacherId={profile.id}
           subjects={subjects ?? []}
           classes={classes}
         />

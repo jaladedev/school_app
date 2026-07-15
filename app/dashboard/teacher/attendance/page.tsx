@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export default async function AttendanceLandingPage() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const today = new Date().toISOString().slice(0, 10);
@@ -10,7 +15,7 @@ export default async function AttendanceLandingPage() {
   const { data: lessons } = await supabase
     .from("lessons")
     .select("*, classes(name, arm), curriculum_topics(title, subject_id), timetable_entry_id")
-    .eq("teacher_id", profile!.id)
+    .eq("teacher_id", profile.id)
     .order("lesson_date", { ascending: false })
     .limit(30);
 

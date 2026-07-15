@@ -1,14 +1,19 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { StudentNotesList } from "@/components/StudentNotesList";
+import { redirect } from "next/navigation";
 
 export default async function StudentNotesPage() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const { data: notes } = await supabase
     .from("student_notes")
     .select("id, note_type, content, created_at, profiles(full_name)")
-    .eq("student_id", profile!.id)
+    .eq("student_id", profile.id)
     .eq("visible_to_student", true)
     .order("created_at", { ascending: false });
 

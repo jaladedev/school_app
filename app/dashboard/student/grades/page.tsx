@@ -1,13 +1,18 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export default async function StudentGradesPage() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const { data: grades } = await supabase
     .from("grades")
     .select("*, assessments(title, max_score, term, academic_year, subjects(name))")
-    .eq("student_id", profile!.id)
+    .eq("student_id", profile.id)
     .order("graded_at", { ascending: false });
 
   const bySubject = new Map<string, typeof grades>();

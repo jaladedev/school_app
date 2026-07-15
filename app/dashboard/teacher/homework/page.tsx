@@ -1,8 +1,13 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { HomeworkStatusToggle } from "@/components/HomeworkStatusToggle";
+import { redirect } from "next/navigation";
 
 export default async function TeacherHomeworkPage() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const { data: lessons } = await supabase
@@ -10,7 +15,7 @@ export default async function TeacherHomeworkPage() {
     .select(
       "id, lesson_date, homework, homework_status, classes(name, arm), curriculum_topics(title), timetable_entries(subjects(name))"
     )
-    .eq("teacher_id", profile!.id)
+    .eq("teacher_id", profile.id)
     .not("homework", "is", null)
     .order("lesson_date", { ascending: false })
     .limit(50);

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { markThreadRead } from "@/lib/actions/messages";
 import { MessageComposer } from "@/components/MessageComposer";
+import { redirect } from "next/navigation";
 
 export default async function MessageThreadPage({
   params,
@@ -9,6 +10,10 @@ export default async function MessageThreadPage({
   params: { userId: string };
 }) {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const { data: partner } = await supabase
@@ -21,7 +26,7 @@ export default async function MessageThreadPage({
     .from("messages")
     .select("id, sender_id, content, sent_at")
     .or(
-      `and(sender_id.eq.${profile!.id},recipient_id.eq.${params.userId}),and(sender_id.eq.${params.userId},recipient_id.eq.${profile!.id})`
+      `and(sender_id.eq.${profile.id},recipient_id.eq.${params.userId}),and(sender_id.eq.${params.userId},recipient_id.eq.${profile.id})`
     )
     .order("sent_at", { ascending: true });
 
@@ -43,7 +48,7 @@ export default async function MessageThreadPage({
 
       <div className="flex-1 space-y-2 overflow-y-auto rounded-lg border border-rule bg-white p-4">
         {messages?.map((m) => {
-          const isMine = m.sender_id === profile!.id;
+          const isMine = m.sender_id === profile.id;
           return (
             <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
               <div

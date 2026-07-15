@@ -1,6 +1,7 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { formatKobo, type InvoiceStatus } from "@/types/database";
 import { PaystackPayButton } from "@/components/PaystackPayButton";
+import { redirect } from "next/navigation";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-leaf-soft text-leaf",
@@ -10,12 +11,16 @@ const STATUS_STYLES: Record<InvoiceStatus, string> = {
 
 export default async function StudentFeesPage() {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const supabase = createClient();
 
   const { data: invoices } = await supabase
     .from("invoices")
     .select("*, fee_structures(title, due_date)")
-    .eq("student_id", profile!.id)
+    .eq("student_id", profile.id)
     .order("created_at", { ascending: false });
 
   const totalOwed = (invoices ?? []).reduce(
@@ -73,7 +78,7 @@ export default async function StudentFeesPage() {
                 <div className="mt-3">
                   <PaystackPayButton
                     invoiceId={inv.id}
-                    email={profile!.email}
+                    email={profile.email}
                     amountKobo={balance}
                   />
                 </div>

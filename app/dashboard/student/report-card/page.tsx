@@ -2,6 +2,7 @@ import { getCurrentProfile } from "@/lib/supabase/server";
 import { getReportCardData } from "@/lib/report-card";
 import { ReportCardView } from "@/components/ReportCardView";
 import { TermYearSelector } from "@/components/TermYearSelector";
+import { redirect } from "next/navigation";
 
 function defaultAcademicYear() {
   const now = new Date();
@@ -16,10 +17,14 @@ export default async function StudentReportCardPage({
   searchParams: { term?: string; year?: string };
 }) {
   const profile = await getCurrentProfile();
+
+  if (!profile) {
+    redirect("/login");
+  }
   const term = Number(searchParams.term ?? 1);
   const academicYear = searchParams.year ?? defaultAcademicYear();
 
-  const data = await getReportCardData(profile!.id, term, academicYear);
+  const data = await getReportCardData(profile.id, term, academicYear);
 
   return (
     <div>
