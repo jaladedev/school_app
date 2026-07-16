@@ -6,8 +6,9 @@ import { ExportStudentsButton } from "@/components/ExportStudentsButton";
 import { ResetPasswordButton } from "@/components/ResetPasswordButton";
 import { DeactivateUserButton } from "@/components/DeactivateUserButton";
 import { SearchInput } from "@/components/SearchInput";
+import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export default async function AdminStudentsPage({
   searchParams,
@@ -15,9 +16,8 @@ export default async function AdminStudentsPage({
   searchParams: { page?: string; q?: string };
 }) {
   const supabase = createClient();
-  const page = Math.max(1, Number(searchParams.page ?? 1));
-  const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
+  const page = parsePage(searchParams.page);
+  const { from, to } = pageRange(page, PAGE_SIZE);
   const q = searchParams.q?.trim();
 
   let matchingIds: string[] | null = null;
@@ -129,31 +129,12 @@ export default async function AdminStudentsPage({
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-center gap-3">
-          <Link
-            href={`/dashboard/admin/students?page=${Math.max(1, page - 1)}${q ? `&q=${q}` : ""}`}
-            aria-disabled={page <= 1}
-            className={`rounded-lg border border-rule px-3 py-1.5 text-sm ${
-              page <= 1 ? "pointer-events-none opacity-40" : "text-ink hover:bg-white"
-            }`}
-          >
-            Previous
-          </Link>
-          <span className="text-sm text-ink-soft">
-            Page {page} of {totalPages}
-          </span>
-          <Link
-            href={`/dashboard/admin/students?page=${Math.min(totalPages, page + 1)}${q ? `&q=${q}` : ""}`}
-            aria-disabled={page >= totalPages}
-            className={`rounded-lg border border-rule px-3 py-1.5 text-sm ${
-              page >= totalPages ? "pointer-events-none opacity-40" : "text-ink hover:bg-white"
-            }`}
-          >
-            Next
-          </Link>
-        </div>
-      )}
+      <Pagination
+        basePath="/dashboard/admin/students"
+        page={page}
+        totalPages={totalPages}
+        searchParams={{ q }}
+      />
     </div>
   );
 }

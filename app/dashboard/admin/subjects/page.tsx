@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { CreateSubjectForm } from "@/components/CreateSubjectForm";
 import { formatLevel, type EducationLevel } from "@/types/database";
+import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 
 const STAGE_ORDER: EducationLevel[] = ["primary", "jss", "sss"];
 const STAGE_LABELS: Record<EducationLevel, string> = {
@@ -9,15 +10,24 @@ const STAGE_LABELS: Record<EducationLevel, string> = {
   sss: "Senior Secondary (SS)",
 };
 
-export default async function AdminSubjectsPage() {
+export default async function AdminSubjectsPage({
+  searchParams,
+}: {
+  searchParams: { page?: string };
+}) {
   const supabase = createClient();
+  const page = parsePage(searchParams.page);
+  const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
-  const { data: subjects } = await supabase
+  const { data: subjects, count } = await supabase
     .from("subjects")
-    .select("*")
+    .select("*", { count: "exact" })
     .order("education_level", { ascending: true })
     .order("min_level_number", { ascending: true })
-    .order("name", { ascending: true });
+    .order("name", { ascending: true })
+    .range(from, to);
+
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / DEFAULT_PAGE_SIZE));
 
   const byStage = new Map<EducationLevel, typeof subjects>();
   for (const s of subjects ?? []) {
@@ -30,7 +40,7 @@ export default async function AdminSubjectsPage() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Subjects</h1>
           <p className="text-sm text-ink-soft">
-            {subjects?.length ?? 0} subjects across Primary, JSS and SS.
+            {count ?? 0} subjects across Primary, JSS and SS · page {page} of {totalPages}
           </p>
         </div>
         <CreateSubjectForm />
@@ -71,6 +81,8 @@ export default async function AdminSubjectsPage() {
       {!subjects?.length && (
         <p className="text-sm text-ink-soft">No subjects created yet.</p>
       )}
+
+      <Pagination basePath="/dashboard/admin/subjects" page={page} totalPages={totalPages} />
     </div>
   );
 }

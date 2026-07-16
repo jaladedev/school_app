@@ -25,10 +25,10 @@ export default async function AdminOverview() {
     .limit(5);
 
   const stats = [
-    { label: "Students", value: studentCount, href: "/dashboard/admin/classes" },
+    { label: "Students", value: studentCount, href: "/dashboard/admin/students" },
     { label: "Teachers", value: teacherCount, href: "/dashboard/admin/staff" },
     { label: "Classes", value: classCount, href: "/dashboard/admin/classes" },
-    { label: "Subjects", value: subjectCount, href: "/dashboard/admin/classes" },
+    { label: "Subjects", value: subjectCount, href: "/dashboard/admin/subjects" },
   ];
 
   return (

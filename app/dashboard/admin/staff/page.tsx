@@ -2,14 +2,17 @@ import { createClient } from "@/lib/supabase/server";
 import { CreateTeacherForm } from "@/components/CreateTeacherForm";
 import { TeacherRow } from "@/components/TeacherRow";
 import { SearchInput } from "@/components/SearchInput";
+import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 
 export default async function AdminStaffPage({
   searchParams,
 }: {
-  searchParams: { q?: string };
+  searchParams: { q?: string; page?: string };
 }) {
   const supabase = createClient();
   const q = searchParams.q?.trim();
+  const page = parsePage(searchParams.page);
+  const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   let matchingIds: string[] | null = null;
 
@@ -25,7 +28,7 @@ export default async function AdminStaffPage({
 
   let teacherQuery = supabase
     .from("teacher_profiles")
-    .select("*, profiles(full_name, email, is_active)")
+    .select("*, profiles(full_name, email, is_active)", { count: "exact" })
     .order("id");
 
   if (matchingIds !== null) {
@@ -35,7 +38,8 @@ export default async function AdminStaffPage({
     );
   }
 
-  const { data: teachers } = await teacherQuery;
+  const { data: teachers, count } = await teacherQuery.range(from, to);
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / DEFAULT_PAGE_SIZE));
 
   const { data: subjects } = await supabase
     .from("subjects")
@@ -50,7 +54,8 @@ export default async function AdminStaffPage({
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Staff</h1>
           <p className="text-sm text-ink-soft">
-            {teachers?.length ?? 0} teachers{q ? ` matching "${q}"` : " on record"}.
+            {count ?? 0} teachers{q ? ` matching "${q}"` : " on record"} · page {page} of{" "}
+            {totalPages}
           </p>
         </div>
         <CreateTeacherForm subjects={subjects ?? []} />
@@ -84,6 +89,13 @@ export default async function AdminStaffPage({
           </p>
         )}
       </div>
+
+      <Pagination
+        basePath="/dashboard/admin/staff"
+        page={page}
+        totalPages={totalPages}
+        searchParams={{ q }}
+      />
     </div>
   );
 }

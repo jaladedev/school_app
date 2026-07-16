@@ -1,8 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { ApproveAssessmentButton } from "@/components/ApproveAssessmentButton";
+import { Pagination, DEFAULT_PAGE_SIZE, parsePage } from "@/components/Pagination";
 
-export default async function AdminGradesModerationPage() {
+export default async function AdminGradesModerationPage({
+  searchParams,
+}: {
+  searchParams: { page?: string };
+}) {
   const supabase = createClient();
+  const page = parsePage(searchParams.page);
 
   const { data: assessments } = await supabase
     .from("assessments")
@@ -28,6 +34,9 @@ export default async function AdminGradesModerationPage() {
   }
 
   const withGrades = (assessments ?? []).filter((a) => statsByAssessment.has(a.id));
+  const totalPages = Math.max(1, Math.ceil(withGrades.length / DEFAULT_PAGE_SIZE));
+  const pageStart = (page - 1) * DEFAULT_PAGE_SIZE;
+  const pageItems = withGrades.slice(pageStart, pageStart + DEFAULT_PAGE_SIZE);
 
   return (
     <div>
@@ -39,7 +48,7 @@ export default async function AdminGradesModerationPage() {
       </p>
 
       <div className="space-y-2">
-        {withGrades.map((a) => {
+        {pageItems.map((a) => {
           const stats = statsByAssessment.get(a.id)!;
           return (
             <div
@@ -71,6 +80,12 @@ export default async function AdminGradesModerationPage() {
           <p className="text-sm text-ink-soft">No grades entered yet.</p>
         )}
       </div>
+
+      <Pagination
+        basePath="/dashboard/admin/grades"
+        page={page}
+        totalPages={totalPages}
+      />
     </div>
   );
 }

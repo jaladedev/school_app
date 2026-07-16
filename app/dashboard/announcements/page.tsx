@@ -1,6 +1,7 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { AnnouncementForm } from "@/components/AnnouncementForm";
 import { redirect } from "next/navigation";
+import { Pagination, DEFAULT_PAGE_SIZE, parsePage } from "@/components/Pagination";
 
 function timeAgo(dateStr: string) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -10,8 +11,13 @@ function timeAgo(dateStr: string) {
   return `${days} days ago`;
 }
 
-export default async function AnnouncementsPage() {
+export default async function AnnouncementsPage({
+  searchParams,
+}: {
+  searchParams: { page?: string };
+}) {
   const profile = await getCurrentProfile();
+  const page = parsePage(searchParams.page);
 
   if (!profile) {
     redirect("/login");
@@ -57,6 +63,10 @@ export default async function AnnouncementsPage() {
     return audienceFilter.includes(a.audience);
   });
 
+  const totalPages = Math.max(1, Math.ceil(visible.length / DEFAULT_PAGE_SIZE));
+  const pageStart = (page - 1) * DEFAULT_PAGE_SIZE;
+  const pageItems = visible.slice(pageStart, pageStart + DEFAULT_PAGE_SIZE);
+
   const { data: classes } = canPost
     ? await supabase.from("classes").select("id, name, arm").order("name")
     : { data: [] };
@@ -76,7 +86,7 @@ export default async function AnnouncementsPage() {
       </div>
 
       <div className="space-y-3">
-        {visible.map((a) => (
+        {pageItems.map((a) => (
           <div key={a.id} className="rounded-xl border border-rule bg-white p-4">
             <div className="mb-1 flex items-center justify-between">
               <p className="font-display text-lg font-semibold text-ink">{a.title}</p>
@@ -94,6 +104,12 @@ export default async function AnnouncementsPage() {
           <p className="text-sm text-ink-soft">No announcements yet.</p>
         )}
       </div>
+
+      <Pagination
+        basePath="/dashboard/announcements"
+        page={page}
+        totalPages={totalPages}
+      />
     </div>
   );
 }

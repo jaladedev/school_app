@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatKobo, type InvoiceStatus } from "@/types/database";
 import { RecordPaymentForm } from "@/components/RecordPaymentForm";
+import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-leaf-soft text-leaf",
@@ -11,21 +12,26 @@ const STATUS_STYLES: Record<InvoiceStatus, string> = {
 export default async function AdminInvoicesPage({
   searchParams,
 }: {
-  searchParams: { status?: string };
+  searchParams: { status?: string; page?: string };
 }) {
   const supabase = createClient();
   const statusFilter = searchParams.status;
+  const page = parsePage(searchParams.page);
+  const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   let query = supabase
     .from("invoices")
-    .select("*, student_profiles(profiles(full_name), classes(name, arm)), fee_structures(title)")
+    .select("*, student_profiles(profiles(full_name), classes(name, arm)), fee_structures(title)", {
+      count: "exact",
+    })
     .order("created_at", { ascending: false });
 
   if (statusFilter) {
-    query = query.eq("status", statusFilter as any);
+    query = query.eq("status", statusFilter as InvoiceStatus);
   }
 
-  const { data: invoices } = await query;
+  const { data: invoices, count } = await query.range(from, to);
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / DEFAULT_PAGE_SIZE));
 
   const { data: allInvoices } = await supabase
     .from("invoices")
@@ -127,6 +133,13 @@ export default async function AdminInvoicesPage({
           <p className="text-sm text-ink-soft">No invoices found.</p>
         )}
       </div>
+
+      <Pagination
+        basePath="/dashboard/admin/fees/invoices"
+        page={page}
+        totalPages={totalPages}
+        searchParams={{ status: statusFilter }}
+      />
     </div>
   );
 }

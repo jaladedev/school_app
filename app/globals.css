@@ -28,6 +28,15 @@ h4 {
   border-radius: 4px;
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   * {
@@ -89,5 +98,4 @@ h4 {
   body {
     background: white;
   }
-}
- 
+} 

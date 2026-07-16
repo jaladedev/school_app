@@ -1,16 +1,26 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatLevel } from "@/types/database";
 import { UnarchiveButton } from "@/components/UnarchiveButton";
+import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 
-export default async function ArchivedClassesPage() {
+export default async function ArchivedClassesPage({
+  searchParams,
+}: {
+  searchParams: { page?: string };
+}) {
   const supabase = createClient();
+  const page = parsePage(searchParams.page);
+  const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
-  const { data: classes } = await supabase
+  const { data: classes, count } = await supabase
     .from("classes")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("is_archived", true)
     .order("education_level", { ascending: true })
-    .order("level_number", { ascending: true });
+    .order("level_number", { ascending: true })
+    .range(from, to);
+
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / DEFAULT_PAGE_SIZE));
 
   return (
     <div>
@@ -44,6 +54,12 @@ export default async function ArchivedClassesPage() {
           <p className="text-sm text-ink-soft">No archived classes.</p>
         )}
       </div>
+
+      <Pagination
+        basePath="/dashboard/admin/classes/archived"
+        page={page}
+        totalPages={totalPages}
+      />
     </div>
   );
 }

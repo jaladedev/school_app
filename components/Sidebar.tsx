@@ -43,8 +43,8 @@ export function Sidebar({ role, fullName }: { role: UserRole; fullName: string }
   const items = NAV_BY_ROLE[role];
 
   return (
-    <aside className="flex h-screen w-56 flex-col justify-between border-r border-rule bg-paper px-4 py-6 print:hidden">
-      <div>
+    <aside className="sticky top-0 flex h-screen w-56 flex-col justify-between border-r border-rule bg-paper px-4 py-6 print:hidden">
+      <div className="min-h-0 overflow-y-auto">
         <div className="mb-8 px-2">
           <p className="font-display text-lg font-semibold text-ink">School</p>
           <p className="text-xs uppercase tracking-wide text-ink-soft">{role}</p>
@@ -61,7 +61,7 @@ export function Sidebar({ role, fullName }: { role: UserRole; fullName: string }
           ))}
         </nav>
       </div>
-      <div className="space-y-2 border-t border-rule px-2 pt-4">
+      <div className="shrink-0 space-y-2 border-t border-rule px-2 pt-4">
         <p className="text-sm text-ink-soft">{fullName}</p>
         <SignOutButton />
       </div>
