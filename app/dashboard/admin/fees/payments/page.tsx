@@ -61,7 +61,7 @@ export default async function AdminPaymentsPage({
                   {formatKobo(p.amount_kobo)}
                 </span>
                 <Link
-                  href={`/dashboard/fees/receipt/${p.id}`}
+                  href={`/dashboard/receipt/${p.id}`}
                   className="text-sm font-medium text-leaf hover:underline"
                 >
                   Receipt →

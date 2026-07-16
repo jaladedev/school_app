@@ -126,7 +126,7 @@ export default async function StudentFeesPage() {
             <div className="flex items-center gap-3">
               <span className="font-medium text-leaf">{formatKobo(p.amount_kobo)}</span>
               <Link
-                href={`/dashboard/fees/receipt/${p.id}`}
+                href={`/dashboard/receipt/${p.id}`}
                 className="text-xs font-medium text-leaf hover:underline"
               >
                 Receipt →
