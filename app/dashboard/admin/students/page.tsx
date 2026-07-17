@@ -48,7 +48,10 @@ export default async function AdminStudentsPage({
     .order("admission_no", { ascending: true });
 
   if (matchingIds !== null) {
-    query = query.in("id", matchingIds.length ? matchingIds : ["00000000-0000-0000-0000-000000000000"]);
+    query = query.in(
+      "id",
+      matchingIds.length ? matchingIds : ["00000000-0000-0000-0000-000000000000"]
+    );
   }
 
   const { data: students, count } = await query.range(from, to);
@@ -98,7 +101,9 @@ export default async function AdminStudentsPage({
               <Link href={`/dashboard/admin/students/${s.id}`} className="flex-1 hover:opacity-80">
                 <p className="font-medium text-ink">
                   {profile?.full_name}
-                  {!isActive && <span className="ml-2 text-xs font-normal text-clay">(deactivated)</span>}
+                  {!isActive && (
+                    <span className="ml-2 text-xs font-normal text-clay">(deactivated)</span>
+                  )}
                 </p>
                 <p className="text-sm text-ink-soft">{profile?.email}</p>
                 {s.admission_no && (

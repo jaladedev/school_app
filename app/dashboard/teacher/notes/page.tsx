@@ -49,9 +49,7 @@ export default async function TeacherNotesPage({
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        Curriculum notes
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Curriculum notes</h1>
       <p className="mb-6 text-sm text-ink-soft">
         Author or edit notes for topics in the subjects you teach.
       </p>
@@ -68,9 +66,8 @@ export default async function TeacherNotesPage({
               <div>
                 <p className="text-ink">{topic.title}</p>
                 <p className="text-xs text-ink-soft">
-                  {topic.subjects?.name} ·{" "}
-                  {formatLevel(topic.education_level, topic.level_number)} · Term{" "}
-                  {topic.term}
+                  {topic.subjects?.name} · {formatLevel(topic.education_level, topic.level_number)}{" "}
+                  · Term {topic.term}
                 </p>
               </div>
               <span
@@ -78,8 +75,8 @@ export default async function TeacherNotesPage({
                   status === "published"
                     ? "bg-leaf-soft text-leaf"
                     : status === "draft"
-                    ? "bg-marigold/20 text-marigold-dark"
-                    : "bg-rule text-ink-soft"
+                      ? "bg-marigold/20 text-marigold-dark"
+                      : "bg-rule text-ink-soft"
                 }`}
               >
                 {status}
@@ -95,11 +92,7 @@ export default async function TeacherNotesPage({
         )}
       </div>
 
-      <Pagination
-        basePath="/dashboard/teacher/notes"
-        page={page}
-        totalPages={totalPages}
-      />
+      <Pagination basePath="/dashboard/teacher/notes" page={page} totalPages={totalPages} />
     </div>
   );
 }

@@ -5,6 +5,7 @@ Next.js + Supabase frontend for the school management system (students, teachers
 ## Setup
 
 1. **Install dependencies**
+
    ```bash
    npm install
    ```

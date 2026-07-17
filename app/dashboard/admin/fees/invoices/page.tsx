@@ -51,9 +51,7 @@ export default async function AdminInvoicesPage({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <h1 className="font-display text-2xl font-semibold text-ink">
-          Invoices & Payments
-        </h1>
+        <h1 className="font-display text-2xl font-semibold text-ink">Invoices & Payments</h1>
         <div className="flex gap-2">
           <ExportDefaultersButton />
           <Link
@@ -96,7 +94,11 @@ export default async function AdminInvoicesPage({
         {["all", "unpaid", "partial", "paid"].map((s) => (
           <a
             key={s}
-            href={s === "all" ? "/dashboard/admin/fees/invoices" : `/dashboard/admin/fees/invoices?status=${s}`}
+            href={
+              s === "all"
+                ? "/dashboard/admin/fees/invoices"
+                : `/dashboard/admin/fees/invoices?status=${s}`
+            }
             className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize ${
               (statusFilter ?? "all") === s
                 ? "border-leaf bg-leaf-soft text-leaf"
@@ -127,7 +129,9 @@ export default async function AdminInvoicesPage({
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}
+                  >
                     {status}
                   </span>
                   <p className="mt-1 text-sm text-ink">
@@ -143,9 +147,7 @@ export default async function AdminInvoicesPage({
           );
         })}
 
-        {!invoices?.length && (
-          <EmptyState message="No invoices found." />
-        )}
+        {!invoices?.length && <EmptyState message="No invoices found." />}
       </div>
 
       <Pagination

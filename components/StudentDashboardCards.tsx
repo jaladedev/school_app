@@ -2,7 +2,16 @@ import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
-const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const WEEKDAY_NAMES = [
+  "",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 export async function StudentDashboardCards() {
   const profile = await getCurrentProfile();
@@ -48,15 +57,16 @@ export async function StudentDashboardCards() {
   const tomorrowWeekday = jsTomorrow === 0 ? 7 : jsTomorrow; // 1-7, Mon-Sun
   const isWeekendTomorrow = tomorrowWeekday === 6 || tomorrowWeekday === 7;
 
-  const { data: tomorrowEntries } = classId && !isWeekendTomorrow
-    ? await supabase
-        .from("timetable_entries")
-        .select("period_number, start_time, subjects(name)")
-        .eq("class_id", classId)
-        .eq("weekday", tomorrowWeekday)
-        .order("period_number", { ascending: true })
-        .limit(4)
-    : { data: [] };
+  const { data: tomorrowEntries } =
+    classId && !isWeekendTomorrow
+      ? await supabase
+          .from("timetable_entries")
+          .select("period_number, start_time, subjects(name)")
+          .eq("class_id", classId)
+          .eq("weekday", tomorrowWeekday)
+          .order("period_number", { ascending: true })
+          .limit(4)
+      : { data: [] };
 
   return (
     <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -75,24 +85,25 @@ export async function StudentDashboardCards() {
         ) : (
           <p className="text-sm text-ink-soft">Nothing pending.</p>
         )}
-        <Link href="/dashboard/student/homework" className="mt-2 inline-block text-xs text-leaf hover:underline">
+        <Link
+          href="/dashboard/student/homework"
+          className="mt-2 inline-block text-xs text-leaf hover:underline"
+        >
           View all →
         </Link>
       </div>
 
       <div className="rounded-xl border border-rule bg-white p-4">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
-          Attendance
-        </p>
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft">Attendance</p>
         <p
           className={`font-display text-2xl font-semibold ${
             attendancePercent === null
               ? "text-ink-soft"
               : attendancePercent >= 90
-              ? "text-leaf"
-              : attendancePercent >= 75
-              ? "text-marigold-dark"
-              : "text-clay"
+                ? "text-leaf"
+                : attendancePercent >= 75
+                  ? "text-marigold-dark"
+                  : "text-clay"
           }`}
         >
           {attendancePercent !== null ? `${attendancePercent}%` : "—"}
@@ -117,7 +128,10 @@ export async function StudentDashboardCards() {
         ) : (
           <p className="text-sm text-ink-soft">No periods scheduled.</p>
         )}
-        <Link href="/dashboard/student/timetable" className="mt-2 inline-block text-xs text-leaf hover:underline">
+        <Link
+          href="/dashboard/student/timetable"
+          className="mt-2 inline-block text-xs text-leaf hover:underline"
+        >
           Full timetable →
         </Link>
       </div>

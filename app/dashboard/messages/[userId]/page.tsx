@@ -5,11 +5,7 @@ import { MessageComposer } from "@/components/MessageComposer";
 import { RealtimeMessageThread } from "@/components/RealtimeMessageThread";
 import { redirect } from "next/navigation";
 
-export default async function MessageThreadPage({
-  params,
-}: {
-  params: { userId: string };
-}) {
+export default async function MessageThreadPage({ params }: { params: { userId: string } }) {
   const profile = await getCurrentProfile();
 
   if (!profile) {

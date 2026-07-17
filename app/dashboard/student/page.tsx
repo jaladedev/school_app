@@ -33,9 +33,7 @@ export default async function StudentHome() {
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        My subjects
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">My subjects</h1>
       <p className="mb-6 text-sm text-ink-soft">
         {classRow
           ? `${classRow.name} (${formatLevel(classRow.education_level, classRow.level_number)})`
@@ -52,9 +50,7 @@ export default async function StudentHome() {
             href={`/dashboard/student/subjects/${subject.id}`}
             className="rounded-xl border border-rule bg-white p-5 transition hover:border-leaf hover:shadow-sm"
           >
-            <p className="font-display text-lg font-semibold text-ink">
-              {subject.name}
-            </p>
+            <p className="font-display text-lg font-semibold text-ink">{subject.name}</p>
             {subject.description && (
               <p className="mt-1 text-sm text-ink-soft">{subject.description}</p>
             )}

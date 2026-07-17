@@ -22,10 +22,9 @@ export default async function AdminPaymentsPage({
 
   const { data: payments, count } = await supabase
     .from("payments")
-    .select(
-      "*, student_profiles(profiles(full_name)), invoices(fee_structures(title))",
-      { count: "exact" }
-    )
+    .select("*, student_profiles(profiles(full_name)), invoices(fee_structures(title))", {
+      count: "exact",
+    })
     .order("paid_at", { ascending: false })
     .range(from, to);
 
@@ -33,9 +32,7 @@ export default async function AdminPaymentsPage({
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        Payment History
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Payment History</h1>
       <p className="mb-6 text-sm text-ink-soft">
         {count ?? 0} payments recorded · page {page} of {totalPages}
       </p>
@@ -71,9 +68,7 @@ export default async function AdminPaymentsPage({
             </div>
           );
         })}
-        {!payments?.length && (
-          <EmptyState message="No payments recorded yet." />
-        )}
+        {!payments?.length && <EmptyState message="No payments recorded yet." />}
       </div>
 
       <Pagination basePath="/dashboard/admin/fees/payments" page={page} totalPages={totalPages} />

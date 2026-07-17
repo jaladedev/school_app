@@ -37,9 +37,7 @@ export function StudentNotesList({
             </span>
           </div>
           <p className="text-sm text-ink">{note.content}</p>
-          {note.author_name && (
-            <p className="mt-1 text-xs text-ink-soft">— {note.author_name}</p>
-          )}
+          {note.author_name && <p className="mt-1 text-xs text-ink-soft">— {note.author_name}</p>}
         </div>
       ))}
     </div>

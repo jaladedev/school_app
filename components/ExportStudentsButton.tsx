@@ -21,14 +21,23 @@ export function ExportStudentsButton() {
     // has open — an export limited to one page of 25 wouldn't be useful.
     const { data: students } = await supabase
       .from("student_profiles")
-      .select("admission_no, guardian_name, guardian_phone, profiles(full_name, email), classes(name, arm)")
+      .select(
+        "admission_no, guardian_name, guardian_phone, profiles(full_name, email), classes(name, arm)"
+      )
       .order("admission_no", { ascending: true });
 
     setLoading(false);
 
     if (!students) return;
 
-    const headers = ["Full Name", "Email", "Admission No", "Class", "Guardian Name", "Guardian Phone"];
+    const headers = [
+      "Full Name",
+      "Email",
+      "Admission No",
+      "Class",
+      "Guardian Name",
+      "Guardian Phone",
+    ];
     const rows = students.map((s) => {
       const profile = s.profiles;
       const cls = s.classes;

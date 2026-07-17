@@ -54,7 +54,10 @@ export function RecordPaymentForm({ invoiceId }: { invoiceId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-paper p-2">
+    <form
+      onSubmit={handleSubmit}
+      className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-paper p-2"
+    >
       <input
         type="number"
         step="0.01"

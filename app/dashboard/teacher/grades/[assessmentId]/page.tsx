@@ -3,11 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { GradeEntryForm } from "@/components/GradeEntryForm";
 import { EmptyState } from "@/components/EmptyState";
 
-export default async function GradeEntryPage({
-  params,
-}: {
-  params: { assessmentId: string };
-}) {
+export default async function GradeEntryPage({ params }: { params: { assessmentId: string } }) {
   const supabase = createClient();
 
   const { data: assessment } = await supabase
@@ -50,9 +46,7 @@ export default async function GradeEntryPage({
       </p>
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">
         {assessment?.title}{" "}
-        <span className="text-base font-normal text-ink-soft">
-          / {assessment?.max_score}
-        </span>
+        <span className="text-base font-normal text-ink-soft">/ {assessment?.max_score}</span>
       </h1>
 
       {students.length ? (

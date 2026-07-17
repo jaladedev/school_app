@@ -8,10 +8,8 @@ export default function RootError({
   reset: () => void;
 }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-paper text-center px-4">
-      <p className="mb-2 font-display text-xl font-semibold text-ink">
-        Something went wrong
-      </p>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-paper px-4 text-center">
+      <p className="mb-2 font-display text-xl font-semibold text-ink">Something went wrong</p>
       <p className="mb-6 max-w-sm text-sm text-ink-soft">
         {error.message || "An unexpected error occurred."}
       </p>

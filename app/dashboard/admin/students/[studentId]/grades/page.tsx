@@ -1,11 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/EmptyState";
 
-export default async function StudentGradesTabPage({
-  params,
-}: {
-  params: { studentId: string };
-}) {
+export default async function StudentGradesTabPage({ params }: { params: { studentId: string } }) {
   const supabase = createClient();
 
   const { data: grades } = await supabase
@@ -22,7 +18,6 @@ export default async function StudentGradesTabPage({
 
   return (
     <div>
-
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">Grades</h1>
 
       {[...bySubject.entries()].map(([subjectName, subjectGrades]) => (

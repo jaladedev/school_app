@@ -74,11 +74,9 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-notebook-lines bg-paper px-4">
+    <div className="flex min-h-screen items-center justify-center bg-paper bg-notebook-lines px-4">
       <div className="w-full max-w-sm rounded-2xl border border-rule bg-paper p-8 shadow-sm">
-        <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-          Set a new password
-        </h1>
+        <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Set a new password</h1>
         <p className="mb-6 text-sm text-ink-soft">
           For security, you need to choose your own password before continuing.
         </p>
@@ -101,10 +99,7 @@ export default function ChangePasswordPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="confirmPassword"
-              className="mb-1 block text-sm font-medium text-ink"
-            >
+            <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium text-ink">
               Confirm new password
             </label>
             <input

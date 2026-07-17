@@ -4,11 +4,7 @@ import { useState, useTransition } from "react";
 import { createTeacherAccount } from "@/lib/actions/admin";
 import { createTeacherSchema, fieldErrorsFrom } from "@/lib/validation";
 
-export function CreateTeacherForm({
-  subjects,
-}: {
-  subjects: { id: string; name: string }[];
-}) {
+export function CreateTeacherForm({ subjects }: { subjects: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -20,9 +16,7 @@ export function CreateTeacherForm({
   const [created, setCreated] = useState<string | null>(null);
 
   function toggleSubject(id: string) {
-    setSubjectIds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
-    );
+    setSubjectIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -122,11 +116,11 @@ export function CreateTeacherForm({
               {s.name}
             </button>
           ))}
-          {!subjects.length && (
-            <p className="text-xs text-ink-soft">No subjects created yet.</p>
-          )}
+          {!subjects.length && <p className="text-xs text-ink-soft">No subjects created yet.</p>}
         </div>
-        {fieldErrors.subjectIds && <p className="mt-1 text-xs text-clay">{fieldErrors.subjectIds}</p>}
+        {fieldErrors.subjectIds && (
+          <p className="mt-1 text-xs text-clay">{fieldErrors.subjectIds}</p>
+        )}
       </div>
 
       <div className="flex gap-2">
@@ -149,8 +143,8 @@ export function CreateTeacherForm({
       {error && <p className="text-sm text-clay">{error}</p>}
       {created && (
         <p className="text-sm text-leaf">
-          Account created for {created}. Share the temporary password with them directly —
-          it won't be shown again here.
+          Account created for {created}. Share the temporary password with them directly — it won't
+          be shown again here.
         </p>
       )}
     </form>

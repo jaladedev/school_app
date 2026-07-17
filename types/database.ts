@@ -7,13 +7,7 @@ export type HomeworkStatus = "given" | "reviewed";
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
 export type GradeModerationStatus = "pending" | "approved";
-export type ResourceType =
-  | "image"
-  | "diagram_mermaid"
-  | "video"
-  | "pdf"
-  | "link"
-  | "audio";
+export type ResourceType = "image" | "diagram_mermaid" | "video" | "pdf" | "link" | "audio";
 
 export type EducationLevel = "primary" | "jss" | "sss";
 
@@ -318,7 +312,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "classes";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       teacher_profiles: {
@@ -332,7 +326,7 @@ export type Database = {
             isOneToOne: true;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       guardian_links: {
@@ -353,7 +347,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "student_profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       classes: {
@@ -367,7 +361,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "teacher_profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       enrollments: {
@@ -388,7 +382,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "classes";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       subjects: {
@@ -415,7 +409,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       topic_notes: {
@@ -436,7 +430,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       topic_resources: {
@@ -464,7 +458,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       timetable_entries: {
@@ -492,7 +486,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "teacher_profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       lessons: {
@@ -527,7 +521,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "teacher_profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       attendance: {
@@ -555,7 +549,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "teacher_profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       assessments: {
@@ -583,7 +577,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "teacher_profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       grades: {
@@ -611,7 +605,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "teacher_profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       student_notes: {
@@ -632,7 +626,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       announcements: {
@@ -653,7 +647,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "classes";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       messages: {
@@ -674,7 +668,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       report_card_remarks: {
@@ -695,7 +689,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       school_settings: {
@@ -715,7 +709,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       invoices: {
@@ -736,7 +730,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "fee_structures";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       payments: {
@@ -764,7 +758,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
     };

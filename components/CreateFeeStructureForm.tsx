@@ -72,7 +72,10 @@ export function CreateFeeStructureForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mb-6 space-y-3 rounded-xl border border-rule bg-white p-4">
+    <form
+      onSubmit={handleSubmit}
+      className="mb-6 space-y-3 rounded-xl border border-rule bg-white p-4"
+    >
       <div className="grid grid-cols-2 gap-3">
         <input
           value={title}

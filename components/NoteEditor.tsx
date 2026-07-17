@@ -31,9 +31,7 @@ export function NoteEditor({
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-wide text-ink-soft">
-          Currently: {initialStatus}
-        </p>
+        <p className="text-xs uppercase tracking-wide text-ink-soft">Currently: {initialStatus}</p>
         <div className="flex gap-2">
           <button
             onClick={() => handleSave("draft")}
@@ -61,9 +59,7 @@ export function NoteEditor({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            Markdown
-          </p>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft">Markdown</p>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -73,9 +69,7 @@ export function NoteEditor({
           />
         </div>
         <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            Preview
-          </p>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft">Preview</p>
           <div className="topic-prose h-[calc(24*1.5rem)] overflow-y-auto rounded-lg border border-rule bg-white p-4">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
           </div>
@@ -83,8 +77,8 @@ export function NoteEditor({
       </div>
 
       <p className="mt-3 text-xs text-ink-soft">
-        Diagrams and other resources (images, Mermaid diagrams, videos) are attached
-        separately after publishing — this editor covers the written note and tables.
+        Diagrams and other resources (images, Mermaid diagrams, videos) are attached separately
+        after publishing — this editor covers the written note and tables.
       </p>
     </div>
   );

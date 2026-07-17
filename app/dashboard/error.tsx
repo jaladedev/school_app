@@ -9,9 +9,7 @@ export default function DashboardError({
 }) {
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
-      <p className="mb-2 font-display text-xl font-semibold text-ink">
-        Something went wrong
-      </p>
+      <p className="mb-2 font-display text-xl font-semibold text-ink">Something went wrong</p>
       <p className="mb-6 max-w-sm text-sm text-ink-soft">
         {error.message || "An unexpected error occurred loading this page."}
       </p>

@@ -25,10 +25,7 @@ export function CreateSubjectForm() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const levelNumbers = Array.from(
-    { length: LEVEL_OPTIONS[educationLevel].max },
-    (_, i) => i + 1
-  );
+  const levelNumbers = Array.from({ length: LEVEL_OPTIONS[educationLevel].max }, (_, i) => i + 1);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,9 +92,7 @@ export function CreateSubjectForm() {
       </div>
 
       <div>
-        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-          Stage
-        </p>
+        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">Stage</p>
         <div className="flex gap-2">
           {(Object.keys(LEVEL_OPTIONS) as EducationLevel[]).map((level) => (
             <button
@@ -122,9 +117,7 @@ export function CreateSubjectForm() {
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            From
-          </p>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">From</p>
           <select
             value={minLevel}
             onChange={(e) => setMinLevel(Number(e.target.value))}
@@ -138,9 +131,7 @@ export function CreateSubjectForm() {
           </select>
         </div>
         <div>
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            To
-          </p>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">To</p>
           <select
             value={maxLevel}
             onChange={(e) => setMaxLevel(Number(e.target.value))}

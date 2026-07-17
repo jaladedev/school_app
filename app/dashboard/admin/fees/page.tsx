@@ -64,9 +64,7 @@ export default async function AdminFeesPage() {
           );
         })}
 
-        {!structures?.length && (
-          <EmptyState message="No fee structures created yet." />
-        )}
+        {!structures?.length && <EmptyState message="No fee structures created yet." />}
       </div>
     </div>
   );

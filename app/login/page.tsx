@@ -35,11 +35,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-notebook-lines bg-paper px-4">
+    <div className="flex min-h-screen items-center justify-center bg-paper bg-notebook-lines px-4">
       <div className="w-full max-w-sm rounded-2xl border border-rule bg-paper p-8 shadow-sm">
-        <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-          Welcome back
-        </h1>
+        <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Welcome back</h1>
         <p className="mb-6 text-sm text-ink-soft">
           Sign in to view your timetable, lessons and notes.
         </p>

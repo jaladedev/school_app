@@ -20,15 +20,13 @@ export function AttendanceForm({
   students: { id: string; full_name: string }[];
   initialStatus: Record<string, AttendanceStatus>;
 }) {
-  const [statuses, setStatuses] = useState<Record<string, AttendanceStatus>>(
-    () => {
-      const base: Record<string, AttendanceStatus> = {};
-      for (const s of students) {
-        base[s.id] = initialStatus[s.id] ?? "present";
-      }
-      return base;
+  const [statuses, setStatuses] = useState<Record<string, AttendanceStatus>>(() => {
+    const base: Record<string, AttendanceStatus> = {};
+    for (const s of students) {
+      base[s.id] = initialStatus[s.id] ?? "present";
     }
-  );
+    return base;
+  });
   const [isPending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
@@ -71,9 +69,7 @@ export function AttendanceForm({
               {STATUS_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() =>
-                    setStatuses((prev) => ({ ...prev, [student.id]: opt.value }))
-                  }
+                  onClick={() => setStatuses((prev) => ({ ...prev, [student.id]: opt.value }))}
                   className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
                     statuses[student.id] === opt.value
                       ? "bg-leaf text-white"

@@ -60,9 +60,7 @@ export default async function StudentHomeworkPage() {
           </div>
         ))}
 
-        {!lessons?.length && (
-          <EmptyState message="No homework given yet." />
-        )}
+        {!lessons?.length && <EmptyState message="No homework given yet." />}
       </div>
     </div>
   );

@@ -41,7 +41,9 @@ export function TeacherRow({
   }
 
   return (
-    <div className={`rounded-lg border border-rule bg-white px-4 py-3 ${!isActive ? "opacity-60" : ""}`}>
+    <div
+      className={`rounded-lg border border-rule bg-white px-4 py-3 ${!isActive ? "opacity-60" : ""}`}
+    >
       <div className="flex items-center justify-between">
         <div className="flex-1">
           {editingName ? (
@@ -75,7 +77,9 @@ export function TeacherRow({
               <Link href={`/dashboard/admin/staff/${teacherId}`} className="hover:underline">
                 {fullName}
               </Link>
-              {!isActive && <span className="ml-2 text-xs font-normal text-clay">(deactivated)</span>}{" "}
+              {!isActive && (
+                <span className="ml-2 text-xs font-normal text-clay">(deactivated)</span>
+              )}{" "}
               <button
                 onClick={() => setEditingName(true)}
                 className="text-xs font-normal text-ink-soft hover:underline"

@@ -2,11 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/Sidebar";
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
 
   if (!profile) {

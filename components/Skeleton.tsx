@@ -1,21 +1,12 @@
 function SkeletonBlock({ className = "" }: { className?: string }) {
-  return (
-    <div
-      className={`animate-pulse rounded-md bg-rule/60 ${className}`}
-      aria-hidden="true"
-    />
-  );
+  return <div className={`animate-pulse rounded-md bg-rule/60 ${className}`} aria-hidden="true" />;
 }
 
 // Matches the subject/class card grids (student subjects page, admin
 // classes overview) — a grid of bordered boxes with a title + subtitle line.
 export function SkeletonCardGrid({ count = 6 }: { count?: number }) {
   return (
-    <div
-      role="status"
-      aria-label="Loading"
-      className="grid grid-cols-2 gap-4 sm:grid-cols-3"
-    >
+    <div role="status" aria-label="Loading" className="grid grid-cols-2 gap-4 sm:grid-cols-3">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="rounded-xl border border-rule bg-white p-5">
           <SkeletonBlock className="mb-2 h-5 w-3/4" />

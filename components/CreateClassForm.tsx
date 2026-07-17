@@ -87,9 +87,7 @@ export function CreateClassForm() {
       className="mb-6 space-y-3 rounded-xl border border-rule bg-white p-4"
     >
       <div>
-        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-          Stage
-        </p>
+        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">Stage</p>
         <div className="flex gap-2">
           {(Object.keys(LEVEL_OPTIONS) as EducationLevel[]).map((level) => (
             <button

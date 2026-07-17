@@ -46,10 +46,7 @@ function generateTempPassword() {
 // gives a clear, specific error instead of surfacing Auth's raw message,
 // and avoids an auth.admin.createUser call (and the compensating cleanup
 // path) we already know will fail.
-async function assertEmailAvailable(
-  admin: ReturnType<typeof createAdminClient>,
-  email: string
-) {
+async function assertEmailAvailable(admin: ReturnType<typeof createAdminClient>, email: string) {
   const { data: existing } = await admin
     .from("profiles")
     .select("id")

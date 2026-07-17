@@ -27,12 +27,8 @@ export default async function StudentNotesPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        My notes
-      </h1>
-      <p className="mb-6 text-sm text-ink-soft">
-        Notes from your teachers and school admin.
-      </p>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">My notes</h1>
+      <p className="mb-6 text-sm text-ink-soft">Notes from your teachers and school admin.</p>
 
       <StudentNotesList notes={formattedNotes} />
     </div>

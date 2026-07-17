@@ -78,10 +78,7 @@ export function GradeEntryForm({
   return (
     <div className="space-y-2">
       {students.map((student) => (
-        <div
-          key={student.id}
-          className="rounded-lg border border-rule bg-white px-4 py-3"
-        >
+        <div key={student.id} className="rounded-lg border border-rule bg-white px-4 py-3">
           <div className="flex items-center justify-between">
             <span className="text-ink">{student.full_name}</span>
             <div className="flex items-center gap-2">
@@ -90,9 +87,7 @@ export function GradeEntryForm({
                 min={0}
                 max={maxScore}
                 value={scores[student.id]}
-                onChange={(e) =>
-                  setScores((prev) => ({ ...prev, [student.id]: e.target.value }))
-                }
+                onChange={(e) => setScores((prev) => ({ ...prev, [student.id]: e.target.value }))}
                 className="w-20 rounded-md border border-rule px-2 py-1 text-sm outline-none focus-visible:border-marigold"
                 placeholder={`/ ${maxScore}`}
               />
@@ -103,18 +98,14 @@ export function GradeEntryForm({
               >
                 {isPending ? "Saving…" : "Save"}
               </button>
-              {savedId === student.id && (
-                <span className="text-xs text-leaf">Saved</span>
-              )}
+              {savedId === student.id && <span className="text-xs text-leaf">Saved</span>}
             </div>
           </div>
 
           <div className="mt-2 flex items-center gap-2">
             <input
               value={remarks[student.id]}
-              onChange={(e) =>
-                setRemarks((prev) => ({ ...prev, [student.id]: e.target.value }))
-              }
+              onChange={(e) => setRemarks((prev) => ({ ...prev, [student.id]: e.target.value }))}
               placeholder="Remark (optional)"
               className="flex-1 rounded-md border border-rule px-2 py-1 text-xs outline-none focus-visible:border-marigold"
             />

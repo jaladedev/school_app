@@ -34,12 +34,10 @@ export default async function PromoteStudentsPage() {
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        Promote students
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Promote students</h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Move selected students to a new class, have them repeat, or graduate them.
-        Uses the current academic year/term from School Settings.
+        Move selected students to a new class, have them repeat, or graduate them. Uses the current
+        academic year/term from School Settings.
       </p>
 
       {classes?.length ? (

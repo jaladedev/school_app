@@ -25,12 +25,10 @@ export default async function ArchivedClassesPage({
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        Archived classes
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Archived classes</h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Historical data (grades, attendance, enrollments) is preserved — archiving just hides
-        a class from the active list.
+        Historical data (grades, attendance, enrollments) is preserved — archiving just hides a
+        class from the active list.
       </p>
 
       <div className="space-y-2">
@@ -51,9 +49,7 @@ export default async function ArchivedClassesPage({
           </div>
         ))}
 
-        {!classes?.length && (
-          <EmptyState message="No archived classes." />
-        )}
+        {!classes?.length && <EmptyState message="No archived classes." />}
       </div>
 
       <Pagination

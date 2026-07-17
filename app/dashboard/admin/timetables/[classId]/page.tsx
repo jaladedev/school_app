@@ -58,10 +58,7 @@ export default async function ClassTimetablePage({
 
   const termsWithData = [...new Set((termCounts ?? []).map((t) => t.term))].sort();
 
-  const { data: subjects } = await supabase
-    .from("subjects")
-    .select("id, name")
-    .order("name");
+  const { data: subjects } = await supabase.from("subjects").select("id, name").order("name");
 
   const { data: teacherProfiles } = await supabase
     .from("teacher_profiles")
@@ -135,16 +132,11 @@ export default async function ClassTimetablePage({
             </h2>
             <div className="space-y-2">
               {entriesByDay.get(day)?.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="rounded-lg border border-rule bg-white p-3 text-sm"
-                >
+                <div key={entry.id} className="rounded-lg border border-rule bg-white p-3 text-sm">
                   <p className="font-medium text-ink">
                     P{entry.period_number} · {entry.subjects?.name}
                   </p>
-                  <p className="text-ink-soft">
-                    {entry.teacher_profiles?.profiles?.full_name}
-                  </p>
+                  <p className="text-ink-soft">{entry.teacher_profiles?.profiles?.full_name}</p>
                   <p className="text-xs text-ink-soft">
                     {entry.start_time}–{entry.end_time}
                     {entry.room ? ` · ${entry.room}` : ""}

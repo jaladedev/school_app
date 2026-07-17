@@ -50,8 +50,8 @@ export default async function AnnouncementsPage({
     profile?.role === "student"
       ? ["all", "students"]
       : profile?.role === "teacher"
-      ? ["all", "teachers"]
-      : ["all", "students", "teachers", "class"];
+        ? ["all", "teachers"]
+        : ["all", "students", "teachers", "class"];
 
   const { data: announcements } = await supabase
     .from("announcements")
@@ -76,12 +76,8 @@ export default async function AnnouncementsPage({
     <div className="max-w-2xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">
-            Announcements
-          </h1>
-          <p className="text-sm text-ink-soft">
-            Updates from the school, relevant to you.
-          </p>
+          <h1 className="font-display text-2xl font-semibold text-ink">Announcements</h1>
+          <p className="text-sm text-ink-soft">Updates from the school, relevant to you.</p>
         </div>
         {canPost && <AnnouncementForm authorId={profile.id} classes={classes ?? []} />}
       </div>
@@ -101,16 +97,10 @@ export default async function AnnouncementsPage({
           </div>
         ))}
 
-        {!visible.length && (
-          <EmptyState message="No announcements yet." />
-        )}
+        {!visible.length && <EmptyState message="No announcements yet." />}
       </div>
 
-      <Pagination
-        basePath="/dashboard/announcements"
-        page={page}
-        totalPages={totalPages}
-      />
+      <Pagination basePath="/dashboard/announcements" page={page} totalPages={totalPages} />
     </div>
   );
 }

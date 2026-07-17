@@ -36,9 +36,7 @@ export default async function TeacherProfilePage({
     .eq("id", 1)
     .single();
 
-  const term = searchParams.term
-    ? Number(searchParams.term)
-    : settings?.current_term ?? 1;
+  const term = searchParams.term ? Number(searchParams.term) : (settings?.current_term ?? 1);
   const selectedTerm = TERMS.includes(term) ? term : 1;
 
   const { data: teacherProfile } = await supabase
@@ -106,7 +104,10 @@ export default async function TeacherProfilePage({
 
   return (
     <div className="max-w-2xl">
-      <Link href="/dashboard/admin/staff" className="mb-4 inline-block text-sm text-leaf hover:underline">
+      <Link
+        href="/dashboard/admin/staff"
+        className="mb-4 inline-block text-sm text-leaf hover:underline"
+      >
         ← Back to staff
       </Link>
 
@@ -187,9 +188,7 @@ export default async function TeacherProfilePage({
               {s.name}
             </span>
           ))}
-          {!subjects?.length && (
-            <EmptyState message="No subjects assigned yet." />
-          )}
+          {!subjects?.length && <EmptyState message="No subjects assigned yet." />}
         </div>
       </div>
 
@@ -205,9 +204,7 @@ export default async function TeacherProfilePage({
             >
               <div>
                 <p className="text-sm font-medium text-ink">{info.className}</p>
-                <p className="text-xs text-ink-soft">
-                  {[...info.subjectNames].join(", ")}
-                </p>
+                <p className="text-xs text-ink-soft">{[...info.subjectNames].join(", ")}</p>
               </div>
               <div className="text-right text-sm text-ink-soft">
                 {info.periodCount} period{info.periodCount === 1 ? "" : "s"} ·{" "}
@@ -216,9 +213,7 @@ export default async function TeacherProfilePage({
             </div>
           ))}
           {!byClass.size && (
-            <p className="text-sm text-ink-soft">
-              Not scheduled in any timetable yet.
-            </p>
+            <p className="text-sm text-ink-soft">Not scheduled in any timetable yet.</p>
           )}
         </div>
       </div>
@@ -244,9 +239,7 @@ export default async function TeacherProfilePage({
               </span>
             </div>
           ))}
-          {!entries?.length && (
-            <EmptyState message="No timetable entries yet." />
-          )}
+          {!entries?.length && <EmptyState message="No timetable entries yet." />}
         </div>
       </div>
     </div>

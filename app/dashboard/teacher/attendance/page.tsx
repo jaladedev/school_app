@@ -100,12 +100,8 @@ export default async function AttendanceLandingPage({
 
   return (
     <div className="max-w-xl">
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        Attendance
-      </h1>
-      <p className="mb-6 text-sm text-ink-soft">
-        Select a lesson to mark or review attendance.
-      </p>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Attendance</h1>
+      <p className="mb-6 text-sm text-ink-soft">Select a lesson to mark or review attendance.</p>
 
       <h2 className="mb-3 font-display text-lg font-semibold text-ink">Today</h2>
       <div className="mb-8 space-y-2">
@@ -113,9 +109,7 @@ export default async function AttendanceLandingPage({
           <LessonRow key={lesson.id} lesson={lesson} />
         ))}
         {!todaysLessons?.length && (
-          <p className="text-sm text-ink-soft">
-            No lessons logged for today yet.
-          </p>
+          <p className="text-sm text-ink-soft">No lessons logged for today yet.</p>
         )}
       </div>
 
@@ -124,16 +118,10 @@ export default async function AttendanceLandingPage({
         {(pastLessons ?? []).map((lesson) => (
           <LessonRow key={lesson.id} lesson={lesson} />
         ))}
-        {!pastLessons?.length && (
-          <EmptyState message="No earlier lessons found." />
-        )}
+        {!pastLessons?.length && <EmptyState message="No earlier lessons found." />}
       </div>
 
-      <Pagination
-        basePath="/dashboard/teacher/attendance"
-        page={page}
-        totalPages={totalPages}
-      />
+      <Pagination basePath="/dashboard/teacher/attendance" page={page} totalPages={totalPages} />
     </div>
   );
 }

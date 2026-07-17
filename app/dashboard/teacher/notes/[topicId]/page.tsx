@@ -3,11 +3,7 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { NoteEditor } from "@/components/NoteEditor";
 import { formatLevel } from "@/types/database";
 
-export default async function TeacherNoteEditPage({
-  params,
-}: {
-  params: { topicId: string };
-}) {
+export default async function TeacherNoteEditPage({ params }: { params: { topicId: string } }) {
   const profile = await getCurrentProfile();
   const supabase = createClient();
 
@@ -34,13 +30,10 @@ export default async function TeacherNoteEditPage({
         ← My subjects
       </Link>
       <p className="mb-1 text-xs uppercase tracking-wide text-leaf">
-        {topic?.subjects?.name} ·{" "}
-        {topic && formatLevel(topic.education_level, topic.level_number)} · Term{" "}
-        {topic?.term}
+        {topic?.subjects?.name} · {topic && formatLevel(topic.education_level, topic.level_number)}{" "}
+        · Term {topic?.term}
       </p>
-      <h1 className="mb-6 font-display text-2xl font-semibold text-ink">
-        {topic?.title}
-      </h1>
+      <h1 className="mb-6 font-display text-2xl font-semibold text-ink">{topic?.title}</h1>
 
       <NoteEditor
         topicId={params.topicId}

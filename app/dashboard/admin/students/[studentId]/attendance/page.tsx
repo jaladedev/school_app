@@ -2,11 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { AttendanceStatus } from "@/types/database";
 import { EmptyState } from "@/components/EmptyState";
 
-export default async function StudentAttendancePage({
-  params,
-}: {
-  params: { studentId: string };
-}) {
+export default async function StudentAttendancePage({ params }: { params: { studentId: string } }) {
   const supabase = createClient();
 
   const { data: rows } = await supabase
@@ -17,16 +13,15 @@ export default async function StudentAttendancePage({
     .limit(100);
 
   const summary: Record<AttendanceStatus, number> = { present: 0, absent: 0, late: 0, excused: 0 };
-    for (const r of rows ?? []) {
+  for (const r of rows ?? []) {
     const status = r.status as AttendanceStatus;
     summary[status] += 1;
-    }
+  }
   const total = rows?.length ?? 0;
   const percent = total > 0 ? Math.round((summary.present / total) * 1000) / 10 : null;
 
   return (
     <div>
-
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">Attendance</h1>
 
       <div className="mb-6 grid grid-cols-4 gap-3">
@@ -50,8 +45,8 @@ export default async function StudentAttendancePage({
 
       {percent !== null && (
         <p className="mb-6 text-sm text-ink-soft">
-          Overall attendance rate: <span className="font-medium text-ink">{percent}%</span>{" "}
-          across {total} recorded lessons.
+          Overall attendance rate: <span className="font-medium text-ink">{percent}%</span> across{" "}
+          {total} recorded lessons.
         </p>
       )}
 
@@ -64,7 +59,9 @@ export default async function StudentAttendancePage({
             <div>
               <p className="text-ink">
                 {r.lessons?.classes?.name} {r.lessons?.classes?.arm}
-                {r.lessons?.curriculum_topics?.title ? ` — ${r.lessons.curriculum_topics.title}` : ""}
+                {r.lessons?.curriculum_topics?.title
+                  ? ` — ${r.lessons.curriculum_topics.title}`
+                  : ""}
               </p>
               <p className="text-xs text-ink-soft">{r.lessons?.lesson_date}</p>
             </div>
@@ -72,9 +69,7 @@ export default async function StudentAttendancePage({
           </div>
         ))}
 
-        {!rows?.length && (
-          <EmptyState message="No attendance records yet." />
-        )}
+        {!rows?.length && <EmptyState message="No attendance records yet." />}
       </div>
     </div>
   );

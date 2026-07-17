@@ -54,7 +54,12 @@ export function RealtimeInbox({
             if (existing) {
               const updated = prev.map((c) =>
                 c.partnerId === row.sender_id
-                  ? { ...c, lastMessage: row.content, lastSentAt: row.sent_at, unread: c.unread + 1 }
+                  ? {
+                      ...c,
+                      lastMessage: row.content,
+                      lastSentAt: row.sent_at,
+                      unread: c.unread + 1,
+                    }
                   : c
               );
               return updated.sort(

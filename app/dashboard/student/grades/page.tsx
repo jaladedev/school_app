@@ -24,18 +24,14 @@ export default async function StudentGradesPage() {
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        My grades
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">My grades</h1>
       <p className="mb-6 text-sm text-ink-soft">
         Scores from assessments across all your subjects.
       </p>
 
       {[...bySubject.entries()].map(([subjectName, subjectGrades]) => (
         <div key={subjectName} className="mb-8">
-          <h2 className="mb-3 font-display text-lg font-semibold text-ink">
-            {subjectName}
-          </h2>
+          <h2 className="mb-3 font-display text-lg font-semibold text-ink">{subjectName}</h2>
           <div className="space-y-2">
             {subjectGrades?.map((g: any) => (
               <div
@@ -57,9 +53,7 @@ export default async function StudentGradesPage() {
         </div>
       ))}
 
-      {!grades?.length && (
-        <EmptyState message="No grades recorded yet." />
-      )}
+      {!grades?.length && <EmptyState message="No grades recorded yet." />}
     </div>
   );
 }

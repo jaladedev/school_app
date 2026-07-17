@@ -94,9 +94,7 @@ export function CreateAssessmentForm({
         return;
       }
 
-      setMessage(
-        `Created: ${toCreate.map((a) => `${a.title} (${a.max_score})`).join(", ")}.`
-      );
+      setMessage(`Created: ${toCreate.map((a) => `${a.title} (${a.max_score})`).join(", ")}.`);
       router.refresh();
     });
   }

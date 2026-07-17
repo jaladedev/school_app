@@ -55,7 +55,10 @@ export function EditStudentForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-lg space-y-3 rounded-xl border border-rule bg-white p-4">
+    <form
+      onSubmit={handleSubmit}
+      className="max-w-lg space-y-3 rounded-xl border border-rule bg-white p-4"
+    >
       <div>
         <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-soft">
           Full name

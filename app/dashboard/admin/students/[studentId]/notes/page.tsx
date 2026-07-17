@@ -2,11 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { StudentNoteForm } from "@/components/StudentNoteForm";
 import { StudentNotesList } from "@/components/StudentNotesList";
 
-export default async function AdminStudentNotesPage({
-  params,
-}: {
-  params: { studentId: string };
-}) {
+export default async function AdminStudentNotesPage({ params }: { params: { studentId: string } }) {
   const supabase = createClient();
 
   const { data: notes } = await supabase
@@ -25,7 +21,6 @@ export default async function AdminStudentNotesPage({
 
   return (
     <div className="max-w-2xl">
-
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">Notes</h1>
 
       <div className="mb-6">

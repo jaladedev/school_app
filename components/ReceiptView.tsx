@@ -93,9 +93,7 @@ export function ReceiptView({
 
         <div className="mb-6 rounded-lg bg-leaf-soft p-4 text-center">
           <p className="text-xs uppercase tracking-wide text-leaf">Amount Paid</p>
-          <p className="font-display text-3xl font-semibold text-leaf">
-            {formatKobo(amountKobo)}
-          </p>
+          <p className="font-display text-3xl font-semibold text-leaf">{formatKobo(amountKobo)}</p>
         </div>
 
         <div className="border-t border-rule pt-4 text-center text-xs text-ink-soft">

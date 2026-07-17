@@ -3,9 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/EmptyState";
 
 async function count(supabase: ReturnType<typeof createClient>, table: string) {
-  const { count } = await supabase
-    .from(table)
-    .select("*", { count: "exact", head: true });
+  const { count } = await supabase.from(table).select("*", { count: "exact", head: true });
   return count ?? 0;
 }
 
@@ -34,9 +32,7 @@ export default async function AdminOverview() {
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        School overview
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">School overview</h1>
       <p className="mb-6 text-sm text-ink-soft">
         A snapshot of enrollment, staffing, and recent activity.
       </p>
@@ -48,9 +44,7 @@ export default async function AdminOverview() {
             href={stat.href}
             className="rounded-xl border border-rule bg-white p-5 transition hover:border-leaf"
           >
-            <p className="font-display text-3xl font-semibold text-ink">
-              {stat.value}
-            </p>
+            <p className="font-display text-3xl font-semibold text-ink">{stat.value}</p>
             <p className="mt-1 text-sm text-ink-soft">{stat.label}</p>
           </Link>
         ))}
@@ -80,9 +74,7 @@ export default async function AdminOverview() {
           className="rounded-xl border border-rule bg-white p-5 transition hover:border-leaf"
         >
           <p className="font-display text-lg font-semibold text-ink">Staff</p>
-          <p className="mt-1 text-sm text-ink-soft">
-            Assign teacher roles and subjects taught.
-          </p>
+          <p className="mt-1 text-sm text-ink-soft">Assign teacher roles and subjects taught.</p>
         </Link>
       </div>
 
@@ -96,9 +88,7 @@ export default async function AdminOverview() {
             <p className="text-sm text-ink-soft">{a.content}</p>
           </div>
         ))}
-        {!recentAnnouncements?.length && (
-          <EmptyState message="No announcements yet." />
-        )}
+        {!recentAnnouncements?.length && <EmptyState message="No announcements yet." />}
       </div>
     </div>
   );

@@ -64,9 +64,7 @@ export default async function AdminSubjectsPage({
                 >
                   <div>
                     <p className="text-ink">{s.name}</p>
-                    {s.description && (
-                      <p className="text-xs text-ink-soft">{s.description}</p>
-                    )}
+                    {s.description && <p className="text-xs text-ink-soft">{s.description}</p>}
                   </div>
                   <span className="text-sm text-ink-soft">
                     {formatLevel(s.education_level, s.min_level_number)} –{" "}
@@ -79,9 +77,7 @@ export default async function AdminSubjectsPage({
         );
       })}
 
-      {!subjects?.length && (
-        <EmptyState message="No subjects created yet." />
-      )}
+      {!subjects?.length && <EmptyState message="No subjects created yet." />}
 
       <Pagination basePath="/dashboard/admin/subjects" page={page} totalPages={totalPages} />
     </div>

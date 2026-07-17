@@ -41,11 +41,7 @@ export function MermaidDiagram({ code, title }: { code: string; title?: string |
 
   return (
     <figure className="my-4 rounded-xl border border-rule bg-white p-4">
-      {title && (
-        <figcaption className="mb-2 text-sm font-medium text-leaf">
-          {title}
-        </figcaption>
-      )}
+      {title && <figcaption className="mb-2 text-sm font-medium text-leaf">{title}</figcaption>}
       {error ? (
         <p className="text-sm text-clay">{error}</p>
       ) : (

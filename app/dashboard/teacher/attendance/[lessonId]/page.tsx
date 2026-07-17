@@ -4,11 +4,7 @@ import { AttendanceForm } from "@/components/AttendanceForm";
 import type { AttendanceStatus } from "@/types/database";
 import { EmptyState } from "@/components/EmptyState";
 
-export default async function AttendancePage({
-  params,
-}: {
-  params: { lessonId: string };
-}) {
+export default async function AttendancePage({ params }: { params: { lessonId: string } }) {
   const supabase = createClient();
 
   const { data: lesson } = await supabase

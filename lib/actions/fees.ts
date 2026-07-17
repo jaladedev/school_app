@@ -148,15 +148,15 @@ export async function applyDiscount(invoiceId: string, discountKobo: number) {
   const profile = await assertIsAdmin();
   const admin = createAdminClient();
 
-  const { data: invoice } = await admin
-    .from("invoices")
-    .select("*")
-    .eq("id", invoiceId)
-    .single();
+  const { data: invoice } = await admin.from("invoices").select("*").eq("id", invoiceId).single();
 
   if (!invoice) throw new Error("Invoice not found.");
 
-  const newStatus = computeStatus(invoice.total_amount_kobo, discountKobo, invoice.amount_paid_kobo);
+  const newStatus = computeStatus(
+    invoice.total_amount_kobo,
+    discountKobo,
+    invoice.amount_paid_kobo
+  );
 
   const { error } = await admin
     .from("invoices")

@@ -69,10 +69,7 @@ export function NewConversationSearch({ currentUserId }: { currentUserId: string
         )}
       </div>
 
-      <button
-        onClick={() => setOpen(false)}
-        className="mt-2 text-sm text-ink-soft hover:underline"
-      >
+      <button onClick={() => setOpen(false)} className="mt-2 text-sm text-ink-soft hover:underline">
         Cancel
       </button>
     </div>

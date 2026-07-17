@@ -52,10 +52,7 @@ export function EditTeacherSubjectsForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mt-3 rounded-xl border border-rule bg-paper p-4"
-    >
+    <form onSubmit={handleSubmit} className="mt-3 rounded-xl border border-rule bg-paper p-4">
       <p className="mb-2 text-sm font-medium text-ink">Subjects taught</p>
       <div className="mb-4 flex flex-wrap gap-2">
         {allSubjects.map((subject) => (
@@ -72,9 +69,7 @@ export function EditTeacherSubjectsForm({
             {subject.name}
           </button>
         ))}
-        {!allSubjects.length && (
-          <p className="text-sm text-ink-soft">No subjects created yet.</p>
-        )}
+        {!allSubjects.length && <p className="text-sm text-ink-soft">No subjects created yet.</p>}
       </div>
 
       <div className="flex gap-2">

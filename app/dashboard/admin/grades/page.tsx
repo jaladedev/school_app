@@ -41,9 +41,7 @@ export default async function AdminGradesModerationPage({
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        Grade Moderation
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Grade Moderation</h1>
       <p className="mb-6 text-sm text-ink-soft">
         Grades stay hidden from students until approved here.
       </p>
@@ -59,8 +57,8 @@ export default async function AdminGradesModerationPage({
               <div>
                 <p className="font-medium text-ink">{a.title}</p>
                 <p className="text-xs text-ink-soft">
-                  {a.subjects?.name} · {a.classes?.name}{" "}
-                  {a.classes?.arm} · Term {a.term} · {a.academic_year}
+                  {a.subjects?.name} · {a.classes?.name} {a.classes?.arm} · Term {a.term} ·{" "}
+                  {a.academic_year}
                 </p>
                 <p className="mt-1 text-xs text-ink-soft">
                   {stats.total - stats.pending} of {stats.total} approved
@@ -77,16 +75,10 @@ export default async function AdminGradesModerationPage({
           );
         })}
 
-        {!withGrades.length && (
-          <EmptyState message="No grades entered yet." />
-        )}
+        {!withGrades.length && <EmptyState message="No grades entered yet." />}
       </div>
 
-      <Pagination
-        basePath="/dashboard/admin/grades"
-        page={page}
-        totalPages={totalPages}
-      />
+      <Pagination basePath="/dashboard/admin/grades" page={page} totalPages={totalPages} />
     </div>
   );
 }

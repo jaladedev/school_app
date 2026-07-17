@@ -20,9 +20,7 @@ export default async function AdminClassesPage() {
     .select("id", { count: "exact", head: true })
     .eq("is_archived", true);
 
-  const { data: studentCounts } = await supabase
-    .from("student_profiles")
-    .select("class_id");
+  const { data: studentCounts } = await supabase.from("student_profiles").select("class_id");
 
   const countByClass = new Map<string, number>();
   for (const row of studentCounts ?? []) {
@@ -73,9 +71,7 @@ export default async function AdminClassesPage() {
           />
         ))}
 
-        {!classes?.length && (
-          <EmptyState message="No active classes." />
-        )}
+        {!classes?.length && <EmptyState message="No active classes." />}
       </div>
     </div>
   );

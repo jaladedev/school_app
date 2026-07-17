@@ -24,9 +24,7 @@ export function StudentDetailTabs({ studentId }: { studentId: string }) {
             key={tab.href}
             href={tab.href}
             className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
-              isActive
-                ? "border-leaf text-leaf"
-                : "border-transparent text-ink-soft hover:text-ink"
+              isActive ? "border-leaf text-leaf" : "border-transparent text-ink-soft hover:text-ink"
             }`}
           >
             {tab.label}

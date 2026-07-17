@@ -4,13 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deactivateUser } from "@/lib/actions/admin";
 
-export function DeactivateUserButton({
-  userId,
-  isActive,
-}: {
-  userId: string;
-  isActive: boolean;
-}) {
+export function DeactivateUserButton({ userId, isActive }: { userId: string; isActive: boolean }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);

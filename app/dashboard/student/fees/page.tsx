@@ -52,7 +52,9 @@ export default async function StudentFeesPage() {
 
       <div className="mb-6 rounded-xl border border-rule bg-white p-4">
         <p className="text-xs uppercase tracking-wide text-ink-soft">Outstanding balance</p>
-        <p className={`font-display text-2xl font-semibold ${totalBalance > 0 ? "text-clay" : "text-leaf"}`}>
+        <p
+          className={`font-display text-2xl font-semibold ${totalBalance > 0 ? "text-clay" : "text-leaf"}`}
+        >
           {formatKobo(totalBalance)}
         </p>
         <p className="text-xs text-ink-soft">
@@ -78,7 +80,9 @@ export default async function StudentFeesPage() {
                     {feeStructure?.due_date && ` · Due ${feeStructure.due_date}`}
                   </p>
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}
+                >
                   {status}
                 </span>
               </div>
@@ -103,9 +107,7 @@ export default async function StudentFeesPage() {
           );
         })}
 
-        {!invoices?.length && (
-          <EmptyState message="No invoices yet." />
-        )}
+        {!invoices?.length && <EmptyState message="No invoices yet." />}
       </div>
 
       <h2 className="mb-2 font-display text-lg font-semibold text-ink">Payment history</h2>
@@ -116,9 +118,7 @@ export default async function StudentFeesPage() {
             className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3"
           >
             <div>
-              <p className="text-sm text-ink">
-                {p.invoices?.fee_structures?.title ?? "Payment"}
-              </p>
+              <p className="text-sm text-ink">{p.invoices?.fee_structures?.title ?? "Payment"}</p>
               <p className="text-xs text-ink-soft">
                 {METHOD_LABELS[p.method as PaymentMethod]} ·{" "}
                 {new Date(p.paid_at).toLocaleDateString()}
@@ -136,14 +136,12 @@ export default async function StudentFeesPage() {
           </div>
         ))}
 
-        {!payments?.length && (
-          <EmptyState message="No payments recorded yet." />
-        )}
+        {!payments?.length && <EmptyState message="No payments recorded yet." />}
       </div>
 
       <p className="mt-6 text-xs text-ink-soft">
-        You can pay online by card above, or at the school office by cash or bank transfer —
-        office payments are recorded by staff and will show here once entered.
+        You can pay online by card above, or at the school office by cash or bank transfer — office
+        payments are recorded by staff and will show here once entered.
       </p>
     </div>
   );
