@@ -2,6 +2,7 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { AnnouncementForm } from "@/components/AnnouncementForm";
 import { redirect } from "next/navigation";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage } from "@/components/Pagination";
+import { EmptyState } from "@/components/EmptyState";
 
 function timeAgo(dateStr: string) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -101,7 +102,7 @@ export default async function AnnouncementsPage({
         ))}
 
         {!visible.length && (
-          <p className="text-sm text-ink-soft">No announcements yet.</p>
+          <EmptyState message="No announcements yet." />
         )}
       </div>
 

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { ApproveAssessmentButton } from "@/components/ApproveAssessmentButton";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage } from "@/components/Pagination";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function AdminGradesModerationPage({
   searchParams,
@@ -77,7 +78,7 @@ export default async function AdminGradesModerationPage({
         })}
 
         {!withGrades.length && (
-          <p className="text-sm text-ink-soft">No grades entered yet.</p>
+          <EmptyState message="No grades entered yet." />
         )}
       </div>
 

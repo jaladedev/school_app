@@ -1,5 +1,6 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function StudentHomeworkPage() {
   const profile = await getCurrentProfile();
@@ -60,7 +61,7 @@ export default async function StudentHomeworkPage() {
         ))}
 
         {!lessons?.length && (
-          <p className="text-sm text-ink-soft">No homework given yet.</p>
+          <EmptyState message="No homework given yet." />
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { AttendanceForm } from "@/components/AttendanceForm";
 import type { AttendanceStatus } from "@/types/database";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function AttendancePage({
   params,
@@ -50,7 +51,7 @@ export default async function AttendancePage({
           initialStatus={initialStatus}
         />
       ) : (
-        <p className="text-sm text-ink-soft">No students found in this class.</p>
+        <EmptyState message="No students found in this class." />
       )}
     </div>
   );

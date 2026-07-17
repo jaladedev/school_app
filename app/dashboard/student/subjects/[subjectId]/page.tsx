@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function SubjectTopicsPage({
   params,
@@ -80,7 +81,7 @@ export default async function SubjectTopicsPage({
       ))}
 
       {!topics?.length && (
-        <p className="text-sm text-ink-soft">No topics published yet.</p>
+        <EmptyState message="No topics published yet." />
       )}
     </div>
   );

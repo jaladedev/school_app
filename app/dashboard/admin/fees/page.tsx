@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CreateFeeStructureForm } from "@/components/CreateFeeStructureForm";
 import { GenerateInvoicesButton } from "@/components/GenerateInvoicesButton";
 import { formatLevel, formatKobo } from "@/types/database";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function AdminFeesPage() {
   const supabase = createClient();
@@ -64,7 +65,7 @@ export default async function AdminFeesPage() {
         })}
 
         {!structures?.length && (
-          <p className="text-sm text-ink-soft">No fee structures created yet.</p>
+          <EmptyState message="No fee structures created yet." />
         )}
       </div>
     </div>

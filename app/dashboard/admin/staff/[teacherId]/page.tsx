@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { EmptyState } from "@/components/EmptyState";
 
 type TimetableRow = {
   id: string;
@@ -187,7 +188,7 @@ export default async function TeacherProfilePage({
             </span>
           ))}
           {!subjects?.length && (
-            <p className="text-sm text-ink-soft">No subjects assigned yet.</p>
+            <EmptyState message="No subjects assigned yet." />
           )}
         </div>
       </div>
@@ -244,7 +245,7 @@ export default async function TeacherProfilePage({
             </div>
           ))}
           {!entries?.length && (
-            <p className="text-sm text-ink-soft">No timetable entries yet.</p>
+            <EmptyState message="No timetable entries yet." />
           )}
         </div>
       </div>

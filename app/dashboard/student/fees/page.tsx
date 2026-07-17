@@ -3,6 +3,7 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { formatKobo, type InvoiceStatus, type PaymentMethod } from "@/types/database";
 import { PaystackPayButton } from "@/components/PaystackPayButton";
 import { redirect } from "next/navigation";
+import { EmptyState } from "@/components/EmptyState";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-leaf-soft text-leaf",
@@ -103,7 +104,7 @@ export default async function StudentFeesPage() {
         })}
 
         {!invoices?.length && (
-          <p className="text-sm text-ink-soft">No invoices yet.</p>
+          <EmptyState message="No invoices yet." />
         )}
       </div>
 
@@ -136,7 +137,7 @@ export default async function StudentFeesPage() {
         ))}
 
         {!payments?.length && (
-          <p className="text-sm text-ink-soft">No payments recorded yet.</p>
+          <EmptyState message="No payments recorded yet." />
         )}
       </div>
 

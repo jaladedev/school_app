@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatLevel } from "@/types/database";
 import { UnarchiveButton } from "@/components/UnarchiveButton";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function ArchivedClassesPage({
   searchParams,
@@ -51,7 +52,7 @@ export default async function ArchivedClassesPage({
         ))}
 
         {!classes?.length && (
-          <p className="text-sm text-ink-soft">No archived classes.</p>
+          <EmptyState message="No archived classes." />
         )}
       </div>
 

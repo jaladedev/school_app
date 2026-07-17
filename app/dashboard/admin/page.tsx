@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { EmptyState } from "@/components/EmptyState";
 
 async function count(supabase: ReturnType<typeof createClient>, table: string) {
   const { count } = await supabase
@@ -96,7 +97,7 @@ export default async function AdminOverview() {
           </div>
         ))}
         {!recentAnnouncements?.length && (
-          <p className="text-sm text-ink-soft">No announcements yet.</p>
+          <EmptyState message="No announcements yet." />
         )}
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { GradeEntryForm } from "@/components/GradeEntryForm";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function GradeEntryPage({
   params,
@@ -55,7 +56,7 @@ export default async function GradeEntryPage({
           initialGrades={initialGrades}
         />
       ) : (
-        <p className="text-sm text-ink-soft">No students found in this class.</p>
+        <EmptyState message="No students found in this class." />
       )}
     </div>
   );

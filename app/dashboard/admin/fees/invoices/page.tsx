@@ -4,6 +4,7 @@ import { formatKobo, type InvoiceStatus } from "@/types/database";
 import { RecordPaymentForm } from "@/components/RecordPaymentForm";
 import { ExportDefaultersButton } from "@/components/ExportDefaultersButton";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
+import { EmptyState } from "@/components/EmptyState";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-leaf-soft text-leaf",
@@ -143,7 +144,7 @@ export default async function AdminInvoicesPage({
         })}
 
         {!invoices?.length && (
-          <p className="text-sm text-ink-soft">No invoices found.</p>
+          <EmptyState message="No invoices found." />
         )}
       </div>
 

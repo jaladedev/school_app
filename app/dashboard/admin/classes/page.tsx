@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateClassForm } from "@/components/CreateClassForm";
 import { ClassRow } from "@/components/ClassRow";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function AdminClassesPage() {
   const supabase = createClient();
@@ -73,7 +74,7 @@ export default async function AdminClassesPage() {
         ))}
 
         {!classes?.length && (
-          <p className="text-sm text-ink-soft">No active classes.</p>
+          <EmptyState message="No active classes." />
         )}
       </div>
     </div>

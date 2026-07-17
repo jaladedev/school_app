@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
+import { EmptyState } from "@/components/EmptyState";
 
 type LessonRowData = {
   id: string;
@@ -124,7 +125,7 @@ export default async function AttendanceLandingPage({
           <LessonRow key={lesson.id} lesson={lesson} />
         ))}
         {!pastLessons?.length && (
-          <p className="text-sm text-ink-soft">No earlier lessons found.</p>
+          <EmptyState message="No earlier lessons found." />
         )}
       </div>
 

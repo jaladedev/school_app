@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { StudentDetailTabs } from "@/components/StudentDetailTabs";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function StudentGradesTabPage({
   params,
@@ -50,7 +51,7 @@ export default async function StudentGradesTabPage({
         </div>
       ))}
 
-      {!grades?.length && <p className="text-sm text-ink-soft">No grades recorded yet.</p>}
+      {!grades?.length && <EmptyState message="No grades recorded yet." />}
     </div>
   );
 }

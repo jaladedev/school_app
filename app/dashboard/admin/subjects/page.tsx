@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CreateSubjectForm } from "@/components/CreateSubjectForm";
 import { formatLevel, type EducationLevel } from "@/types/database";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
+import { EmptyState } from "@/components/EmptyState";
 
 const STAGE_ORDER: EducationLevel[] = ["primary", "jss", "sss"];
 const STAGE_LABELS: Record<EducationLevel, string> = {
@@ -79,7 +80,7 @@ export default async function AdminSubjectsPage({
       })}
 
       {!subjects?.length && (
-        <p className="text-sm text-ink-soft">No subjects created yet.</p>
+        <EmptyState message="No subjects created yet." />
       )}
 
       <Pagination basePath="/dashboard/admin/subjects" page={page} totalPages={totalPages} />

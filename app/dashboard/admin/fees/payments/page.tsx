@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatKobo, type PaymentMethod } from "@/types/database";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
+import { EmptyState } from "@/components/EmptyState";
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: "Cash",
@@ -71,7 +72,7 @@ export default async function AdminPaymentsPage({
           );
         })}
         {!payments?.length && (
-          <p className="text-sm text-ink-soft">No payments recorded yet.</p>
+          <EmptyState message="No payments recorded yet." />
         )}
       </div>
 

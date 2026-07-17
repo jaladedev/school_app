@@ -1,5 +1,6 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function StudentGradesPage() {
   const profile = await getCurrentProfile();
@@ -57,7 +58,7 @@ export default async function StudentGradesPage() {
       ))}
 
       {!grades?.length && (
-        <p className="text-sm text-ink-soft">No grades recorded yet.</p>
+        <EmptyState message="No grades recorded yet." />
       )}
     </div>
   );

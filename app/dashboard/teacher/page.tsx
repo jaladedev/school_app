@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { LessonEntryRow } from "@/components/LessonEntryRow";
 import { redirect } from "next/navigation";
+import { EmptyState } from "@/components/EmptyState";
 
 const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -107,7 +108,7 @@ export default async function TeacherHome() {
         })}
 
         {!todaysEntries?.length && (
-          <p className="text-sm text-ink-soft">No lessons scheduled for today.</p>
+          <EmptyState message="No lessons scheduled for today." />
         )}
       </div>
 
