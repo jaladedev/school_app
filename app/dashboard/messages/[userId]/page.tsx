@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { markThreadRead } from "@/lib/actions/messages";
 import { MessageComposer } from "@/components/MessageComposer";
+import { RealtimeMessageThread } from "@/components/RealtimeMessageThread";
 import { redirect } from "next/navigation";
 
 export default async function MessageThreadPage({
@@ -46,31 +47,11 @@ export default async function MessageThreadPage({
         <p className="text-xs capitalize text-ink-soft">{partner?.role}</p>
       </div>
 
-      <div className="flex-1 space-y-2 overflow-y-auto rounded-lg border border-rule bg-white p-4">
-        {messages?.map((m) => {
-          const isMine = m.sender_id === profile.id;
-          return (
-            <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-                  isMine ? "bg-marigold text-ink" : "bg-paper text-ink"
-                }`}
-              >
-                <p>{m.content}</p>
-                <p className="mt-1 text-[10px] text-ink-soft">
-                  {new Date(m.sent_at).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-
-        {!messages?.length && (
-          <p className="text-center text-sm text-ink-soft">
-            No messages yet — say hello.
-          </p>
-        )}
-      </div>
+      <RealtimeMessageThread
+        currentUserId={profile.id}
+        partnerId={params.userId}
+        initialMessages={messages ?? []}
+      />
 
       <div className="mt-4">
         <MessageComposer recipientId={params.userId} />

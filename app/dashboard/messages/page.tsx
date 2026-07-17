@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { NewConversationSearch } from "@/components/NewConversationSearch";
+import { RealtimeInbox } from "@/components/RealtimeInbox";
 import { redirect } from "next/navigation";
 
 export default async function MessagesInboxPage() {
@@ -41,9 +41,16 @@ export default async function MessagesInboxPage() {
 
   const partnerById = new Map((partners ?? []).map((p) => [p.id, p]));
 
-  const sortedConversations = [...conversations.entries()].sort(
-    (a, b) => new Date(b[1].lastSentAt).getTime() - new Date(a[1].lastSentAt).getTime()
-  );
+  const sortedConversations = [...conversations.entries()]
+    .sort((a, b) => new Date(b[1].lastSentAt).getTime() - new Date(a[1].lastSentAt).getTime())
+    .map(([partnerId, convo]) => ({
+      partnerId,
+      partnerName: partnerById.get(partnerId)?.full_name ?? "Unknown",
+      partnerRole: partnerById.get(partnerId)?.role ?? "",
+      lastMessage: convo.lastMessage,
+      lastSentAt: convo.lastSentAt,
+      unread: convo.unread,
+    }));
 
   return (
     <div className="max-w-xl">
@@ -52,32 +59,7 @@ export default async function MessagesInboxPage() {
         <NewConversationSearch currentUserId={profile.id} />
       </div>
 
-      <div className="space-y-2">
-        {sortedConversations.map(([partnerId, convo]) => {
-          const partner = partnerById.get(partnerId);
-          return (
-            <Link
-              key={partnerId}
-              href={`/dashboard/messages/${partnerId}`}
-              className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 transition hover:border-leaf"
-            >
-              <div className="min-w-0">
-                <p className="font-medium text-ink">{partner?.full_name ?? "Unknown"}</p>
-                <p className="truncate text-sm text-ink-soft">{convo.lastMessage}</p>
-              </div>
-              {convo.unread > 0 && (
-                <span className="ml-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-marigold px-1.5 text-xs font-medium text-ink">
-                  {convo.unread}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-
-        {!sortedConversations.length && (
-          <p className="text-sm text-ink-soft">No conversations yet.</p>
-        )}
-      </div>
+      <RealtimeInbox currentUserId={profile.id} initialConversations={sortedConversations} />
     </div>
   );
 }
