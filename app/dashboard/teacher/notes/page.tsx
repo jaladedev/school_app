@@ -2,14 +2,21 @@ import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { formatLevel } from "@/types/database";
 import { redirect } from "next/navigation";
+import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 
-export default async function TeacherNotesPage() {
+export default async function TeacherNotesPage({
+  searchParams,
+}: {
+  searchParams: { page?: string };
+}) {
   const profile = await getCurrentProfile();
 
   if (!profile) {
     redirect("/login");
   }
   const supabase = createClient();
+  const page = parsePage(searchParams.page);
+  const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   const { data: teacherProfile } = await supabase
     .from("teacher_profiles")
@@ -19,14 +26,17 @@ export default async function TeacherNotesPage() {
 
   const subjectIds = teacherProfile?.subjects_taught ?? [];
 
-  const { data: topics } = await supabase
+  const { data: topics, count } = await supabase
     .from("curriculum_topics")
-    .select("*, subjects(name)")
+    .select("*, subjects(name)", { count: "exact" })
     .in("subject_id", subjectIds.length ? subjectIds : ["00000000-0000-0000-0000-000000000000"])
     .order("education_level", { ascending: true })
     .order("level_number", { ascending: true })
     .order("term", { ascending: true })
-    .order("sequence_order", { ascending: true });
+    .order("sequence_order", { ascending: true })
+    .range(from, to);
+
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / DEFAULT_PAGE_SIZE));
 
   const topicIds = (topics ?? []).map((t) => t.id);
 
@@ -84,6 +94,12 @@ export default async function TeacherNotesPage() {
           </p>
         )}
       </div>
+
+      <Pagination
+        basePath="/dashboard/teacher/notes"
+        page={page}
+        totalPages={totalPages}
+      />
     </div>
   );
 }

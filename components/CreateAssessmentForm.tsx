@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { createAssessmentSchema, fieldErrorsFrom } from "@/lib/validation";
 
 const STANDARD_ASSESSMENTS = [
   { title: "1st CA", max_score: 20 },
@@ -31,6 +32,7 @@ export function CreateAssessmentForm({
   const [customMaxScore, setCustomMaxScore] = useState(20);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
 
   function defaultAcademicYear() {
@@ -44,10 +46,17 @@ export function CreateAssessmentForm({
     setError(null);
     setMessage(null);
 
-    if (!subjectId || !classId) {
-      setError("Select a subject and class first.");
+    const errors = fieldErrorsFrom(createAssessmentSchema, {
+      subjectId,
+      classId,
+      term,
+      academicYear,
+    });
+    if (errors) {
+      setFieldErrors(errors);
       return;
     }
+    setFieldErrors({});
 
     startTransition(async () => {
       // Skip any that already exist for this subject/class/term/year, so
@@ -97,10 +106,23 @@ export function CreateAssessmentForm({
     setError(null);
     setMessage(null);
 
-    if (!subjectId || !classId || !customTitle) {
-      setError("Fill in subject, class, and a title.");
+    const errors = fieldErrorsFrom(createAssessmentSchema, {
+      subjectId,
+      classId,
+      term,
+      academicYear,
+      customTitle,
+      customMaxScore,
+    });
+    if (errors) {
+      setFieldErrors(errors);
       return;
     }
+    if (!customTitle.trim()) {
+      setFieldErrors({ customTitle: "Enter a title for this assessment." });
+      return;
+    }
+    setFieldErrors({});
 
     startTransition(async () => {
       const { error: insertError } = await supabase.from("assessments").insert({
@@ -169,11 +191,16 @@ export function CreateAssessmentForm({
           <option value={2}>Term 2</option>
           <option value={3}>Term 3</option>
         </select>
-        <input
-          value={academicYear}
-          onChange={(e) => setAcademicYear(e.target.value)}
-          className="rounded-lg border border-rule px-3 py-2 text-sm"
-        />
+        <div>
+          <input
+            value={academicYear}
+            onChange={(e) => setAcademicYear(e.target.value)}
+            className="w-full rounded-lg border border-rule px-3 py-2 text-sm"
+          />
+          {fieldErrors.academicYear && (
+            <p className="mt-1 text-xs text-clay">{fieldErrors.academicYear}</p>
+          )}
+        </div>
       </div>
 
       <div className="rounded-lg bg-paper p-3">
@@ -192,23 +219,33 @@ export function CreateAssessmentForm({
       <form onSubmit={handleCreateCustom} className="rounded-lg bg-paper p-3">
         <p className="mb-2 text-sm font-medium text-ink">Or add a custom assessment</p>
         <div className="flex gap-2">
-          <input
-            placeholder="Title (e.g. Mid-term Test)"
-            value={customTitle}
-            onChange={(e) => setCustomTitle(e.target.value)}
-            className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
-          />
-          <input
-            type="number"
-            min={1}
-            value={customMaxScore}
-            onChange={(e) => setCustomMaxScore(Number(e.target.value))}
-            className="w-24 rounded-lg border border-rule px-3 py-2 text-sm"
-          />
+          <div className="flex-1">
+            <input
+              placeholder="Title (e.g. Mid-term Test)"
+              value={customTitle}
+              onChange={(e) => setCustomTitle(e.target.value)}
+              className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+            />
+            {fieldErrors.customTitle && (
+              <p className="mt-1 text-xs text-clay">{fieldErrors.customTitle}</p>
+            )}
+          </div>
+          <div>
+            <input
+              type="number"
+              min={1}
+              value={customMaxScore}
+              onChange={(e) => setCustomMaxScore(Number(e.target.value))}
+              className="w-24 rounded-lg border border-rule px-3 py-2 text-sm"
+            />
+            {fieldErrors.customMaxScore && (
+              <p className="mt-1 text-xs text-clay">{fieldErrors.customMaxScore}</p>
+            )}
+          </div>
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg border border-rule px-3 py-2 text-sm text-ink hover:bg-white disabled:opacity-60"
+            className="h-fit rounded-lg border border-rule px-3 py-2 text-sm text-ink hover:bg-white disabled:opacity-60"
           >
             Add
           </button>

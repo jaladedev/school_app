@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { announcementSchema, fieldErrorsFrom } from "@/lib/validation";
 
 type Audience = "all" | "students" | "teachers" | "class";
 
@@ -23,10 +24,23 @@ export function AnnouncementForm({
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const errors = fieldErrorsFrom(announcementSchema, {
+      title,
+      content,
+      audience,
+      classId: audience === "class" ? classId : undefined,
+    });
+    if (errors) {
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
 
     startTransition(async () => {
       const { error: insertError } = await supabase.from("announcements").insert({
@@ -66,22 +80,26 @@ export function AnnouncementForm({
       onSubmit={handleSubmit}
       className="mb-6 space-y-3 rounded-xl border border-rule bg-white p-4"
     >
-      <input
-        required
-        placeholder="Title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
-      />
+      <div>
+        <input
+          placeholder="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+        />
+        {fieldErrors.title && <p className="mt-1 text-xs text-clay">{fieldErrors.title}</p>}
+      </div>
 
-      <textarea
-        required
-        placeholder="Write your announcement…"
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        rows={4}
-        className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
-      />
+      <div>
+        <textarea
+          placeholder="Write your announcement…"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          rows={4}
+          className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+        />
+        {fieldErrors.content && <p className="mt-1 text-xs text-clay">{fieldErrors.content}</p>}
+      </div>
 
       <div className="flex flex-wrap gap-3">
         <select

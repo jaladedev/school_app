@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createTeacherAccount } from "@/lib/actions/admin";
+import { createTeacherSchema, fieldErrorsFrom } from "@/lib/validation";
 
 export function CreateTeacherForm({
   subjects,
@@ -15,6 +16,7 @@ export function CreateTeacherForm({
   const [subjectIds, setSubjectIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [created, setCreated] = useState<string | null>(null);
 
   function toggleSubject(id: string) {
@@ -28,9 +30,17 @@ export function CreateTeacherForm({
     setError(null);
     setCreated(null);
 
+    const input = { fullName, email, temporaryPassword, subjectIds };
+    const errors = fieldErrorsFrom(createTeacherSchema, input);
+    if (errors) {
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
+
     startTransition(async () => {
       try {
-        await createTeacherAccount({ fullName, email, temporaryPassword, subjectIds });
+        await createTeacherAccount(input);
         setCreated(email);
         setFullName("");
         setEmail("");
@@ -59,32 +69,39 @@ export function CreateTeacherForm({
       className="mb-6 space-y-3 rounded-xl border border-rule bg-white p-4"
     >
       <div className="grid grid-cols-2 gap-3">
-        <input
-          required
-          placeholder="Full name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          className="rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
-        />
-        <input
-          required
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
-        />
+        <div>
+          <input
+            placeholder="Full name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+          />
+          {fieldErrors.fullName && <p className="mt-1 text-xs text-clay">{fieldErrors.fullName}</p>}
+        </div>
+        <div>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+          />
+          {fieldErrors.email && <p className="mt-1 text-xs text-clay">{fieldErrors.email}</p>}
+        </div>
       </div>
 
-      <input
-        required
-        type="text"
-        minLength={8}
-        placeholder="Temporary password (share with the teacher directly)"
-        value={temporaryPassword}
-        onChange={(e) => setTemporaryPassword(e.target.value)}
-        className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
-      />
+      <div>
+        <input
+          type="text"
+          placeholder="Temporary password (share with the teacher directly)"
+          value={temporaryPassword}
+          onChange={(e) => setTemporaryPassword(e.target.value)}
+          className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+        />
+        {fieldErrors.temporaryPassword && (
+          <p className="mt-1 text-xs text-clay">{fieldErrors.temporaryPassword}</p>
+        )}
+      </div>
 
       <div>
         <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
@@ -109,6 +126,7 @@ export function CreateTeacherForm({
             <p className="text-xs text-ink-soft">No subjects created yet.</p>
           )}
         </div>
+        {fieldErrors.subjectIds && <p className="mt-1 text-xs text-clay">{fieldErrors.subjectIds}</p>}
       </div>
 
       <div className="flex gap-2">

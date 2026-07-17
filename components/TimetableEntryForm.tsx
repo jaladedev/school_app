@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { timetableEntrySchema, fieldErrorsFrom } from "@/lib/validation";
 
 const WEEKDAYS = [
   { value: 1, label: "Monday" },
@@ -37,12 +38,29 @@ export function TimetableEntryForm({
   const [room, setRoom] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [open, setOpen] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
     setError(null);
+
+    const input = {
+      weekday,
+      periodNumber,
+      startTime,
+      endTime,
+      subjectId,
+      teacherId,
+      room: room.trim() || undefined,
+    };
+    const errors = fieldErrorsFrom(timetableEntrySchema, input);
+    if (errors) {
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
+    setSaving(true);
 
     // --- Conflict checks, run before inserting ---
 
@@ -175,12 +193,15 @@ export function TimetableEntryForm({
         onChange={(e) => setStartTime(e.target.value)}
         className="rounded-lg border border-rule px-3 py-2 text-sm"
       />
-      <input
-        type="time"
-        value={endTime}
-        onChange={(e) => setEndTime(e.target.value)}
-        className="rounded-lg border border-rule px-3 py-2 text-sm"
-      />
+      <div className="col-span-1">
+        <input
+          type="time"
+          value={endTime}
+          onChange={(e) => setEndTime(e.target.value)}
+          className="w-full rounded-lg border border-rule px-3 py-2 text-sm"
+        />
+        {fieldErrors.endTime && <p className="mt-1 text-xs text-clay">{fieldErrors.endTime}</p>}
+      </div>
 
       <select
         value={subjectId}

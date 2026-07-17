@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { EducationLevel } from "@/types/database";
 
+import { createClassSchema, fieldErrorsFrom } from "@/lib/validation";
+
 const LEVEL_OPTIONS: Record<EducationLevel, { label: string; numbers: number[] }> = {
   primary: { label: "Primary", numbers: [1, 2, 3, 4, 5, 6] },
   jss: { label: "JSS", numbers: [1, 2, 3] },
@@ -31,6 +33,7 @@ export function CreateClassForm() {
   const [academicYear, setAcademicYear] = useState(defaultAcademicYear());
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const stageLabel = LEVEL_OPTIONS[educationLevel].label;
   const derivedName = `${stageLabel} ${levelNumber}`;
@@ -38,6 +41,14 @@ export function CreateClassForm() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const input = { educationLevel, levelNumber, arm: arm || undefined, academicYear };
+    const errors = fieldErrorsFrom(createClassSchema, input);
+    if (errors) {
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
 
     startTransition(async () => {
       const { error: insertError } = await supabase.from("classes").insert({
@@ -139,6 +150,9 @@ export function CreateClassForm() {
             onChange={(e) => setAcademicYear(e.target.value)}
             className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
           />
+          {fieldErrors.academicYear && (
+            <p className="mt-1 text-xs text-clay">{fieldErrors.academicYear}</p>
+          )}
         </div>
       </div>
 
