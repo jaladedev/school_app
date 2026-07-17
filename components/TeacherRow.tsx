@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { EditTeacherSubjectsForm } from "@/components/EditTeacherSubjectsForm";
 import { ResetPasswordButton } from "@/components/ResetPasswordButton";
 import { DeactivateUserButton } from "@/components/DeactivateUserButton";
@@ -71,7 +72,9 @@ export function TeacherRow({
             </form>
           ) : (
             <p className="font-medium text-ink">
-              {fullName}
+              <Link href={`/dashboard/admin/staff/${teacherId}`} className="hover:underline">
+                {fullName}
+              </Link>
               {!isActive && <span className="ml-2 text-xs font-normal text-clay">(deactivated)</span>}{" "}
               <button
                 onClick={() => setEditingName(true)}
