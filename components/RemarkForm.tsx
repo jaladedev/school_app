@@ -49,7 +49,7 @@ export function RemarkForm({
       <p className="mb-3 text-sm font-medium text-ink">Edit remarks</p>
 
       <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-soft">
-        Class teacher's remark
+        Class teacher&apos;s remark
       </label>
       <textarea
         value={classTeacherRemark}
@@ -59,7 +59,7 @@ export function RemarkForm({
       />
 
       <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-soft">
-        Head teacher's / admin remark
+        Head teacher&apos;s / admin remark
       </label>
       <textarea
         value={adminRemark}

@@ -1,11 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { ReceiptView } from "@/components/ReceiptView";
 
-export default async function ReceiptPage({
-  params,
-}: {
-  params: { paymentId: string };
-}) {
+export default async function ReceiptPage({ params }: { params: { paymentId: string } }) {
   const supabase = createClient();
 
   const { data: settings } = await supabase
@@ -25,9 +21,7 @@ export default async function ReceiptPage({
   if (!payment) {
     return (
       <div className="max-w-lg">
-        <p className="text-sm text-clay">
-          Receipt not found, or you don't have access to it.
-        </p>
+        <p className="text-sm text-clay">Receipt not found, or you don&apos;t have access to it.</p>
       </div>
     );
   }

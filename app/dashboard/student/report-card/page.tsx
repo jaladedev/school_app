@@ -28,16 +28,14 @@ export default async function StudentReportCardPage({
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        My report card
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">My report card</h1>
       <TermYearSelector currentTerm={term} currentYear={academicYear} />
 
       {data ? (
         <ReportCardView data={data} />
       ) : (
         <p className="text-sm text-ink-soft">
-          Report card isn't available yet — you may not be assigned to a class.
+          Report card isn&apos;t available yet — you may not be assigned to a class.
         </p>
       )}
     </div>

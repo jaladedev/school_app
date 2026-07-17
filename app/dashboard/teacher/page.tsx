@@ -4,7 +4,16 @@ import { LessonEntryRow } from "@/components/LessonEntryRow";
 import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/EmptyState";
 
-const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const WEEKDAY_NAMES = [
+  "",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 export default async function TeacherHome() {
   const profile = await getCurrentProfile();
@@ -31,9 +40,7 @@ export default async function TeacherHome() {
     .eq("teacher_id", profile.id)
     .eq("lesson_date", todayDate);
 
-  const lessonByEntry = new Map(
-    (lessons ?? []).map((l) => [l.timetable_entry_id, l.id])
-  );
+  const lessonByEntry = new Map((lessons ?? []).map((l) => [l.timetable_entry_id, l.id]));
 
   // Fetch curriculum topics for every (subject, education_level, level_number)
   // combination appearing in today's schedule, so each row's "Log lesson"
@@ -78,7 +85,7 @@ export default async function TeacherHome() {
   return (
     <div>
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        {WEEKDAY_NAMES[todayWeekday]}'s lessons
+        {WEEKDAY_NAMES[todayWeekday]}&apos;s lessons
       </h1>
       <p className="mb-6 text-sm text-ink-soft">
         Log a lesson to unlock attendance for that period, or jump to a class below.
@@ -107,9 +114,7 @@ export default async function TeacherHome() {
           );
         })}
 
-        {!todaysEntries?.length && (
-          <EmptyState message="No lessons scheduled for today." />
-        )}
+        {!todaysEntries?.length && <EmptyState message="No lessons scheduled for today." />}
       </div>
 
       <h2 className="mb-3 font-display text-lg font-semibold text-ink">My classes</h2>
@@ -119,9 +124,7 @@ export default async function TeacherHome() {
             <p className="font-display text-lg font-semibold text-ink">
               {cls.name} {cls.arm}
             </p>
-            <p className="mt-1 text-sm text-ink-soft">
-              {[...cls.subjects].join(", ")}
-            </p>
+            <p className="mt-1 text-sm text-ink-soft">{[...cls.subjects].join(", ")}</p>
             <div className="mt-3 flex gap-3 text-sm">
               <Link href="/dashboard/teacher/notes" className="text-leaf hover:underline">
                 Notes

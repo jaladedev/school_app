@@ -25,13 +25,23 @@ export function ReportCardView({
       <div className="rounded-2xl border border-rule bg-white p-8 print:border-0 print:p-0 print:shadow-none">
         {/* Header */}
         <div className="mb-6 border-b-2 border-ink pb-4 text-center">
+          {data.schoolLogoUrl && (
+            // Print layouts render outside Next's normal image pipeline,
+            // and a plain <img> avoids the Image component's
+            // fixed-dimension requirements complicating a document meant
+            // to also work as a static print/PDF output.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={data.schoolLogoUrl}
+              alt=""
+              className="mx-auto mb-2 h-16 w-16 object-contain"
+            />
+          )}
           <h1 className="font-display text-2xl font-semibold text-ink">{data.schoolName}</h1>
           {data.schoolMotto && (
             <p className="mt-1 text-xs italic text-ink-soft">{data.schoolMotto}</p>
           )}
-          <p className="mt-1 text-sm uppercase tracking-wide text-ink-soft">
-            Termly Report Card
-          </p>
+          <p className="mt-1 text-sm uppercase tracking-wide text-ink-soft">Termly Report Card</p>
         </div>
 
         {/* Student info */}
@@ -94,9 +104,7 @@ export function ReportCardView({
         {/* Overall + attendance summary */}
         <div className="mb-6 grid grid-cols-2 gap-4">
           <div className="rounded-lg border border-rule bg-paper p-4">
-            <p className="mb-1 text-xs uppercase tracking-wide text-ink-soft">
-              Overall Average
-            </p>
+            <p className="mb-1 text-xs uppercase tracking-wide text-ink-soft">Overall Average</p>
             <p className="font-display text-xl font-semibold text-ink">
               {data.overall.averagePercent !== null
                 ? `${data.overall.averagePercent}% (${data.overall.letterGrade ?? "—"})`
@@ -124,7 +132,7 @@ export function ReportCardView({
         <div className="space-y-3 border-t border-rule pt-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-ink-soft">
-              Class Teacher's Remark
+              Class Teacher&apos;s Remark
             </p>
             <p className="text-sm text-ink">
               {data.remark?.classTeacherRemark || "No remark yet."}
@@ -132,9 +140,29 @@ export function ReportCardView({
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-ink-soft">
-              Head Teacher's / Admin Remark
+              Head Teacher&apos;s / Admin Remark
             </p>
             <p className="text-sm text-ink">{data.remark?.adminRemark || "No remark yet."}</p>
+          </div>
+        </div>
+
+        {/* Signatures and stamp — shown on-screen for a preview and
+            printed as part of the physical document. */}
+        <div className="mt-10 grid grid-cols-3 gap-6 pt-4">
+          <div className="text-center">
+            <div className="h-12 border-b border-ink" />
+            <p className="mt-1 text-xs text-ink-soft">Class Teacher&apos;s Signature</p>
+          </div>
+          <div className="text-center">
+            <div className="h-12 border-b border-ink" />
+            <p className="mt-1 text-xs text-ink-soft">Head Teacher&apos;s Signature</p>
+          </div>
+          <div className="text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-ink-soft text-[9px] uppercase leading-tight text-ink-soft">
+              Official
+              <br />
+              Stamp
+            </div>
           </div>
         </div>
       </div>

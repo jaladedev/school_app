@@ -117,9 +117,7 @@ export function PromoteStudentsForm({
       </div>
 
       <div>
-        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-          Outcome
-        </p>
+        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">Outcome</p>
         <div className="flex gap-2">
           {(["promote", "repeat", "graduate"] as PromotionOutcome[]).map((o) => (
             <button
@@ -130,9 +128,7 @@ export function PromoteStudentsForm({
                 if (o === "repeat") setTargetClassId(sourceClassId);
               }}
               className={`rounded-lg border px-3 py-2 text-sm font-medium capitalize transition ${
-                outcome === o
-                  ? "border-leaf bg-leaf-soft text-leaf"
-                  : "border-rule text-ink-soft"
+                outcome === o ? "border-leaf bg-leaf-soft text-leaf" : "border-rule text-ink-soft"
               }`}
             >
               {o}
@@ -162,8 +158,8 @@ export function PromoteStudentsForm({
 
       {outcome === "graduate" && (
         <p className="rounded-lg bg-marigold/10 p-3 text-sm text-marigold-dark">
-          Graduating removes these students from any class. There's currently no separate
-          "alumni" status — this just clears their class assignment.
+          Graduating removes these students from any class. There&apos;s currently no separate
+          &quot;alumni&quot; status — this just clears their class assignment.
         </p>
       )}
 
@@ -172,7 +168,9 @@ export function PromoteStudentsForm({
         disabled={isPending}
         className="rounded-lg bg-leaf px-4 py-2 text-sm font-medium text-white hover:bg-leaf/90 disabled:opacity-60"
       >
-        {isPending ? "Processing…" : `${outcome === "graduate" ? "Graduate" : outcome === "repeat" ? "Repeat" : "Promote"} selected students`}
+        {isPending
+          ? "Processing…"
+          : `${outcome === "graduate" ? "Graduate" : outcome === "repeat" ? "Repeat" : "Promote"} selected students`}
       </button>
 
       {result && (

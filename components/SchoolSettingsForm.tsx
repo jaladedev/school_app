@@ -8,6 +8,7 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
   const [name, setName] = useState(settings.name);
   const [motto, setMotto] = useState(settings.motto ?? "");
   const [address, setAddress] = useState(settings.address ?? "");
+  const [logoUrl, setLogoUrl] = useState(settings.logo_url ?? "");
   const [academicYear, setAcademicYear] = useState(settings.current_academic_year);
   const [term, setTerm] = useState(settings.current_term);
   const [gradeScale, setGradeScale] = useState<GradeScaleEntry[]>(settings.grade_scale);
@@ -32,6 +33,7 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
           name,
           motto,
           address,
+          logoUrl,
           currentAcademicYear: academicYear,
           currentTerm: term,
           gradeScale,
@@ -78,13 +80,42 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
               className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
             />
           </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-soft">
+              Logo URL (optional)
+            </label>
+            <p className="mb-1 text-xs text-ink-soft">
+              A hosted image URL — shown on report cards. Uploading a file directly isn&apos;t
+              supported yet; paste a link to an image hosted elsewhere.
+            </p>
+            <div className="flex items-center gap-3">
+              <input
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="https://…"
+                className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+              />
+              {logoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className="h-10 w-10 rounded object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.visibility = "hidden";
+                  }}
+                />
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="rounded-xl border border-rule bg-white p-4">
         <h2 className="mb-3 font-display text-lg font-semibold text-ink">Current session</h2>
         <p className="mb-3 text-xs text-ink-soft">
-          Used as the default term/year across the app where a page doesn't have its own selector.
+          Used as the default term/year across the app where a page doesn&apos;t have its own
+          selector.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -125,7 +156,7 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
               <input
                 value={g.grade}
                 onChange={(e) => updateGrade(i, "grade", e.target.value)}
-                className="w-16 rounded-lg border border-rule px-2 py-1 text-sm text-center"
+                className="w-16 rounded-lg border border-rule px-2 py-1 text-center text-sm"
               />
               <span className="text-sm text-ink-soft">min score</span>
               <input

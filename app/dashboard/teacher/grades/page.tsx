@@ -48,14 +48,10 @@ export default async function TeacherGradesPage() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Grades</h1>
           <p className="text-sm text-ink-soft">
-            Assessments you've created. Select one to enter or review scores.
+            Assessments you&apos;ve created. Select one to enter or review scores.
           </p>
         </div>
-        <CreateAssessmentForm
-          teacherId={profile.id}
-          subjects={subjects ?? []}
-          classes={classes}
-        />
+        <CreateAssessmentForm teacherId={profile.id} subjects={subjects ?? []} classes={classes} />
       </div>
 
       <div className="space-y-2">
@@ -68,8 +64,7 @@ export default async function TeacherGradesPage() {
             <div>
               <p className="text-ink">{a.title}</p>
               <p className="text-xs text-ink-soft">
-                {a.subjects?.name} · {a.classes?.name}{" "}
-                {a.classes?.arm} · Term {a.term}
+                {a.subjects?.name} · {a.classes?.name} {a.classes?.arm} · Term {a.term}
               </p>
             </div>
             <span className="text-sm text-ink-soft">Max {a.max_score}</span>

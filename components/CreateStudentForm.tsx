@@ -182,8 +182,8 @@ export function CreateStudentForm({
       {error && <p className="text-sm text-clay">{error}</p>}
       {created && (
         <p className="text-sm text-leaf">
-          Account created for {created}. Share the temporary password with them directly —
-          it won't be shown again here.
+          Account created for {created}. Share the temporary password with them directly — it
+          won&apos;t be shown again here.
         </p>
       )}
     </form>

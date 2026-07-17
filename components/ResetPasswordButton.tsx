@@ -29,8 +29,8 @@ export function ResetPasswordButton({ userId }: { userId: string }) {
           New password: <span className="font-mono">{newPassword}</span>
         </p>
         <p className="text-ink-soft">
-          Share this directly — it won't be shown again. They'll be asked to set their own on
-          next login.
+          Share this directly — it won&apos;t be shown again. They&apos;ll be asked to set their own
+          on next login.
         </p>
       </div>
     );

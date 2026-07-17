@@ -29,6 +29,7 @@ export type ReportCardData = {
   academicYear: string;
   schoolName: string;
   schoolMotto: string | null;
+  schoolLogoUrl: string | null;
   subjects: SubjectResult[];
   overall: {
     averagePercent: number | null;
@@ -106,7 +107,7 @@ export async function getReportCardData(
 
   const { data: settings } = await supabase
     .from("school_settings")
-    .select("name, motto, grade_scale")
+    .select("name, motto, logo_url, grade_scale")
     .eq("id", 1)
     .single();
 
@@ -293,6 +294,7 @@ export async function getReportCardData(
     academicYear,
     schoolName: settings?.name ?? "School Name",
     schoolMotto: settings?.motto ?? null,
+    schoolLogoUrl: settings?.logo_url ?? null,
     subjects,
     overall: {
       averagePercent: overallAverage !== null ? Math.round(overallAverage * 10) / 10 : null,

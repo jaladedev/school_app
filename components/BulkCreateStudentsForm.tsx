@@ -170,8 +170,8 @@ export function BulkCreateStudentsForm({
         <div>
           <div className="mb-1 flex items-center justify-between">
             <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-              One student per line: Full Name, Email, Admission No (optional), Guardian
-              Name (optional), Guardian Phone (optional)
+              One student per line: Full Name, Email, Admission No (optional), Guardian Name
+              (optional), Guardian Phone (optional)
             </p>
             <button
               type="button"
@@ -209,9 +209,7 @@ export function BulkCreateStudentsForm({
         </div>
 
         <div>
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-            Password
-          </p>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">Password</p>
           <div className="flex gap-2">
             <button
               type="button"
@@ -300,7 +298,7 @@ export function BulkCreateStudentsForm({
             </table>
           </div>
           <p className="mt-2 text-xs text-ink-soft">
-            Copy these passwords out now — they won't be shown again after you leave this page.
+            Copy these passwords out now — they won&apos;t be shown again after you leave this page.
           </p>
         </div>
       )}

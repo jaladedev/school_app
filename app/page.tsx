@@ -1,7 +1,11 @@
 import Link from "next/link";
 
 const SUBJECT_TABS = [
-  { name: "Basic Science & Technology", color: "#2F6B4F", topic: "Classification of Living Things" },
+  {
+    name: "Basic Science & Technology",
+    color: "#2F6B4F",
+    topic: "Classification of Living Things",
+  },
   { name: "Mathematics", color: "#B24C3C", topic: "Fractions and Decimals" },
   { name: "English Studies", color: "#C98F00", topic: "Comprehension and Composition" },
   { name: "Social Studies", color: "#3B5B8C", topic: "Our Community and Its Leaders" },
@@ -9,7 +13,7 @@ const SUBJECT_TABS = [
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-notebook-lines bg-paper">
+    <div className="min-h-screen bg-paper bg-notebook-lines">
       {/* Nav */}
       <header className="flex items-center justify-between px-8 py-6">
         <p className="font-display text-xl font-semibold text-ink">School</p>
@@ -35,9 +39,8 @@ export default function HomePage() {
             timetables.
           </h1>
           <p className="mb-8 max-w-md text-base leading-relaxed text-ink-soft">
-            Every topic, term, and class period a student, teacher, or admin
-            needs — already organized, already written, ready the moment an
-            account is created.
+            Every topic, term, and class period a student, teacher, or admin needs — already
+            organized, already written, ready the moment an account is created.
           </p>
           <div className="flex gap-3">
             <Link
@@ -58,9 +61,7 @@ export default function HomePage() {
                 className="group relative mb-3 rounded-r-xl border border-l-4 border-rule bg-white px-5 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 style={{ borderLeftColor: subject.color, marginLeft: i * 14 }}
               >
-                <p className="font-display text-base font-semibold text-ink">
-                  {subject.name}
-                </p>
+                <p className="font-display text-base font-semibold text-ink">{subject.name}</p>
                 <p className="mt-1 text-sm text-ink-soft">
                   Next up: <span className="text-ink">{subject.topic}</span>
                 </p>
@@ -73,29 +74,23 @@ export default function HomePage() {
       {/* Role sections — grounded in real features, not generic icons+text */}
       <section className="grid grid-cols-1 gap-6 border-t border-rule px-8 py-16 md:grid-cols-3 md:px-16">
         <div>
-          <p className="mb-2 font-mono text-xs uppercase tracking-widest text-leaf">
-            For students
-          </p>
+          <p className="mb-2 font-mono text-xs uppercase tracking-widest text-leaf">For students</p>
           <h2 className="mb-2 font-display text-xl font-semibold text-ink">
             Every topic note, term by term
           </h2>
           <p className="text-sm leading-relaxed text-ink-soft">
-            Browse subjects by term, read notes with diagrams and tables
-            built in, and check grades and attendance without asking a
-            teacher.
+            Browse subjects by term, read notes with diagrams and tables built in, and check grades
+            and attendance without asking a teacher.
           </p>
         </div>
         <div>
-          <p className="mb-2 font-mono text-xs uppercase tracking-widest text-clay">
-            For teachers
-          </p>
+          <p className="mb-2 font-mono text-xs uppercase tracking-widest text-clay">For teachers</p>
           <h2 className="mb-2 font-display text-xl font-semibold text-ink">
             Mark, grade, and author in one flow
           </h2>
           <p className="text-sm leading-relaxed text-ink-soft">
-            Take attendance per lesson, enter grades against the term's
-            assessments, and write or edit topic notes your students see
-            immediately once published.
+            Take attendance per lesson, enter grades against the term&apos;s assessments, and write
+            or edit topic notes your students see immediately once published.
           </p>
         </div>
         <div>
@@ -106,8 +101,8 @@ export default function HomePage() {
             Classes, timetables, and staff — governed centrally
           </h2>
           <p className="text-sm leading-relaxed text-ink-soft">
-            Manage enrollments, build conflict-free timetables, and see
-            every class's records without chasing paper files.
+            Manage enrollments, build conflict-free timetables, and see every class&apos;s records
+            without chasing paper files.
           </p>
         </div>
       </section>

@@ -8,6 +8,7 @@ export async function saveSchoolSettings(input: {
   name: string;
   motto?: string;
   address?: string;
+  logoUrl?: string;
   currentAcademicYear: string;
   currentTerm: number;
   gradeScale: GradeScaleEntry[];
@@ -25,6 +26,7 @@ export async function saveSchoolSettings(input: {
       name: input.name,
       motto: input.motto || null,
       address: input.address || null,
+      logo_url: input.logoUrl || null,
       current_academic_year: input.currentAcademicYear,
       current_term: input.currentTerm,
       grade_scale: input.gradeScale,

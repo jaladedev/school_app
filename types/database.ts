@@ -1,4 +1,4 @@
-export type UserRole = "student" | "teacher" | "admin";
+export type UserRole = "student" | "teacher" | "admin" | "parent";
 export type NoteStatus = "draft" | "published" | "archived";
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disciplinary";
@@ -54,6 +54,15 @@ export type TeacherProfile = {
   staff_id: string | null;
   subjects_taught: string[] | null;
   hire_date: string | null;
+};
+
+export type GuardianLink = {
+  id: string;
+  parent_id: string;
+  student_id: string;
+  relationship: string | null;
+  is_primary: boolean;
+  created_at: string;
 };
 
 export type ClassRow = {
@@ -322,6 +331,27 @@ export type Database = {
             columns: ["id"];
             isOneToOne: true;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      guardian_links: {
+        Row: GuardianLink;
+        Insert: Partial<GuardianLink>;
+        Update: Partial<GuardianLink>;
+        Relationships: [
+          {
+            foreignKeyName: "guardian_links_parent_id_fkey";
+            columns: ["parent_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "guardian_links_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
             referencedColumns: ["id"];
           }
         ];

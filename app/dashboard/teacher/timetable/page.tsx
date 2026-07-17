@@ -25,11 +25,9 @@ export default async function TeacherTimetablePage() {
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        My timetable
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">My timetable</h1>
       <p className="mb-6 text-sm text-ink-soft">
-        All classes you're scheduled to teach this term.
+        All classes you&apos;re scheduled to teach this term.
       </p>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
@@ -40,10 +38,7 @@ export default async function TeacherTimetablePage() {
             </h2>
             <div className="space-y-2">
               {entriesByDay.get(day)?.map((entry: any) => (
-                <div
-                  key={entry.id}
-                  className="rounded-lg border border-rule bg-white p-3 text-sm"
-                >
+                <div key={entry.id} className="rounded-lg border border-rule bg-white p-3 text-sm">
                   <p className="font-medium text-ink">
                     P{entry.period_number} · {entry.subjects?.name}
                   </p>

@@ -24,10 +24,7 @@ export default async function AdminStudentReportCardPage({
 
   return (
     <div>
-
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        Report card
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Report card</h1>
       <TermYearSelector currentTerm={term} currentYear={academicYear} />
 
       {data ? (
@@ -45,7 +42,7 @@ export default async function AdminStudentReportCardPage({
         />
       ) : (
         <p className="text-sm text-ink-soft">
-          This student isn't assigned to a class yet, so no report card can be generated.
+          This student isn&apos;t assigned to a class yet, so no report card can be generated.
         </p>
       )}
     </div>
