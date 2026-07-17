@@ -5,17 +5,74 @@ import { createStudentsBulk, type BulkStudentResult } from "@/lib/actions/admin"
 
 type PasswordStrategy = "auto" | "shared";
 
+/**
+ * Parses raw CSV text into rows of fields, per RFC 4180: handles quoted
+ * fields (so a field can contain commas or newlines), escaped quotes
+ * ("" inside a quoted field), and both \n and \r\n line endings.
+ *
+ * The previous version split each line on a raw "," which silently
+ * corrupted any field that itself contained a comma — including data
+ * this app's own CSV export can produce (guardian names like
+ * "Okafor, Jr.", addresses, etc.), so exporting and re-importing the
+ * same data could break.
+ */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (normalized[i + 1] === '"') {
+          field += '"';
+          i++; // skip the escaped quote's second character
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = true;
+    } else if (char === ",") {
+      row.push(field);
+      field = "";
+    } else if (char === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+
+  // Final field/row, if the text doesn't end with a newline.
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  return rows.filter((r) => r.some((f) => f.trim().length > 0));
+}
+
 function parseRows(raw: string) {
-  return raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [fullName, email, admissionNo, guardianName, guardianPhone] = line
-        .split(",")
-        .map((part) => part.trim());
-      return { fullName, email, admissionNo, guardianName, guardianPhone };
-    });
+  return parseCsv(raw).map(([fullName, email, admissionNo, guardianName, guardianPhone]) => ({
+    fullName: (fullName ?? "").trim(),
+    email: (email ?? "").trim(),
+    admissionNo: (admissionNo ?? "").trim(),
+    guardianName: (guardianName ?? "").trim(),
+    guardianPhone: (guardianPhone ?? "").trim(),
+  }));
 }
 
 export function BulkCreateStudentsForm({

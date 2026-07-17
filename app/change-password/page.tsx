@@ -63,6 +63,12 @@ export default function ChangePasswordPage() {
     // read the stale claim and bounce the user right back to this page.
     await supabase.auth.refreshSession();
 
+    // The temporary password may have been used to sign in elsewhere
+    // (or by whoever set it up, before handing it off). Revoking every
+    // other session forces anyone still on the old password to sign in
+    // again with the one just chosen here.
+    await supabase.auth.signOut({ scope: "others" });
+
     router.push("/dashboard");
     router.refresh();
   }

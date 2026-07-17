@@ -1,12 +1,36 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCurrentProfile } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+// Deliberately re-checks the role via the service-role client rather than
+// trusting getCurrentProfile()'s result. auth.getUser() validates the JWT
+// directly against Supabase's Auth server and can't be spoofed, but the
+// *profile row* getCurrentProfile() reads is fetched with the session's
+// anon-key client — its trustworthiness for a security gate like this one
+// depends entirely on RLS SELECT policies on `profiles` being airtight.
+// Reading the row again here with the admin client removes that
+// dependency: this check trusts nothing but the validated user id and the
+// database's actual data, bypassing RLS altogether.
 async function assertIsAdmin() {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "admin") {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in.");
+  }
+
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("role, is_active")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile || profile.role !== "admin" || !profile.is_active) {
     throw new Error("Only an admin can create accounts.");
   }
 }
@@ -16,6 +40,25 @@ function generateTempPassword() {
   const word = words[Math.floor(Math.random() * words.length)];
   const num = Math.floor(10 + Math.random() * 89);
   return `${word}-${num}-${words[Math.floor(Math.random() * words.length)]}`;
+}
+
+// Supabase Auth would reject a true duplicate anyway, but checking first
+// gives a clear, specific error instead of surfacing Auth's raw message,
+// and avoids an auth.admin.createUser call (and the compensating cleanup
+// path) we already know will fail.
+async function assertEmailAvailable(
+  admin: ReturnType<typeof createAdminClient>,
+  email: string
+) {
+  const { data: existing } = await admin
+    .from("profiles")
+    .select("id")
+    .ilike("email", email)
+    .maybeSingle();
+
+  if (existing) {
+    throw new Error(`An account with the email "${email}" already exists.`);
+  }
 }
 
 async function getCurrentTermYear(admin: ReturnType<typeof createAdminClient>) {
@@ -57,6 +100,7 @@ export async function createTeacherAccount(input: {
 }) {
   await assertIsAdmin();
   const admin = createAdminClient();
+  await assertEmailAvailable(admin, input.email);
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email: input.email,
@@ -113,6 +157,7 @@ export async function createStudentAccount(input: {
   }
 
   const admin = createAdminClient();
+  await assertEmailAvailable(admin, input.email);
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email: input.email,
@@ -201,6 +246,23 @@ export async function createStudentsBulk(input: {
       input.passwordStrategy === "shared" ? input.sharedPassword! : generateTempPassword();
 
     try {
+      const emailTaken = await admin
+        .from("profiles")
+        .select("id")
+        .ilike("email", row.email)
+        .maybeSingle()
+        .then(({ data }) => !!data);
+
+      if (emailTaken) {
+        results.push({
+          email: row.email,
+          fullName: row.fullName,
+          success: false,
+          error: `An account with the email "${row.email}" already exists.`,
+        });
+        continue;
+      }
+
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email: row.email,
         password,
