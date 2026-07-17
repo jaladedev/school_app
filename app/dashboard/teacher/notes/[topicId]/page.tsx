@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { NoteEditor } from "@/components/NoteEditor";
 import { formatLevel } from "@/types/database";
@@ -26,6 +27,12 @@ export default async function TeacherNoteEditPage({
 
   return (
     <div>
+      <Link
+        href="/dashboard/teacher/notes"
+        className="mb-2 inline-block text-sm text-leaf hover:underline"
+      >
+        ← My subjects
+      </Link>
       <p className="mb-1 text-xs uppercase tracking-wide text-leaf">
         {topic?.subjects?.name} ·{" "}
         {topic && formatLevel(topic.education_level, topic.level_number)} · Term{" "}

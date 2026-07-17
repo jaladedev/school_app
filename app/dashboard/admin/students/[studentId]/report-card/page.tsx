@@ -2,7 +2,6 @@ import { getReportCardData } from "@/lib/report-card";
 import { ReportCardView } from "@/components/ReportCardView";
 import { TermYearSelector } from "@/components/TermYearSelector";
 import { RemarkForm } from "@/components/RemarkForm";
-import { StudentDetailTabs } from "@/components/StudentDetailTabs";
 
 function defaultAcademicYear() {
   const now = new Date();
@@ -25,7 +24,6 @@ export default async function AdminStudentReportCardPage({
 
   return (
     <div>
-      <StudentDetailTabs studentId={params.studentId} />
 
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
         Report card

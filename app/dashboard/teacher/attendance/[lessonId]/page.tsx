@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AttendanceForm } from "@/components/AttendanceForm";
 import type { AttendanceStatus } from "@/types/database";
@@ -39,6 +40,12 @@ export default async function AttendancePage({
 
   return (
     <div className="max-w-xl">
+      <Link
+        href="/dashboard/teacher/attendance"
+        className="mb-2 inline-block text-sm text-leaf hover:underline"
+      >
+        ← Attendance
+      </Link>
       <p className="mb-1 text-xs uppercase tracking-wide text-leaf">Attendance</p>
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">
         {lesson?.classes?.name} {lesson?.classes?.arm}

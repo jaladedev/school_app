@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { StudentDetailTabs } from "@/components/StudentDetailTabs";
 import type { AttendanceStatus } from "@/types/database";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -27,7 +26,6 @@ export default async function StudentAttendancePage({
 
   return (
     <div>
-      <StudentDetailTabs studentId={params.studentId} />
 
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">Attendance</h1>
 

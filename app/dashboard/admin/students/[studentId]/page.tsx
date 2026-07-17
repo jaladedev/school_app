@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { StudentDetailTabs } from "@/components/StudentDetailTabs";
 import { EditStudentForm } from "@/components/EditStudentForm";
 import { formatLevel } from "@/types/database";
 
@@ -28,7 +27,6 @@ export default async function StudentInfoPage({
 
   return (
     <div>
-      <StudentDetailTabs studentId={params.studentId} />
 
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
         {profile?.full_name ?? "Student"}

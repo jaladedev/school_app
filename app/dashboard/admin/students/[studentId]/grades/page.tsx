@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { StudentDetailTabs } from "@/components/StudentDetailTabs";
 import { EmptyState } from "@/components/EmptyState";
 
 export default async function StudentGradesTabPage({
@@ -23,7 +22,6 @@ export default async function StudentGradesTabPage({
 
   return (
     <div>
-      <StudentDetailTabs studentId={params.studentId} />
 
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">Grades</h1>
 

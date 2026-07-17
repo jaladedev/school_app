@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { GradeEntryForm } from "@/components/GradeEntryForm";
 import { EmptyState } from "@/components/EmptyState";
@@ -38,6 +39,12 @@ export default async function GradeEntryPage({
 
   return (
     <div className="max-w-xl">
+      <Link
+        href="/dashboard/teacher/grades"
+        className="mb-2 inline-block text-sm text-leaf hover:underline"
+      >
+        ← Grades
+      </Link>
       <p className="mb-1 text-xs uppercase tracking-wide text-leaf">
         {assessment?.classes?.name} {assessment?.classes?.arm}
       </p>

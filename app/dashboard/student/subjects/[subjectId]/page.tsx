@@ -52,6 +52,12 @@ export default async function SubjectTopicsPage({
 
   return (
     <div>
+      <Link
+        href="/dashboard/student"
+        className="mb-2 inline-block text-sm text-leaf hover:underline"
+      >
+        ← My subjects
+      </Link>
       <p className="mb-1 text-xs uppercase tracking-wide text-leaf">Subject</p>
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">
         {subject?.name}
