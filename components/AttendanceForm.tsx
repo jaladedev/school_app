@@ -62,10 +62,10 @@ export function AttendanceForm({
         {students.map((student) => (
           <div
             key={student.id}
-            className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3"
+            className="flex flex-col gap-2 rounded-lg border border-rule bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
           >
             <span className="text-ink">{student.full_name}</span>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {STATUS_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}

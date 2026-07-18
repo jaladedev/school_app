@@ -226,7 +226,7 @@ export default async function TeacherProfilePage({
           {(entries ?? []).map((e) => (
             <div
               key={e.id}
-              className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-2 text-sm"
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-rule bg-white px-4 py-2 text-sm"
             >
               <span className="text-ink-soft">
                 {WEEKDAY_NAMES[e.weekday]} P{e.period_number}

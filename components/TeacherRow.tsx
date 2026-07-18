@@ -44,7 +44,7 @@ export function TeacherRow({
     <div
       className={`rounded-lg border border-rule bg-white px-4 py-3 ${!isActive ? "opacity-60" : ""}`}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex-1">
           {editingName ? (
             <form onSubmit={handleSaveName} className="flex items-center gap-2">
@@ -93,7 +93,7 @@ export function TeacherRow({
             {subjectNames.length ? subjectNames.join(", ") : "No subjects assigned"}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <ResetPasswordButton userId={teacherId} />
           <DeactivateUserButton userId={teacherId} isActive={isActive} />
           <EditTeacherSubjectsForm

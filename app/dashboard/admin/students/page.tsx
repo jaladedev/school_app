@@ -67,7 +67,7 @@ export default async function AdminStudentsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Students</h1>
           <p className="text-sm text-ink-soft">
@@ -75,7 +75,7 @@ export default async function AdminStudentsPage({
             {totalPages}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <ExportStudentsButton />
           <CreateStudentForm classes={classes ?? []} />
           <BulkCreateStudentsForm classes={classes ?? []} />
@@ -94,7 +94,7 @@ export default async function AdminStudentsPage({
           return (
             <div
               key={s.id}
-              className={`flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 ${
+              className={`flex flex-col gap-3 rounded-lg border border-rule bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
                 !isActive ? "opacity-60" : ""
               }`}
             >
@@ -110,7 +110,7 @@ export default async function AdminStudentsPage({
                   <p className="text-xs text-ink-soft">Admission no. {s.admission_no}</p>
                 )}
               </Link>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <span className="rounded-full bg-leaf-soft px-3 py-1 text-sm font-medium text-leaf">
                   {cls ? `${cls.name} ${cls.arm ?? ""}` : "Unassigned"}
                 </span>

@@ -37,7 +37,7 @@ export function ClassRow({
 
   return (
     <div className="rounded-lg border border-rule bg-white px-4 py-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-medium text-ink">
             {name} {arm}
@@ -46,7 +46,7 @@ export function ClassRow({
             {formatLevel(educationLevel, levelNumber)} · {academicYear} · {studentCount} students
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <div>
             <p className="mb-1 text-xs text-ink-soft">Class teacher</p>
             <AssignClassTeacherSelect
