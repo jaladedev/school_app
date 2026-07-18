@@ -32,10 +32,23 @@ export default async function AdminClassesPage() {
     .from("teacher_profiles")
     .select("id, profiles(full_name)");
 
-  const teachers = (teacherProfiles ?? []).map((t: any) => ({
+  const teachers = (teacherProfiles ?? []).map((t) => ({
     id: t.id,
     full_name: t.profiles?.full_name ?? "Unknown",
   }));
+
+  const { data: entries } = await supabase.from("timetable_entries").select("class_id, subject_id");
+
+  const timetableStatsByClass = new Map<string, { periodCount: number; subjectIds: Set<string> }>();
+  for (const e of entries ?? []) {
+    const stats = timetableStatsByClass.get(e.class_id) ?? {
+      periodCount: 0,
+      subjectIds: new Set<string>(),
+    };
+    stats.periodCount += 1;
+    stats.subjectIds.add(e.subject_id);
+    timetableStatsByClass.set(e.class_id, stats);
+  }
 
   return (
     <div>
@@ -55,21 +68,26 @@ export default async function AdminClassesPage() {
       </div>
 
       <div className="space-y-2">
-        {classes?.map((cls) => (
-          <ClassRow
-            key={cls.id}
-            classId={cls.id}
-            name={cls.name}
-            arm={cls.arm}
-            educationLevel={cls.education_level}
-            levelNumber={cls.level_number}
-            academicYear={cls.academic_year}
-            isArchived={cls.is_archived}
-            studentCount={countByClass.get(cls.id) ?? 0}
-            currentTeacherId={cls.class_teacher_id}
-            teachers={teachers}
-          />
-        ))}
+        {classes?.map((cls) => {
+          const stats = timetableStatsByClass.get(cls.id);
+          return (
+            <ClassRow
+              key={cls.id}
+              classId={cls.id}
+              name={cls.name}
+              arm={cls.arm}
+              educationLevel={cls.education_level}
+              levelNumber={cls.level_number}
+              academicYear={cls.academic_year}
+              isArchived={cls.is_archived}
+              studentCount={countByClass.get(cls.id) ?? 0}
+              subjectsScheduledCount={stats?.subjectIds.size ?? 0}
+              periodsPerWeek={stats?.periodCount ?? 0}
+              currentTeacherId={cls.class_teacher_id}
+              teachers={teachers}
+            />
+          );
+        })}
 
         {!classes?.length && <EmptyState message="No active classes." />}
       </div>

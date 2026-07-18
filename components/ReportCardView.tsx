@@ -67,39 +67,41 @@ export function ReportCardView({
         </div>
 
         {/* Subjects table */}
-        <table className="mb-6 w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b-2 border-ink text-left">
-              <th className="py-2 pr-2">Subject</th>
-              <th className="py-2 pr-2 text-right">Score (%)</th>
-              <th className="py-2 pr-2 text-right">Grade</th>
-              <th className="py-2 pr-2 text-right">Position</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.subjects.map((s) => (
-              <tr key={s.subjectId} className="border-b border-rule">
-                <td className="py-2 pr-2 text-ink">{s.subjectName}</td>
-                <td className="py-2 pr-2 text-right text-ink">
-                  {s.scorePercent !== null ? `${s.scorePercent}%` : "—"}
-                </td>
-                <td className="py-2 pr-2 text-right font-medium text-ink">
-                  {s.letterGrade ?? "—"}
-                </td>
-                <td className="py-2 pr-2 text-right text-ink-soft">
-                  {s.position ? `${s.position} of ${s.classSize}` : "—"}
-                </td>
+        <div className="mb-6 overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b-2 border-ink text-left">
+                <th className="py-2 pr-2">Subject</th>
+                <th className="py-2 pr-2 text-right">Score (%)</th>
+                <th className="py-2 pr-2 text-right">Grade</th>
+                <th className="py-2 pr-2 text-right">Position</th>
               </tr>
-            ))}
-            {!data.subjects.length && (
-              <tr>
-                <td colSpan={4} className="py-4 text-center text-ink-soft">
-                  No grades recorded for this term yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.subjects.map((s) => (
+                <tr key={s.subjectId} className="border-b border-rule">
+                  <td className="py-2 pr-2 text-ink">{s.subjectName}</td>
+                  <td className="py-2 pr-2 text-right text-ink">
+                    {s.scorePercent !== null ? `${s.scorePercent}%` : "—"}
+                  </td>
+                  <td className="py-2 pr-2 text-right font-medium text-ink">
+                    {s.letterGrade ?? "—"}
+                  </td>
+                  <td className="py-2 pr-2 text-right text-ink-soft">
+                    {s.position ? `${s.position} of ${s.classSize}` : "—"}
+                  </td>
+                </tr>
+              ))}
+              {!data.subjects.length && (
+                <tr>
+                  <td colSpan={4} className="py-4 text-center text-ink-soft">
+                    No grades recorded for this term yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Overall + attendance summary */}
         <div className="mb-6 grid grid-cols-2 gap-4">

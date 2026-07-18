@@ -15,6 +15,8 @@ export function ClassRow({
   academicYear,
   isArchived,
   studentCount,
+  subjectsScheduledCount,
+  periodsPerWeek,
   currentTeacherId,
   teachers,
 }: {
@@ -26,6 +28,8 @@ export function ClassRow({
   academicYear: string;
   isArchived: boolean;
   studentCount: number;
+  subjectsScheduledCount: number;
+  periodsPerWeek: number;
   currentTeacherId: string | null;
   teachers: { id: string; full_name: string }[];
 }) {
@@ -65,6 +69,17 @@ export function ClassRow({
           </Link>
         </div>
       </div>
+
+      <p className="mt-2 text-xs text-ink-soft">
+        {periodsPerWeek > 0 ? (
+          <>
+            {subjectsScheduledCount} subject{subjectsScheduledCount === 1 ? "" : "s"} scheduled ·{" "}
+            {periodsPerWeek} period{periodsPerWeek === 1 ? "" : "s"}/week
+          </>
+        ) : (
+          <span className="text-marigold-dark">Not scheduled yet</span>
+        )}
+      </p>
 
       {editing && (
         <EditClassForm

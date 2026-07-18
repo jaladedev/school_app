@@ -271,7 +271,7 @@ export function BulkCreateStudentsForm({
           <p className="mb-2 text-sm font-medium text-ink">
             {results.filter((r) => r.success).length} of {results.length} created
           </p>
-          <div className="max-h-64 overflow-y-auto rounded-lg border border-rule">
+          <div className="max-h-64 overflow-x-auto overflow-y-auto rounded-lg border border-rule">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-rule bg-paper text-left text-xs uppercase text-ink-soft">
