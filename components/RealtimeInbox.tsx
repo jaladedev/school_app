@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { ArchiveConversationButton } from "@/components/ArchiveConversationButton";
 
 type Conversation = {
   partnerId: string;
@@ -11,17 +12,25 @@ type Conversation = {
   lastMessage: string;
   lastSentAt: string;
   unread: number;
+  isArchived: boolean;
 };
 
 export function RealtimeInbox({
   currentUserId,
   initialConversations,
+  view,
 }: {
   currentUserId: string;
   initialConversations: Conversation[];
+  view: "active" | "archived";
 }) {
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const knownPartnerIds = useRef(new Set(initialConversations.map((c) => c.partnerId)));
+  // A brand new message always belongs to an unarchived conversation, so
+  // it should only ever be live-injected while looking at the Active
+  // tab. Archived conversations stay put until the page is reloaded,
+  // matching how most inboxes treat muted/archived threads.
+  const isActiveView = view === "active";
 
   useEffect(() => {
     setConversations(initialConversations);
@@ -29,6 +38,8 @@ export function RealtimeInbox({
   }, [initialConversations]);
 
   useEffect(() => {
+    if (!isActiveView) return;
+
     const supabase = createClient();
 
     const channel = supabase
@@ -90,6 +101,7 @@ export function RealtimeInbox({
                 lastMessage: row.content,
                 lastSentAt: row.sent_at,
                 unread: 1,
+                isArchived: false,
               };
               return [next, ...prev].sort(
                 (a, b) => new Date(b.lastSentAt).getTime() - new Date(a.lastSentAt).getTime()
@@ -103,26 +115,28 @@ export function RealtimeInbox({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUserId]);
+  }, [currentUserId, isActiveView]);
 
   return (
     <div className="space-y-2">
       {conversations.map((convo) => (
-        <Link
+        <div
           key={convo.partnerId}
-          href={`/dashboard/messages/${convo.partnerId}`}
           className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 transition hover:border-leaf"
         >
-          <div className="min-w-0">
+          <Link href={`/dashboard/messages/${convo.partnerId}`} className="min-w-0 flex-1">
             <p className="font-medium text-ink">{convo.partnerName}</p>
             <p className="truncate text-sm text-ink-soft">{convo.lastMessage}</p>
+          </Link>
+          <div className="ml-3 flex items-center gap-3">
+            {convo.unread > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-marigold px-1.5 text-xs font-medium text-ink">
+                {convo.unread}
+              </span>
+            )}
+            <ArchiveConversationButton partnerId={convo.partnerId} isArchived={convo.isArchived} />
           </div>
-          {convo.unread > 0 && (
-            <span className="ml-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-marigold px-1.5 text-xs font-medium text-ink">
-              {convo.unread}
-            </span>
-          )}
-        </Link>
+        </div>
       ))}
 
       {!conversations.length && <p className="text-sm text-ink-soft">No conversations yet.</p>}

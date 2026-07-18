@@ -215,6 +215,12 @@ export type Message = {
   sent_at: string;
 };
 
+export type ConversationArchive = {
+  user_id: string;
+  partner_id: string;
+  archived_at: string;
+};
+
 export type ReportCardRemark = {
   id: string;
   student_id: string;
@@ -665,6 +671,27 @@ export type Database = {
           {
             foreignKeyName: "messages_recipient_id_fkey";
             columns: ["recipient_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      conversation_archives: {
+        Row: ConversationArchive;
+        Insert: Partial<ConversationArchive>;
+        Update: Partial<ConversationArchive>;
+        Relationships: [
+          {
+            foreignKeyName: "conversation_archives_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "conversation_archives_partner_id_fkey";
+            columns: ["partner_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
