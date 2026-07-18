@@ -7,6 +7,7 @@ import { EditTeacherSubjectsForm } from "@/components/EditTeacherSubjectsForm";
 import { ResetPasswordButton } from "@/components/ResetPasswordButton";
 import { DeactivateUserButton } from "@/components/DeactivateUserButton";
 import { updateTeacherAccount } from "@/lib/actions/admin";
+import type { PickableSubject } from "@/components/SubjectPicker";
 
 export function TeacherRow({
   teacherId,
@@ -23,10 +24,9 @@ export function TeacherRow({
   isActive: boolean;
   subjectNames: string[];
   currentSubjectIds: string[];
-  allSubjects: { id: string; name: string }[];
+  allSubjects: PickableSubject[];
 }) {
   const router = useRouter();
-  const [editingSubjects, setEditingSubjects] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(fullName);
   const [isPending, startTransition] = useTransition();
@@ -96,23 +96,13 @@ export function TeacherRow({
         <div className="flex items-center gap-3">
           <ResetPasswordButton userId={teacherId} />
           <DeactivateUserButton userId={teacherId} isActive={isActive} />
-          <button
-            onClick={() => setEditingSubjects((prev) => !prev)}
-            className="text-sm font-medium text-leaf hover:underline"
-          >
-            {editingSubjects ? "Close" : "Edit subjects"}
-          </button>
+          <EditTeacherSubjectsForm
+            teacherId={teacherId}
+            currentSubjectIds={currentSubjectIds}
+            allSubjects={allSubjects}
+          />
         </div>
       </div>
-
-      {editingSubjects && (
-        <EditTeacherSubjectsForm
-          teacherId={teacherId}
-          currentSubjectIds={currentSubjectIds}
-          allSubjects={allSubjects}
-          onClose={() => setEditingSubjects(false)}
-        />
-      )}
     </div>
   );
 }

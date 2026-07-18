@@ -3,21 +3,21 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { SubjectPicker, type PickableSubject } from "@/components/SubjectPicker";
 
 export function EditTeacherSubjectsForm({
   teacherId,
   currentSubjectIds,
   allSubjects,
-  onClose,
 }: {
   teacherId: string;
   currentSubjectIds: string[];
-  allSubjects: { id: string; name: string }[];
-  onClose: () => void;
+  allSubjects: PickableSubject[];
 }) {
   const router = useRouter();
   const supabase = createClient();
 
+  const [open, setOpen] = useState(false);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(currentSubjectIds);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,32 +47,32 @@ export function EditTeacherSubjectsForm({
       return;
     }
 
-    onClose();
+    setOpen(false);
     router.refresh();
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-sm font-medium text-leaf hover:underline"
+      >
+        Edit subjects
+      </button>
+    );
   }
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 rounded-xl border border-rule bg-paper p-4">
       <p className="mb-2 text-sm font-medium text-ink">Subjects taught</p>
-      <div className="mb-4 flex flex-wrap gap-2">
-        {allSubjects.map((subject) => (
-          <button
-            type="button"
-            key={subject.id}
-            onClick={() => toggleSubject(subject.id)}
-            className={`rounded-full border px-3 py-1 text-sm transition ${
-              selectedSubjects.includes(subject.id)
-                ? "border-leaf bg-leaf-soft text-leaf"
-                : "border-rule text-ink-soft"
-            }`}
-          >
-            {subject.name}
-          </button>
-        ))}
-        {!allSubjects.length && <p className="text-sm text-ink-soft">No subjects created yet.</p>}
-      </div>
 
-      <div className="flex gap-2">
+      <SubjectPicker
+        subjects={allSubjects}
+        selectedIds={selectedSubjects}
+        onToggle={toggleSubject}
+      />
+
+      <div className="mt-4 flex gap-2">
         <button
           type="submit"
           disabled={saving}
@@ -82,7 +82,11 @@ export function EditTeacherSubjectsForm({
         </button>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+            setOpen(false);
+            setSelectedSubjects(currentSubjectIds);
+            setError(null);
+          }}
           className="rounded-lg border border-rule px-3 py-2 text-sm text-ink-soft"
         >
           Cancel

@@ -41,7 +41,10 @@ export default async function AdminStaffPage({
   const { data: teachers, count } = await teacherQuery.range(from, to);
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / DEFAULT_PAGE_SIZE));
 
-  const { data: subjects } = await supabase.from("subjects").select("id, name").order("name");
+  const { data: subjects } = await supabase
+    .from("subjects")
+    .select("id, name, education_level, min_level_number, max_level_number")
+    .order("name");
 
   const subjectNameById = new Map((subjects ?? []).map((s) => [s.id, s.name]));
 

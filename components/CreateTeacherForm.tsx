@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { createTeacherAccount } from "@/lib/actions/admin";
 import { createTeacherSchema, fieldErrorsFrom } from "@/lib/validation";
+import { SubjectPicker, type PickableSubject } from "@/components/SubjectPicker";
 
-export function CreateTeacherForm({ subjects }: { subjects: { id: string; name: string }[] }) {
+export function CreateTeacherForm({ subjects }: { subjects: PickableSubject[] }) {
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -101,23 +102,7 @@ export function CreateTeacherForm({ subjects }: { subjects: { id: string; name: 
         <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
           Subjects taught
         </p>
-        <div className="flex flex-wrap gap-2">
-          {subjects.map((s) => (
-            <button
-              type="button"
-              key={s.id}
-              onClick={() => toggleSubject(s.id)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                subjectIds.includes(s.id)
-                  ? "bg-leaf text-white"
-                  : "bg-paper text-ink-soft hover:bg-leaf-soft"
-              }`}
-            >
-              {s.name}
-            </button>
-          ))}
-          {!subjects.length && <p className="text-xs text-ink-soft">No subjects created yet.</p>}
-        </div>
+        <SubjectPicker subjects={subjects} selectedIds={subjectIds} onToggle={toggleSubject} />
         {fieldErrors.subjectIds && (
           <p className="mt-1 text-xs text-clay">{fieldErrors.subjectIds}</p>
         )}
@@ -143,8 +128,8 @@ export function CreateTeacherForm({ subjects }: { subjects: { id: string; name: 
       {error && <p className="text-sm text-clay">{error}</p>}
       {created && (
         <p className="text-sm text-leaf">
-          Account created for {created}. Share the temporary password with them directly — it won't
-          be shown again here.
+          Account created for {created}. Share the temporary password with them directly — it
+          won&apos;t be shown again here.
         </p>
       )}
     </form>
