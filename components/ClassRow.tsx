@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { AssignClassTeacherSelect } from "@/components/AssignClassTeacherSelect";
 import { EditClassForm } from "@/components/EditClassForm";
+import { ExportClassListButton } from "@/components/ExportClassListButton";
 import { formatLevel, type EducationLevel } from "@/types/database";
 
 export function ClassRow({
@@ -61,6 +62,7 @@ export function ClassRow({
           >
             {editing ? "Close" : "Edit"}
           </button>
+          <ExportClassListButton classId={classId} className={`${name} ${arm ?? ""}`} />
           <Link
             href={`/dashboard/admin/timetables/${classId}`}
             className="text-sm font-medium text-leaf hover:underline"

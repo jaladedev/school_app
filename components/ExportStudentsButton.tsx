@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-function escapeCsvField(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
+import { downloadCsv } from "@/lib/csv";
 
 export function ExportStudentsButton() {
   const supabase = createClient();
@@ -48,20 +42,10 @@ export function ExportStudentsButton() {
         cls ? `${cls.name} ${cls.arm ?? ""}`.trim() : "",
         s.guardian_name ?? "",
         s.guardian_phone ?? "",
-      ]
-        .map((field) => escapeCsvField(String(field)))
-        .join(",");
+      ];
     });
 
-    const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `students-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`students-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
   return (

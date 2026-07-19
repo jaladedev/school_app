@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ApproveAssessmentButton } from "@/components/ApproveAssessmentButton";
+import { ExportGradeSheetButton } from "@/components/ExportGradeSheetButton";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage } from "@/components/Pagination";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -64,13 +65,21 @@ export default async function AdminGradesModerationPage({
                   {stats.total - stats.pending} of {stats.total} approved
                 </p>
               </div>
-              {stats.pending > 0 ? (
-                <ApproveAssessmentButton assessmentId={a.id} />
-              ) : (
-                <span className="rounded-full bg-leaf-soft px-3 py-1 text-xs font-medium text-leaf">
-                  All approved
-                </span>
-              )}
+              <div className="flex items-center gap-3">
+                <ExportGradeSheetButton
+                  assessmentId={a.id}
+                  assessmentTitle={`${a.title}-${a.classes?.name ?? ""}`}
+                  classId={a.class_id}
+                  maxScore={a.max_score}
+                />
+                {stats.pending > 0 ? (
+                  <ApproveAssessmentButton assessmentId={a.id} />
+                ) : (
+                  <span className="rounded-full bg-leaf-soft px-3 py-1 text-xs font-medium text-leaf">
+                    All approved
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
