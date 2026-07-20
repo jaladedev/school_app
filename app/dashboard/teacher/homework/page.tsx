@@ -2,6 +2,16 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { HomeworkStatusToggle } from "@/components/HomeworkStatusToggle";
 import { redirect } from "next/navigation";
 
+type HomeworkLessonRow = {
+  id: string;
+  lesson_date: string;
+  homework: string | null;
+  homework_status: "given" | "reviewed";
+  classes: { name: string; arm: string | null } | null;
+  curriculum_topics: { title: string } | null;
+  timetable_entries: { subjects: { name: string } | null } | null;
+};
+
 export default async function TeacherHomeworkPage() {
   const profile = await getCurrentProfile();
 
@@ -18,7 +28,8 @@ export default async function TeacherHomeworkPage() {
     .eq("teacher_id", profile.id)
     .not("homework", "is", null)
     .order("lesson_date", { ascending: false })
-    .limit(50);
+    .limit(50)
+    .returns<HomeworkLessonRow[]>();
 
   const pendingCount = (lessons ?? []).filter((l) => l.homework_status === "given").length;
 
@@ -32,7 +43,7 @@ export default async function TeacherHomeworkPage() {
       </p>
 
       <div className="space-y-2">
-        {lessons?.map((l: any) => (
+        {lessons?.map((l) => (
           <div key={l.id} className="rounded-lg border border-rule bg-white p-4">
             <div className="mb-1 flex items-center justify-between gap-3">
               <p className="font-medium text-ink">

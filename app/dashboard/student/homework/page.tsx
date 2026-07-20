@@ -2,6 +2,15 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/EmptyState";
 
+type HomeworkLessonRow = {
+  id: string;
+  lesson_date: string;
+  homework: string | null;
+  homework_status: "given" | "reviewed";
+  curriculum_topics: { title: string } | null;
+  timetable_entries: { subjects: { name: string } | null } | null;
+};
+
 export default async function StudentHomeworkPage() {
   const profile = await getCurrentProfile();
 
@@ -24,7 +33,8 @@ export default async function StudentHomeworkPage() {
     .eq("class_id", studentProfile?.class_id ?? "")
     .not("homework", "is", null)
     .order("lesson_date", { ascending: false })
-    .limit(30);
+    .limit(30)
+    .returns<HomeworkLessonRow[]>();
 
   return (
     <div className="max-w-2xl">
@@ -34,7 +44,7 @@ export default async function StudentHomeworkPage() {
       </p>
 
       <div className="space-y-2">
-        {lessons?.map((l: any) => (
+        {lessons?.map((l) => (
           <div key={l.id} className="rounded-lg border border-rule bg-white p-4">
             <div className="mb-1 flex items-center justify-between gap-3">
               <p className="font-medium text-ink">
