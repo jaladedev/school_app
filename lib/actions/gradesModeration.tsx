@@ -1,17 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient, getCurrentProfile } from "@/lib/supabase/server";
-
-async function assertIsAdmin() {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "admin") {
-    throw new Error("Only an admin can approve grades.");
-  }
-}
+import { createClient } from "@/lib/supabase/server";
+import { assertRole } from "@/lib/actions/authGuards";
 
 export async function approveAssessmentGrades(assessmentId: string) {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can approve grades.");
   const supabase = createClient();
 
   const { error, count } = await supabase
@@ -29,7 +23,7 @@ export async function approveAssessmentGrades(assessmentId: string) {
 }
 
 export async function approveSingleGrade(gradeId: string) {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can approve grades.");
   const supabase = createClient();
 
   const { data: grade } = await supabase

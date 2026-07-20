@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { assertRole } from "@/lib/actions/authGuards";
 
 export async function saveReportCardRemark(input: {
   studentId: string;
@@ -10,10 +11,7 @@ export async function saveReportCardRemark(input: {
   classTeacherRemark?: string;
   adminRemark?: string;
 }) {
-  const profile = await getCurrentProfile();
-  if (!profile || (profile.role !== "admin" && profile.role !== "teacher")) {
-    throw new Error("Only staff can add report card remarks.");
-  }
+  const { id } = await assertRole(["admin", "teacher"], "Only staff can add report card remarks.");
 
   const supabase = createClient();
 
@@ -24,7 +22,7 @@ export async function saveReportCardRemark(input: {
       academic_year: input.academicYear,
       class_teacher_remark: input.classTeacherRemark,
       admin_remark: input.adminRemark,
-      updated_by: profile.id,
+      updated_by: id,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "student_id,term,academic_year" }

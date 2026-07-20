@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { assertRole } from "@/lib/actions/authGuards";
 import type { GradeScaleEntry } from "@/types/database";
 
 export async function saveSchoolSettings(input: {
@@ -13,10 +14,7 @@ export async function saveSchoolSettings(input: {
   currentTerm: number;
   gradeScale: GradeScaleEntry[];
 }) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "admin") {
-    throw new Error("Only an admin can update school settings.");
-  }
+  await assertRole(["admin"], "Only an admin can update school settings.");
 
   const supabase = createClient();
 

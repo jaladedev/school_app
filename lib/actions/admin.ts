@@ -3,37 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-// Deliberately re-checks the role via the service-role client rather than
-// trusting getCurrentProfile()'s result. auth.getUser() validates the JWT
-// directly against Supabase's Auth server and can't be spoofed, but the
-// *profile row* getCurrentProfile() reads is fetched with the session's
-// anon-key client — its trustworthiness for a security gate like this one
-// depends entirely on RLS SELECT policies on `profiles` being airtight.
-// Reading the row again here with the admin client removes that
-// dependency: this check trusts nothing but the validated user id and the
-// database's actual data, bypassing RLS altogether.
-async function assertIsAdmin() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("You must be signed in.");
-  }
-
-  const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("role, is_active")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin" || !profile.is_active) {
-    throw new Error("Only an admin can create accounts.");
-  }
-}
+import { assertRole } from "@/lib/actions/authGuards";
 
 function generateTempPassword() {
   const words = ["river", "otter", "cedar", "maple", "coral", "amber", "birch", "delta"];
@@ -95,7 +65,7 @@ export async function createTeacherAccount(input: {
   temporaryPassword: string;
   subjectIds: string[];
 }) {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can perform this action.");
   const admin = createAdminClient();
   await assertEmailAvailable(admin, input.email);
 
@@ -147,7 +117,7 @@ export async function createStudentAccount(input: {
   guardianName?: string;
   guardianPhone?: string;
 }) {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can perform this action.");
 
   if (!input.classId) {
     throw new Error("Please select a class before creating the student.");
@@ -221,7 +191,7 @@ export async function createStudentsBulk(input: {
   passwordStrategy: "auto" | "shared";
   sharedPassword?: string;
 }): Promise<BulkStudentResult[]> {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can perform this action.");
 
   if (!input.classId) {
     throw new Error("Please select a class before creating students.");
@@ -338,7 +308,7 @@ export async function createStudentsBulk(input: {
 }
 
 export async function reassignStudentClass(studentId: string, classId: string) {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can perform this action.");
 
   if (!classId) {
     throw new Error("Please select a valid class.");
@@ -368,7 +338,7 @@ export async function updateStudentAccount(input: {
   guardianPhone?: string;
   classId?: string;
 }) {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can perform this action.");
   const admin = createAdminClient();
 
   const { error: profileError } = await admin
@@ -401,7 +371,7 @@ export async function updateStudentAccount(input: {
 // ---------- Edit teacher ----------
 
 export async function updateTeacherAccount(input: { teacherId: string; fullName: string }) {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can perform this action.");
   const admin = createAdminClient();
 
   const { error } = await admin
@@ -418,7 +388,7 @@ export async function updateTeacherAccount(input: { teacherId: string; fullName:
 // ---------- Deactivation (any role) ----------
 
 export async function deactivateUser(userId: string, deactivate: boolean) {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can perform this action.");
   const admin = createAdminClient();
 
   // ban_duration actually blocks sign-in at the auth level. "none" lifts
@@ -453,7 +423,7 @@ export async function promoteStudents(input: {
   targetClassId: string | null;
   outcome: PromotionOutcome;
 }) {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can perform this action.");
   const admin = createAdminClient();
 
   if (input.outcome !== "graduate" && !input.targetClassId) {
@@ -511,7 +481,7 @@ export async function promoteStudents(input: {
 // ---------- Password reset ----------
 
 export async function resetUserPassword(userId: string): Promise<{ password: string }> {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can perform this action.");
   const admin = createAdminClient();
 
   const newPassword = generateTempPassword();

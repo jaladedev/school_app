@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { assertRole } from "@/lib/actions/authGuards";
 import type { StudentNoteType } from "@/types/database";
 
 export async function createStudentNote(input: {
@@ -10,16 +11,16 @@ export async function createStudentNote(input: {
   content: string;
   visibleToStudent: boolean;
 }) {
-  const profile = await getCurrentProfile();
-  if (!profile || (profile.role !== "admin" && profile.role !== "teacher")) {
-    throw new Error("Only staff can add student notes.");
-  }
+  const { id: authorId } = await assertRole(
+    ["admin", "teacher"],
+    "Only staff can add student notes."
+  );
 
   const supabase = createClient();
 
   const { error } = await supabase.from("student_notes").insert({
     student_id: input.studentId,
-    author_id: profile.id,
+    author_id: authorId,
     note_type: input.noteType,
     content: input.content,
     visible_to_student: input.visibleToStudent,

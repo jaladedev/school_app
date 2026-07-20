@@ -1,17 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { assertRole } from "@/lib/actions/authGuards";
 import type { EducationLevel, PaymentMethod } from "@/types/database";
-
-async function assertIsAdmin() {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "admin") {
-    throw new Error("Only an admin can manage fees.");
-  }
-  return profile;
-}
 
 function computeStatus(totalKobo: number, discountKobo: number, paidKobo: number) {
   const owed = totalKobo - discountKobo;
@@ -29,7 +22,7 @@ export async function createFeeStructure(input: {
   amountKobo: number;
   dueDate?: string;
 }) {
-  const profile = await assertIsAdmin();
+  const { id } = await assertRole(["admin"], "Only an admin can manage fees.");
   const supabase = createClient();
 
   const { error } = await supabase.from("fee_structures").insert({
@@ -40,7 +33,7 @@ export async function createFeeStructure(input: {
     title: input.title,
     amount_kobo: input.amountKobo,
     due_date: input.dueDate || null,
-    created_by: profile.id,
+    created_by: id,
   });
 
   if (error) throw new Error(error.message);
@@ -49,7 +42,7 @@ export async function createFeeStructure(input: {
 }
 
 export async function generateInvoicesForClass(feeStructureId: string, classId: string) {
-  await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can manage fees.");
   const admin = createAdminClient();
 
   const { data: feeStructure } = await admin
@@ -104,7 +97,7 @@ export async function recordPayment(input: {
   method: PaymentMethod;
   reference?: string;
 }) {
-  const profile = await assertIsAdmin();
+  const { id } = await assertRole(["admin"], "Only an admin can manage fees.");
   const admin = createAdminClient();
 
   if (input.amountKobo <= 0) {
@@ -125,7 +118,7 @@ export async function recordPayment(input: {
     amount_kobo: input.amountKobo,
     method: input.method,
     reference: input.reference || null,
-    verified_by: profile.id,
+    verified_by: id,
   });
 
   if (paymentError) throw new Error(paymentError.message);
@@ -145,7 +138,7 @@ export async function recordPayment(input: {
 }
 
 export async function applyDiscount(invoiceId: string, discountKobo: number) {
-  const profile = await assertIsAdmin();
+  await assertRole(["admin"], "Only an admin can manage fees.");
   const admin = createAdminClient();
 
   const { data: invoice } = await admin.from("invoices").select("*").eq("id", invoiceId).single();
@@ -178,8 +171,12 @@ export async function applyDiscount(invoiceId: string, discountKobo: number) {
 // payment. This is the same trust model a webhook would use, just
 // triggered by the client instead of by Paystack calling back to you.
 export async function verifyPaystackPayment(input: { reference: string; invoiceId: string }) {
-  const profile = await getCurrentProfile();
-  if (!profile) throw new Error("You must be signed in.");
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("You must be signed in.");
 
   const admin = createAdminClient();
 
@@ -191,10 +188,13 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
 
   if (!invoice) throw new Error("Invoice not found.");
 
-  // A student can only ever verify a payment against their OWN invoice —
-  // this check runs before touching Paystack or writing anything.
-  if (invoice.student_id !== profile.id && profile.role !== "admin") {
-    throw new Error("You can't pay an invoice that isn't yours.");
+  // A student can only ever verify a payment against their OWN invoice.
+  // Ownership is checked against auth.getUser()'s id directly — that's
+  // JWT-validated and can't be spoofed. The admin bypass is checked
+  // separately via assertRole (service-role verified) rather than
+  // trusting a role read off the session-scoped profile.
+  if (invoice.student_id !== user.id) {
+    await assertRole(["admin"], "You can't pay an invoice that isn't yours.");
   }
 
   // Idempotency: if this reference was already recorded, don't credit
