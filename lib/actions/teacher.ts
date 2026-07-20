@@ -127,6 +127,10 @@ export async function markAttendance(
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/teacher/attendance/${lessonId}`);
+  revalidatePath("/dashboard/teacher/attendance");
+  for (const studentId of new Set(records.map((r) => r.studentId))) {
+    revalidatePath(`/dashboard/admin/students/${studentId}/attendance`);
+  }
 }
 
 // ---------- Grades ----------
@@ -184,6 +188,9 @@ export async function saveGrade(
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/teacher/grades/${assessmentId}`);
+  revalidatePath("/dashboard/admin/grades");
+  revalidatePath(`/dashboard/admin/students/${studentId}/grades`);
+  revalidatePath("/dashboard/student/grades");
 }
 
 // ---------- Note authoring ----------

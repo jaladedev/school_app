@@ -33,4 +33,5 @@ export async function saveReportCardRemark(input: {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/admin/students/${input.studentId}/report-card`);
+  revalidatePath("/dashboard/student/report-card");
 }

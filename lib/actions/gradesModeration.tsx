@@ -23,12 +23,20 @@ export async function approveAssessmentGrades(assessmentId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin/grades");
+  revalidatePath(`/dashboard/teacher/grades/${assessmentId}`);
+  revalidatePath("/dashboard/student/grades");
   return { count };
 }
 
 export async function approveSingleGrade(gradeId: string) {
   await assertIsAdmin();
   const supabase = createClient();
+
+  const { data: grade } = await supabase
+    .from("grades")
+    .select("assessment_id, student_id")
+    .eq("id", gradeId)
+    .single();
 
   const { error } = await supabase
     .from("grades")
@@ -38,4 +46,9 @@ export async function approveSingleGrade(gradeId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin/grades");
+  revalidatePath("/dashboard/student/grades");
+  if (grade) {
+    revalidatePath(`/dashboard/teacher/grades/${grade.assessment_id}`);
+    revalidatePath(`/dashboard/admin/students/${grade.student_id}/grades`);
+  }
 }

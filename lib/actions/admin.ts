@@ -412,6 +412,7 @@ export async function updateTeacherAccount(input: { teacherId: string; fullName:
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin/staff");
+  revalidatePath(`/dashboard/admin/staff/${input.teacherId}`);
 }
 
 // ---------- Deactivation (any role) ----------
@@ -439,6 +440,8 @@ export async function deactivateUser(userId: string, deactivate: boolean) {
 
   revalidatePath("/dashboard/admin/staff");
   revalidatePath("/dashboard/admin/students");
+  revalidatePath(`/dashboard/admin/staff/${userId}`);
+  revalidatePath(`/dashboard/admin/students/${userId}`);
 }
 
 // ---------- Promotion ----------
@@ -528,6 +531,8 @@ export async function resetUserPassword(userId: string): Promise<{ password: str
 
   revalidatePath("/dashboard/admin/staff");
   revalidatePath("/dashboard/admin/students");
+  revalidatePath(`/dashboard/admin/staff/${userId}`);
+  revalidatePath(`/dashboard/admin/students/${userId}`);
 
   return { password: newPassword };
 }

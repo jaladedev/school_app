@@ -28,4 +28,5 @@ export async function createStudentNote(input: {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/admin/students/${input.studentId}/notes`);
+  revalidatePath("/dashboard/student/notes");
 }
