@@ -33,6 +33,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Promote Students", href: "/dashboard/admin/classes/promote" },
     { label: "Subjects", href: "/dashboard/admin/subjects" },
     { label: "Students", href: "/dashboard/admin/students" },
+    { label: "Parents", href: "/dashboard/admin/parents" },
     { label: "Timetables", href: "/dashboard/admin/timetables" },
     { label: "Staff", href: "/dashboard/admin/staff" },
     { label: "Grade Moderation", href: "/dashboard/admin/grades" },
@@ -41,12 +42,14 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Announcements", href: "/dashboard/announcements" },
     { label: "Settings", href: "/dashboard/admin/settings" },
   ],
-  // Parent portal routes (linked children, read-only attendance/grades/
-  // report-card/fees/homework/timetable) don't exist yet — only
-  // Messages and Announcements are real, working routes for any signed-in
-  // role today. Add the rest here as those pages get built; a link to a
-  // route that doesn't exist would 404, which is worse than a short list.
   parent: [
+    { label: "Overview", href: "/dashboard/parent" },
+    { label: "Attendance", href: "/dashboard/parent/attendance" },
+    { label: "Grades", href: "/dashboard/parent/grades" },
+    { label: "Report Card", href: "/dashboard/parent/report-card" },
+    { label: "Fees", href: "/dashboard/parent/fees" },
+    { label: "Timetable", href: "/dashboard/parent/timetable" },
+    { label: "Homework", href: "/dashboard/parent/homework" },
     { label: "Messages", href: "/dashboard/messages" },
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
