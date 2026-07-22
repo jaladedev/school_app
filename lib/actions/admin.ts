@@ -385,6 +385,99 @@ export async function updateTeacherAccount(input: { teacherId: string; fullName:
   revalidatePath(`/dashboard/admin/staff/${input.teacherId}`);
 }
 
+// ---------- Parent accounts ----------
+
+export type ParentChildLink = {
+  studentId: string;
+  relationship: string;
+  isPrimary: boolean;
+};
+
+export async function createParentAccount(input: {
+  fullName: string;
+  email: string;
+  temporaryPassword: string;
+  children: ParentChildLink[];
+}) {
+  await assertRole(["admin"], "Only an admin can perform this action.");
+
+  if (!input.children.length) {
+    throw new Error("Link at least one child before creating the account.");
+  }
+
+  const admin = createAdminClient();
+  await assertEmailAvailable(admin, input.email);
+
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email: input.email,
+    password: input.temporaryPassword,
+    email_confirm: true,
+  });
+
+  if (createError || !created.user) {
+    throw new Error(createError?.message ?? "Failed to create the auth account.");
+  }
+
+  const userId = created.user.id;
+
+  const { error: profileError } = await admin.from("profiles").insert({
+    id: userId,
+    role: "parent",
+    full_name: input.fullName,
+    email: input.email,
+  });
+
+  if (profileError) {
+    await admin.auth.admin.deleteUser(userId);
+    throw new Error(profileError.message);
+  }
+
+  const { error: linksError } = await admin.from("guardian_links").insert(
+    input.children.map((c) => ({
+      parent_id: userId,
+      student_id: c.studentId,
+      relationship: c.relationship || null,
+      is_primary: c.isPrimary,
+    }))
+  );
+
+  if (linksError) {
+    await admin.auth.admin.deleteUser(userId);
+    throw new Error(linksError.message);
+  }
+
+  revalidatePath("/dashboard/admin/parents");
+  return { userId };
+}
+
+export async function addChildToParent(parentId: string, studentId: string, relationship?: string) {
+  await assertRole(["admin"], "Only an admin can perform this action.");
+  const admin = createAdminClient();
+
+  const { error } = await admin.from("guardian_links").insert({
+    parent_id: parentId,
+    student_id: studentId,
+    relationship: relationship || null,
+    is_primary: false,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/parents");
+  revalidatePath(`/dashboard/admin/parents/${parentId}`);
+}
+
+export async function removeChildFromParent(guardianLinkId: string) {
+  await assertRole(["admin"], "Only an admin can perform this action.");
+  const admin = createAdminClient();
+
+  const { error } = await admin.from("guardian_links").delete().eq("id", guardianLinkId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/parents");
+}
+
 // ---------- Deactivation (any role) ----------
 
 export async function deactivateUser(userId: string, deactivate: boolean) {
@@ -410,6 +503,7 @@ export async function deactivateUser(userId: string, deactivate: boolean) {
 
   revalidatePath("/dashboard/admin/staff");
   revalidatePath("/dashboard/admin/students");
+  revalidatePath("/dashboard/admin/parents");
   revalidatePath(`/dashboard/admin/staff/${userId}`);
   revalidatePath(`/dashboard/admin/students/${userId}`);
 }
@@ -501,6 +595,7 @@ export async function resetUserPassword(userId: string): Promise<{ password: str
 
   revalidatePath("/dashboard/admin/staff");
   revalidatePath("/dashboard/admin/students");
+  revalidatePath("/dashboard/admin/parents");
   revalidatePath(`/dashboard/admin/staff/${userId}`);
   revalidatePath(`/dashboard/admin/students/${userId}`);
 

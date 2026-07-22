@@ -188,13 +188,29 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
 
   if (!invoice) throw new Error("Invoice not found.");
 
-  // A student can only ever verify a payment against their OWN invoice.
-  // Ownership is checked against auth.getUser()'s id directly — that's
-  // JWT-validated and can't be spoofed. The admin bypass is checked
-  // separately via assertRole (service-role verified) rather than
-  // trusting a role read off the session-scoped profile.
+  // Who can trigger verification for this invoice:
+  //  1. The student themselves — checked against auth.getUser()'s id,
+  //     which is JWT-validated and can't be spoofed.
+  //  2. A parent/guardian linked to this student via guardian_links —
+  //     looked up with the admin client (bypasses RLS, reads ground
+  //     truth) keyed off user.id, not a client-suppliable profile field.
+  //     NOTE: guardian_links must itself be locked down with RLS so a
+  //     parent can't insert their own link to an arbitrary student.
+  //  3. An admin — verified via assertRole (service-role verified),
+  //     never trusted off a session-scoped profile row. This stays a
+  //     separate, stricter check rather than something like
+  //     `profile.role === "admin"`.
   if (invoice.student_id !== user.id) {
-    await assertRole(["admin"], "You can't pay an invoice that isn't yours.");
+    const { data: link } = await admin
+      .from("guardian_links")
+      .select("id")
+      .eq("parent_id", user.id)
+      .eq("student_id", invoice.student_id)
+      .maybeSingle();
+
+    if (!link) {
+      await assertRole(["admin"], "You can't pay an invoice that isn't yours.");
+    }
   }
 
   // Idempotency: if this reference was already recorded, don't credit
