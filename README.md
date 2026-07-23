@@ -1,69 +1,146 @@
 # School Management App
 
-Next.js + Supabase frontend for the school management system (students, teachers, admin).
+A Next.js 14 + Supabase school management application for a Nigerian school workflow. The app is organized around admin, teacher, student, and parent roles, with a notebook-style UI and data-driven pages for academics, attendance, fees, messaging, and report cards.
 
-## Setup
+## Overview
 
-1. **Install dependencies**
+This project is a full-stack school ERP-style web app built with:
 
-   ```bash
-   npm install
-   ```
+- Next.js App Router
+- TypeScript
+- Tailwind CSS
+- Supabase Auth + Postgres + RLS
+- Server actions for authenticated mutations
 
-2. **Connect Supabase**
-   - Create a project at https://supabase.com
-   - In the SQL editor, run the four seed files from the schema project in order:
-     `01_schema.sql` → `02_rls_policies.sql` → `03_seed_subject_topics.sql` → `04_seed_notes.sql`
-   - Copy `.env.local.example` to `.env.local` and fill in your project URL + anon key
-     (found in Supabase → Project Settings → API).
+The app currently covers:
 
-3. **Create a test student user**
-   - In Supabase Auth, create a user (email + password)
-   - Insert matching rows into `profiles` (role = 'student'), `student_profiles`,
-     and `classes`/`enrollments` so the student is linked to a Primary 4 class —
-     this is what makes the seeded Basic Science and Technology content show up.
+- Admin account lifecycle and password reset workflows
+- Class, subject, timetable, and enrollment management
+- Student and staff records
+- Teacher lesson planning, attendance, assessments, and grade entry
+- Curriculum notes with markdown + tables + Mermaid rendering
+- Parent portal access for read-only child views
+- Messaging and announcements
+- Invoicing, payments, and printable receipts
+- Report-card generation, ranking, and grading workflows
 
-4. **Run the dev server**
-   ```bash
-   npm run dev
-   ```
-   Visit http://localhost:3000/login
+## Current status
 
-## What's built so far
+The codebase is already beyond the early scaffold phase. The most recent work includes:
 
-- Auth (login) with middleware-protected `/dashboard` routes
-- Role-based redirect (`/dashboard` → `/dashboard/student` etc.)
-- Student flow: subjects list → topics by term → topic page rendering
-  markdown notes, tables, and Mermaid diagrams from the seeded content
-- Design tokens (notebook/paper theme) in `tailwind.config.ts` and `app/globals.css`
+- stronger temporary-password generation and account-cleanup safeguards
+- targeted role and RLS hardening across academic and parent flows
+- announcement read-state UX polish
+- shared toast feedback for save actions
+- richer term/year selector syncing and dashboard polish
 
-## Not yet built
+This README describes the current app state rather than the original starter-era behavior.
 
-- Signup flow (currently assumes admin creates accounts directly in Supabase)
-- Teacher dashboard (lesson planning, attendance, grade entry, note authoring)
-- Admin dashboard (user/class management, timetable builder)
-- Timetable UI
-- Messaging/announcements
+## Tech stack
 
-## Structure
+- Next.js: 14.2.5
+- React: 18
+- TypeScript: 5
+- Tailwind CSS: 3
+- Supabase SSR / Supabase JS
+- Zod validation
+- Mermaid rendering for curriculum notes
 
+## Local development
+
+### 1. Install dependencies
+
+```bash
+npm install
 ```
-app/
-  login/page.tsx                          — sign-in
-  dashboard/
-    layout.tsx                            — role-aware sidebar shell
-    page.tsx                              — redirects by role
-    student/
-      page.tsx                            — subject list
-      subjects/[subjectId]/page.tsx       — topics grouped by term
-      topics/[topicId]/page.tsx           — rendered note + resources
-components/
-  Sidebar.tsx
-  TopicContent.tsx                        — renders markdown + resources
-  MermaidDiagram.tsx                       — renders mermaid syntax as SVG
-lib/supabase/
-  client.ts                               — browser client
-  server.ts                                — server client + getCurrentProfile()
-types/database.ts                         — types matching the SQL schema
-middleware.ts                             — session refresh + route protection
+
+### 2. Configure environment variables
+
+Create a local environment file with the Supabase values used by the app.
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
+
+These values come from your Supabase project in the Project Settings → API section.
+
+### 3. Start the app
+
+```bash
+npm run dev
+```
+
+Then open:
+
+```text
+http://localhost:3000/login
+```
+
+## Available scripts
+
+```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
+npm run typecheck
+npm run format
+npm run format:check
+```
+
+## Key product areas
+
+### Admin
+
+- Manage classes, subjects, staff, students, timetables, and school settings
+- Create and reset user accounts
+- Review moderation workflows and fee/invoice operations
+
+### Teacher
+
+- Create lesson plans from timetable slots
+- Take attendance
+- Create assessments and enter grades
+- Author curriculum notes with draft/published status
+
+### Student and parent
+
+- View subject and topic materials
+- Access schedule, attendance, grades, fees, report cards, announcements, and messages
+- Parent accounts can switch across linked children
+
+### Fees and receipts
+
+- Fee structures and invoice generation
+- Manual payment recording
+- Paystack integration with server-side verification
+- Printable receipt pages
+
+### Reporting
+
+- Weighted grade calculation paths
+- Report-card generation
+- Class ranking and grade moderation support
+
+## Project structure
+
+```text
+app/                  — App Router pages and role-driven dashboard routes
+components/          — reusable UI components and forms
+lib/                 — server actions, helpers, validators, and Supabase integration
+types/               — shared database typing
+proxy.ts             — local request/proxy entry point used during development
+```
+
+## Notes for contributors
+
+- The app uses Role-Based Access Control and Postgres RLS across many tables.
+- Most page data is server rendered, while interactive pages stay in client components.
+- The database typing file is maintained manually and should be kept aligned with the SQL schema.
+- Work is tracked in the project todo list and should be reconciled with the actual codebase before being marked complete.
+
+## License
+
+This project is currently intended for internal or local development use within the workspace and is not yet packaged for public distribution.
