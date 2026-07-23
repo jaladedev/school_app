@@ -37,6 +37,10 @@ export async function createLesson(input: {
     throw new Error(`You aren't assigned to this period for ${className}.`);
   }
 
+  if (entry.class_id !== input.classId) {
+    throw new Error("Class doesn't match this timetable entry.");
+  }
+
   const { data: lesson, error } = await supabase
     .from("lessons")
     .insert({
