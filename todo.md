@@ -85,7 +85,7 @@
 - [x] Homework feed (given/reviewed status toggle)
 - [ ] Homework "mark as graded" beyond the given/reviewed binary
 - [x] Attendance tools — teacher attendance includes a recent-history chart, CSV register export, and “copy from last lesson”
-- [~] Grade moderation — `all.md` adds an HOD subject-scoped grade-update policy via `is_hod_of_subject()`; a distinct HOD moderation/approval UI and workflow are still outstanding
+- [x] Grade moderation — admins can approve all grades, while HODs can approve pending grades only for their assigned subjects through the teacher grades UI
 - [x] CSV grade import — teachers can import `Admission No`, `Score`, and optional `Remark` columns; class membership, score range, and subject assignment are verified before the batch upsert
 - [ ] Assessment "type" as a real enum (currently free-text titles)
 - [x] `weight_percent` — now used in report-card scoring (`lib/report-card.ts` reads `weight_percent` and applies the weighted-average path when available)

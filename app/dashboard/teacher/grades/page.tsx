@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { CreateAssessmentForm } from "@/components/CreateAssessmentForm";
+import { ApproveAssessmentButton } from "@/components/ApproveAssessmentButton";
 import { redirect } from "next/navigation";
 
 export default async function TeacherGradesPage() {
@@ -20,7 +21,7 @@ export default async function TeacherGradesPage() {
 
   const { data: teacherProfile } = await supabase
     .from("teacher_profiles")
-    .select("subjects_taught")
+    .select("subjects_taught, staff_role")
     .eq("id", profile.id)
     .single();
 
@@ -41,6 +42,29 @@ export default async function TeacherGradesPage() {
     if (cls) classMap.set(cls.id, cls);
   }
   const classes = [...classMap.values()];
+
+  const { data: moderationAssessments } =
+    teacherProfile?.staff_role === "hod" && subjectIds.length
+      ? await supabase
+          .from("assessments")
+          .select("id, title, classes(name, arm), subjects(name)")
+          .in("subject_id", subjectIds)
+      : { data: [] };
+  const moderationIds = (moderationAssessments ?? []).map((assessment) => assessment.id);
+  const { data: moderationGrades } = moderationIds.length
+    ? await supabase
+        .from("grades")
+        .select("assessment_id, moderation_status")
+        .in("assessment_id", moderationIds)
+    : { data: [] };
+  const pendingByAssessment = new Map<string, number>();
+  for (const grade of moderationGrades ?? []) {
+    if (grade.moderation_status === "pending")
+      pendingByAssessment.set(
+        grade.assessment_id,
+        (pendingByAssessment.get(grade.assessment_id) ?? 0) + 1
+      );
+  }
 
   return (
     <div>
@@ -77,6 +101,42 @@ export default async function TeacherGradesPage() {
           </p>
         )}
       </div>
+
+      {teacherProfile?.staff_role === "hod" && (
+        <section className="mt-10">
+          <h2 className="font-display text-lg font-semibold text-ink">HOD moderation</h2>
+          <p className="mb-3 text-sm text-ink-soft">
+            Approve pending grades for subjects assigned to you.
+          </p>
+          <div className="space-y-2">
+            {(moderationAssessments ?? []).map((assessment) => {
+              const pending = pendingByAssessment.get(assessment.id) ?? 0;
+              return (
+                <div
+                  key={assessment.id}
+                  className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3"
+                >
+                  <div>
+                    <p className="font-medium text-ink">{assessment.title}</p>
+                    <p className="text-xs text-ink-soft">
+                      {assessment.subjects?.name} · {assessment.classes?.name}{" "}
+                      {assessment.classes?.arm}
+                    </p>
+                  </div>
+                  {pending ? (
+                    <ApproveAssessmentButton assessmentId={assessment.id} />
+                  ) : (
+                    <span className="text-xs text-leaf">All approved</span>
+                  )}
+                </div>
+              );
+            })}
+            {!moderationAssessments?.length && (
+              <p className="text-sm text-ink-soft">No assessments for your subjects yet.</p>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
