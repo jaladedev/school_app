@@ -117,7 +117,7 @@
 - [x] **Bug fixed mid-build**: `verifyPaystackPayment`'s authorization only checked "is this the invoice's own student or admin" — which would have silently rejected a parent trying to pay for their child. Patched to also check `guardian_links`.
 - [x] **Atomic invoice payment updates** — manual and Paystack payments now use `record_invoice_payment`, which locks the invoice and records the payment plus balance/status update in one transaction; payment references are idempotent.
 - [ ] Flutterwave (Paystack only)
-- [ ] Receipt PDF via a real library (currently print-to-PDF, same as report cards)
+- [x] Receipt PDF via a real library — receipt pages provide a downloadable A5 PDF generated with `jspdf`, alongside the existing print option.
 
 ---
 

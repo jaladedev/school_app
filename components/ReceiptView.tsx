@@ -1,4 +1,5 @@
 import { PrintButton } from "@/components/PrintButton";
+import { ReceiptPdfButton } from "@/components/ReceiptPdfButton";
 import { formatKobo, type PaymentMethod } from "@/types/database";
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -41,7 +42,24 @@ export function ReceiptView({
     <div className="max-w-lg">
       <div className="mb-4 flex items-center justify-between print:hidden">
         <p className="text-sm text-ink-soft">Payment Receipt</p>
-        <PrintButton />
+        <div className="flex gap-2">
+          <ReceiptPdfButton
+            schoolName={schoolName}
+            schoolMotto={schoolMotto}
+            receiptNo={receiptNo}
+            studentName={studentName}
+            admissionNo={admissionNo}
+            feeTitle={feeTitle}
+            term={term}
+            academicYear={academicYear}
+            amountKobo={amountKobo}
+            method={method}
+            reference={reference}
+            paidAt={paidAt}
+            recordedBy={recordedBy}
+          />
+          <PrintButton />
+        </div>
       </div>
 
       <div className="rounded-2xl border border-rule bg-white p-8 print:border-0 print:p-0 print:shadow-none">
