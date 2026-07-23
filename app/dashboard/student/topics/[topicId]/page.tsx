@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { TopicContent } from "@/components/TopicContent";
 import { formatLevel } from "@/types/database";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function TopicPage({ params }: { params: { topicId: string } }) {
   const supabase = createClient();
@@ -27,6 +28,17 @@ export default async function TopicPage({ params }: { params: { topicId: string 
     .eq("topic_id", params.topicId)
     .order("sequence_order", { ascending: true });
 
+  const admin = createAdminClient();
+  const displayResources = await Promise.all(
+    (resources ?? []).map(async (resource) => {
+      if (!resource.file_url || resource.file_url.startsWith("http")) return resource;
+      const { data: signed } = await admin.storage
+        .from("topic-resources")
+        .createSignedUrl(resource.file_url, 60 * 60);
+      return { ...resource, file_url: signed?.signedUrl ?? null };
+    })
+  );
+
   return (
     <div className="max-w-2xl">
       <Link
@@ -42,7 +54,7 @@ export default async function TopicPage({ params }: { params: { topicId: string 
       </p>
 
       {note ? (
-        <TopicContent content={note.content} resources={resources ?? []} />
+        <TopicContent content={note.content} resources={displayResources} />
       ) : (
         <p className="rounded-lg border border-rule bg-white p-4 text-sm text-ink-soft">
           Notes for this topic haven&apos;t been published yet.

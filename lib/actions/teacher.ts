@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
-import type { AttendanceStatus, HomeworkStatus } from "@/types/database";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { AttendanceStatus, HomeworkStatus, ResourceType } from "@/types/database";
 
 // ---------- Lessons ----------
 
@@ -299,4 +300,87 @@ export async function saveTopicNote(
   }
 
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
+}
+
+const TOPIC_RESOURCE_BUCKET = "topic-resources";
+const MAX_TOPIC_RESOURCE_BYTES = 20 * 1024 * 1024;
+const RESOURCE_TYPES = new Map<string, Extract<ResourceType, "image" | "pdf" | "audio" | "video">>([
+  ["image/jpeg", "image"],
+  ["image/png", "image"],
+  ["image/webp", "image"],
+  ["application/pdf", "pdf"],
+  ["audio/mpeg", "audio"],
+  ["audio/wav", "audio"],
+  ["audio/ogg", "audio"],
+  ["video/mp4", "video"],
+  ["video/webm", "video"],
+]);
+
+export async function uploadTopicResource(topicId: string, noteId: string, formData: FormData) {
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== "teacher")
+    throw new Error("Only teachers can upload resources.");
+
+  const file = formData.get("file");
+  const title = String(formData.get("title") ?? "").trim();
+  if (!(file instanceof File) || !file.size) throw new Error("Choose a file to upload.");
+  if (file.size > MAX_TOPIC_RESOURCE_BYTES) throw new Error("Resources must be 20 MB or smaller.");
+  const resourceType = RESOURCE_TYPES.get(file.type);
+  if (!resourceType)
+    throw new Error("Use an image, PDF, MP3/WAV/OGG audio, or MP4/WebM video file.");
+
+  const supabase = createClient();
+  const [{ data: topic }, { data: teacher }] = await Promise.all([
+    supabase.from("curriculum_topics").select("subject_id").eq("id", topicId).single(),
+    supabase.from("teacher_profiles").select("subjects_taught").eq("id", profile.id).single(),
+  ]);
+  if (!topic || !teacher?.subjects_taught?.includes(topic.subject_id)) {
+    throw new Error("You can only add resources for subjects assigned to you.");
+  }
+
+  const admin = createAdminClient();
+  const { error: bucketError } = await admin.storage.createBucket(TOPIC_RESOURCE_BUCKET, {
+    public: false,
+    fileSizeLimit: `${MAX_TOPIC_RESOURCE_BYTES}`,
+    allowedMimeTypes: [...RESOURCE_TYPES.keys()],
+  });
+  if (bucketError && !/already exists/i.test(bucketError.message))
+    throw new Error(bucketError.message);
+
+  const extension =
+    file.name
+      .split(".")
+      .pop()
+      ?.replace(/[^a-z0-9]/gi, "") || "file";
+  const objectPath = `${topicId}/${crypto.randomUUID()}.${extension}`;
+  const { error: uploadError } = await admin.storage
+    .from(TOPIC_RESOURCE_BUCKET)
+    .upload(objectPath, file, {
+      contentType: file.type,
+    });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { data: latestResource } = await admin
+    .from("topic_resources")
+    .select("sequence_order")
+    .eq("topic_id", topicId)
+    .order("sequence_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { error: insertError } = await admin.from("topic_resources").insert({
+    topic_id: topicId,
+    note_id: noteId,
+    resource_type: resourceType,
+    title: title || file.name,
+    file_url: objectPath,
+    sequence_order: (latestResource?.sequence_order ?? 0) + 1,
+    uploaded_by: profile.id,
+  });
+  if (insertError) {
+    await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([objectPath]);
+    throw new Error(insertError.message);
+  }
+
+  revalidatePath(`/dashboard/teacher/notes/${topicId}`);
+  revalidatePath(`/dashboard/student/topics/${topicId}`);
 }

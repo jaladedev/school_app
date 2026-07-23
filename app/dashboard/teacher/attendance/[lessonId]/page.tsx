@@ -34,6 +34,30 @@ export default async function AttendancePage({ params }: { params: { lessonId: s
     initialStatus[row.student_id] = row.status;
   }
 
+  const { data: previousLesson } = lesson
+    ? await supabase
+        .from("lessons")
+        .select("id")
+        .eq("teacher_id", lesson.teacher_id)
+        .eq("class_id", lesson.class_id)
+        .lt("lesson_date", lesson.lesson_date)
+        .order("lesson_date", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+
+  const { data: previousAttendance } = previousLesson
+    ? await supabase
+        .from("attendance")
+        .select("student_id, status")
+        .eq("lesson_id", previousLesson.id)
+    : { data: [] };
+
+  const previousStatus: Record<string, AttendanceStatus> = {};
+  for (const row of previousAttendance ?? []) {
+    previousStatus[row.student_id] = row.status;
+  }
+
   return (
     <div className="max-w-xl">
       <Link
@@ -52,6 +76,7 @@ export default async function AttendancePage({ params }: { params: { lessonId: s
           lessonId={params.lessonId}
           students={students}
           initialStatus={initialStatus}
+          previousStatus={previousLesson ? previousStatus : undefined}
           lessonDate={lesson?.lesson_date ?? "attendance"}
           className={`${lesson?.classes?.name ?? "Class"} ${lesson?.classes?.arm ?? ""}`.trim()}
         />

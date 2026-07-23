@@ -27,7 +27,7 @@
 - [ ] Rate limiting on `/login` and account creation actions
 - [x] Friendly pre-check for email-uniqueness before account creation (`assertEmailAvailable()` in `lib/actions/admin.ts` now surfaces a clear duplicate-email error before the Auth create call)
 - [x] Invalidate other sessions when a password is reset/changed
-- [~] `assertIsAdmin()` hardening — current pattern (session-checked role, service-role action) is reasonable as-is; deeper re-verification per action not done
+- [x] Admin-action guard hardening — `assertRole()` validates the session with Supabase Auth, then re-reads role and active state through the service-role client before privileged actions run
 - [x] **`generateTempPassword()` has weak entropy** — now uses `node:crypto` plus a broader wordlist to produce a much stronger temporary password.
 - [x] **Orphaned-auth-user cleanup path** — added a service-role cleanup helper that scans auth users against `profiles` and prunes orphans, and the create-account failure paths now invoke that cleanup if the compensation `deleteUser` step itself fails.
 
@@ -84,12 +84,12 @@
 - [x] Author curriculum notes (draft/published workflow)
 - [x] Homework feed (given/reviewed status toggle)
 - [ ] Homework "mark as graded" beyond the given/reviewed binary
-- [~] Attendance tools — CSV register export is available from each lesson; attendance history chart and “copy from last lesson” remain outstanding
+- [x] Attendance tools — teacher attendance includes a recent-history chart, CSV register export, and “copy from last lesson”
 - [ ] Grade moderation is admin-only — no HOD-level intermediate approval step
 - [x] CSV grade import — teachers can import `Admission No`, `Score`, and optional `Remark` columns; class membership, score range, and subject assignment are verified before the batch upsert
 - [ ] Assessment "type" as a real enum (currently free-text titles)
 - [x] `weight_percent` — now used in report-card scoring (`lib/report-card.ts` reads `weight_percent` and applies the weighted-average path when available)
-- [~] Curriculum notes — `pdf` and `audio` resources now render in `TopicContent`; upload wiring and version-history UI remain outstanding
+- [~] Curriculum notes — teachers can upload private image, PDF, audio, and video resources, while `pdf` and `audio` render in `TopicContent`; version-history UI remains outstanding
 
 ---
 

@@ -3,6 +3,7 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 import { EmptyState } from "@/components/EmptyState";
+import { AttendanceHistoryChart } from "@/components/AttendanceHistoryChart";
 
 type LessonRowData = {
   id: string;
@@ -69,6 +70,37 @@ export default async function AttendanceLandingPage({
 
   const markedLessonIds = new Set((attendanceRows ?? []).map((a) => a.lesson_id));
 
+  const { data: historyLessons } = await supabase
+    .from("lessons")
+    .select("id, lesson_date")
+    .eq("teacher_id", profile.id)
+    .order("lesson_date", { ascending: false })
+    .limit(8);
+
+  const historyLessonIds = (historyLessons ?? []).map((lesson) => lesson.id);
+  const { data: historyAttendance } = historyLessonIds.length
+    ? await supabase
+        .from("attendance")
+        .select("lesson_id, status")
+        .in("lesson_id", historyLessonIds)
+    : { data: [] };
+
+  const attendanceByLesson = new Map<string, { present: number; total: number }>();
+  for (const row of historyAttendance ?? []) {
+    const current = attendanceByLesson.get(row.lesson_id) ?? { present: 0, total: 0 };
+    current.total += 1;
+    if (row.status === "present" || row.status === "late") current.present += 1;
+    attendanceByLesson.set(row.lesson_id, current);
+  }
+
+  const history = (historyLessons ?? [])
+    .map((lesson) => ({
+      id: lesson.id,
+      lessonDate: lesson.lesson_date,
+      ...(attendanceByLesson.get(lesson.id) ?? { present: 0, total: 0 }),
+    }))
+    .reverse();
+
   function LessonRow({ lesson }: { lesson: LessonRowData }) {
     const subjectName = subjectNameById.get(lesson.curriculum_topics?.subject_id ?? "") ?? "Lesson";
     const marked = markedLessonIds.has(lesson.id);
@@ -102,6 +134,8 @@ export default async function AttendanceLandingPage({
     <div className="max-w-xl">
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Attendance</h1>
       <p className="mb-6 text-sm text-ink-soft">Select a lesson to mark or review attendance.</p>
+
+      <AttendanceHistoryChart lessons={history} />
 
       <h2 className="mb-3 font-display text-lg font-semibold text-ink">Today</h2>
       <div className="mb-8 space-y-2">

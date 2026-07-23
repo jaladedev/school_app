@@ -17,12 +17,14 @@ export function AttendanceForm({
   lessonId,
   students,
   initialStatus,
+  previousStatus,
   lessonDate,
   className,
 }: {
   lessonId: string;
   students: { id: string; full_name: string }[];
   initialStatus: Record<string, AttendanceStatus>;
+  previousStatus?: Record<string, AttendanceStatus>;
   lessonDate: string;
   className: string;
 }) {
@@ -39,6 +41,17 @@ export function AttendanceForm({
     const next: Record<string, AttendanceStatus> = {};
     for (const s of students) next[s.id] = status;
     setStatuses(next);
+  }
+
+  function copyPreviousAttendance() {
+    if (!previousStatus) return;
+    setStatuses((current) => {
+      const next = { ...current };
+      for (const student of students) {
+        if (previousStatus[student.id]) next[student.id] = previousStatus[student.id];
+      }
+      return next;
+    });
   }
 
   function handleSave() {
@@ -60,6 +73,14 @@ export function AttendanceForm({
         >
           Mark all present
         </button>
+        {previousStatus && (
+          <button
+            onClick={copyPreviousAttendance}
+            className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-leaf-soft"
+          >
+            Copy last lesson
+          </button>
+        )}
         <ExportAttendanceRegisterButton
           lessonDate={lessonDate}
           className={className}

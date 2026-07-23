@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { NoteEditor } from "@/components/NoteEditor";
+import { TopicResourceUpload } from "@/components/TopicResourceUpload";
 import { formatLevel } from "@/types/database";
 
 export default async function TeacherNoteEditPage({ params }: { params: { topicId: string } }) {
@@ -41,6 +42,11 @@ export default async function TeacherNoteEditPage({ params }: { params: { topicI
         initialContent={note?.content ?? `## Introduction\n\nWrite about "${topic?.title}" here.\n`}
         initialStatus={note?.status ?? "unwritten"}
       />
+      {note ? (
+        <TopicResourceUpload topicId={params.topicId} noteId={note.id} />
+      ) : (
+        <p className="mt-4 text-sm text-ink-soft">Save the note once before attaching resources.</p>
+      )}
     </div>
   );
 }
