@@ -46,12 +46,18 @@ export default async function ParentHomeworkPage({
                 <span className="text-xs text-ink-soft">{l.lesson_date}</span>
                 <span
                   className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                    l.homework_status === "reviewed"
-                      ? "bg-leaf-soft text-leaf"
-                      : "bg-marigold/20 text-marigold-dark"
+                    l.homework_status === "graded"
+                      ? "bg-sky-100 text-sky-800"
+                      : l.homework_status === "reviewed"
+                        ? "bg-leaf-soft text-leaf"
+                        : "bg-marigold/20 text-marigold-dark"
                   }`}
                 >
-                  {l.homework_status === "reviewed" ? "Reviewed" : "Given"}
+                  {l.homework_status === "graded"
+                    ? "Graded"
+                    : l.homework_status === "reviewed"
+                      ? "Reviewed"
+                      : "Given"}
                 </span>
               </div>
             </div>

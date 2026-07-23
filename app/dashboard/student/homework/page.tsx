@@ -1,12 +1,13 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/EmptyState";
+import type { HomeworkStatus } from "@/types/database";
 
 type HomeworkLessonRow = {
   id: string;
   lesson_date: string;
   homework: string | null;
-  homework_status: "given" | "reviewed";
+  homework_status: HomeworkStatus;
   curriculum_topics: { title: string } | null;
   timetable_entries: { subjects: { name: string } | null } | null;
 };
@@ -54,12 +55,18 @@ export default async function StudentHomeworkPage() {
                 <span className="text-xs text-ink-soft">{l.lesson_date}</span>
                 <span
                   className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                    l.homework_status === "reviewed"
-                      ? "bg-leaf-soft text-leaf"
-                      : "bg-marigold/20 text-marigold-dark"
+                    l.homework_status === "graded"
+                      ? "bg-sky-100 text-sky-800"
+                      : l.homework_status === "reviewed"
+                        ? "bg-leaf-soft text-leaf"
+                        : "bg-marigold/20 text-marigold-dark"
                   }`}
                 >
-                  {l.homework_status === "reviewed" ? "Reviewed" : "Given"}
+                  {l.homework_status === "graded"
+                    ? "Graded"
+                    : l.homework_status === "reviewed"
+                      ? "Reviewed"
+                      : "Given"}
                 </span>
               </div>
             </div>

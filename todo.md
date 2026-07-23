@@ -45,7 +45,7 @@
 - [x] Timetable PDF export — class timetables have a print-optimised “Print / Save as PDF” action; editing and navigation controls are excluded from the printed output
 - [x] Admin-facing teacher conflict view — per-teacher weekly schedules, free periods, and duplicate period warnings are available from the timetable index
 - [x] `timetable_entries.period_number > 0` check constraint — added alongside the timetable conflict trigger
-- [~] Enrollment unique index — current constraint is `(student_id, class_id, academic_year, term)`; whether that's the right shape for the promotion model wasn't revisited
+- [x] Enrollment unique index — enforced as `(student_id, class_id, academic_year, term)`, allowing enrollment history across terms and academic years while preventing duplicate records for the same class period.
 - [x] Bulk promotion and student creation avoid sequential loops — promotions use one student update plus a batched enrollment upsert; bulk account creation uses a bounded five-account concurrency pool and one batched enrollment write.
 
 ---
@@ -83,7 +83,7 @@
 - [x] Enter grades — remark field + quick-select comment bank, teacher-scoped to their actual `timetable_entries` assignment
 - [x] Author curriculum notes (draft/published workflow)
 - [x] Homework feed (given/reviewed status toggle)
-- [ ] Homework "mark as graded" beyond the given/reviewed binary
+- [x] Homework "mark as graded" — homework now progresses from given to reviewed to graded, with a reopen option for corrections.
 - [x] Attendance tools — teacher attendance includes a recent-history chart, CSV register export, and “copy from last lesson”
 - [x] Grade moderation — admins can approve all grades, while HODs can approve pending grades only for their assigned subjects through the teacher grades UI
 - [x] CSV grade import — teachers can import `Admission No`, `Score`, and optional `Remark` columns; class membership, score range, and subject assignment are verified before the batch upsert

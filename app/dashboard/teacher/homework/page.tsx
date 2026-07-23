@@ -1,16 +1,25 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { HomeworkStatusToggle } from "@/components/HomeworkStatusToggle";
 import { redirect } from "next/navigation";
+import type { HomeworkStatus } from "@/types/database";
 
 type HomeworkLessonRow = {
   id: string;
   lesson_date: string;
   homework: string | null;
-  homework_status: "given" | "reviewed";
+  homework_status: HomeworkStatus;
   classes: { name: string; arm: string | null } | null;
   curriculum_topics: { title: string } | null;
   timetable_entries: { subjects: { name: string } | null } | null;
 };
+
+function summaryLine(givenCount: number, reviewedCount: number): string {
+  if (givenCount === 0 && reviewedCount === 0) return "All homework has been graded.";
+  const parts: string[] = [];
+  if (givenCount > 0) parts.push(`${givenCount} not yet reviewed`);
+  if (reviewedCount > 0) parts.push(`${reviewedCount} reviewed, awaiting a grade`);
+  return parts.join(" · ") + ".";
+}
 
 export default async function TeacherHomeworkPage() {
   const profile = await getCurrentProfile();
@@ -31,16 +40,13 @@ export default async function TeacherHomeworkPage() {
     .limit(50)
     .returns<HomeworkLessonRow[]>();
 
-  const pendingCount = (lessons ?? []).filter((l) => l.homework_status === "given").length;
+  const givenCount = (lessons ?? []).filter((l) => l.homework_status === "given").length;
+  const reviewedCount = (lessons ?? []).filter((l) => l.homework_status === "reviewed").length;
 
   return (
     <div className="max-w-2xl">
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Homework given</h1>
-      <p className="mb-6 text-sm text-ink-soft">
-        {pendingCount > 0
-          ? `${pendingCount} not yet marked reviewed.`
-          : "All caught up — everything's marked reviewed."}
-      </p>
+      <p className="mb-6 text-sm text-ink-soft">{summaryLine(givenCount, reviewedCount)}</p>
 
       <div className="space-y-2">
         {lessons?.map((l) => (
