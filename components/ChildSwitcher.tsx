@@ -4,20 +4,20 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { LinkedChild } from "@/lib/parent";
 
 export function ChildSwitcher({
-  children,
+  linkedChildren,
   selectedChildId,
 }: {
-  children: LinkedChild[];
+  linkedChildren: LinkedChild[];
   selectedChildId: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  if (children.length <= 1) {
+  if (linkedChildren.length <= 1) {
     return (
       <p className="mb-4 text-sm text-ink-soft">
-        Viewing: <span className="font-medium text-ink">{children[0]?.fullName}</span>
+        Viewing: <span className="font-medium text-ink">{linkedChildren[0]?.fullName}</span>
       </p>
     );
   }
@@ -38,7 +38,7 @@ export function ChildSwitcher({
         onChange={(e) => handleChange(e.target.value)}
         className="rounded-lg border border-rule px-3 py-2 text-sm"
       >
-        {children.map((c) => (
+        {linkedChildren.map((c) => (
           <option key={c.id} value={c.id}>
             {c.fullName}
             {c.className ? ` — ${c.className}` : ""}

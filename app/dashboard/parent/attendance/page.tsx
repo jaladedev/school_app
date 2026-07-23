@@ -40,7 +40,7 @@ export default async function ParentAttendancePage({
   return (
     <div>
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Attendance</h1>
-      <ChildSwitcher children={children} selectedChildId={selected.id} />
+      <ChildSwitcher linkedChildren={children} selectedChildId={selected.id} />
 
       <div className="mb-6 grid grid-cols-4 gap-3">
         <div className="rounded-lg border border-rule bg-white p-4 text-center">

@@ -39,7 +39,7 @@ export default async function ParentTimetablePage({
   return (
     <div>
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Timetable</h1>
-      <ChildSwitcher children={children} selectedChildId={selected.id} />
+      <ChildSwitcher linkedChildren={children} selectedChildId={selected.id} />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         {[1, 2, 3, 4, 5].map((day) => (

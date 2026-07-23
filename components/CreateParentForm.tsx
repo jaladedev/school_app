@@ -217,7 +217,7 @@ export function CreateParentForm() {
       {error && <p className="text-sm text-clay">{error}</p>}
       {created && (
         <p className="text-sm text-leaf">
-          Account created for {created}. Share the temporary password directly — it won't be
+          Account created for {created}. Share the temporary password directly — it won&apos;t be
           shown again.
         </p>
       )}

@@ -49,7 +49,7 @@ export default async function ParentHome({
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
         {selected.fullName}
       </h1>
-      <ChildSwitcher children={children} selectedChildId={selected.id} />
+      <ChildSwitcher linkedChildren={children} selectedChildId={selected.id} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-rule bg-white p-4">

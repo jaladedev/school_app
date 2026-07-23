@@ -31,13 +31,13 @@ export default async function ParentReportCardPage({
   return (
     <div>
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Report card</h1>
-      <ChildSwitcher children={children} selectedChildId={selected.id} />
+      <ChildSwitcher linkedChildren={children} selectedChildId={selected.id} />
       <TermYearSelector currentTerm={term} currentYear={academicYear} />
 
       {data ? (
         <ReportCardView data={data} />
       ) : (
-        <p className="text-sm text-ink-soft">Report card isn't available yet for this term.</p>
+        <p className="text-sm text-ink-soft">Report card is not available yet for this term.</p>
       )}
     </div>
   );

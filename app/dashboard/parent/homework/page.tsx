@@ -33,7 +33,7 @@ export default async function ParentHomeworkPage({
   return (
     <div className="max-w-2xl">
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Homework</h1>
-      <ChildSwitcher children={children} selectedChildId={selected.id} />
+      <ChildSwitcher linkedChildren={children} selectedChildId={selected.id} />
 
       <div className="space-y-2">
         {lessons?.map((l) => (
