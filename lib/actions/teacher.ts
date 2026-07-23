@@ -193,6 +193,78 @@ export async function saveGrade(
   revalidatePath("/dashboard/student/grades");
 }
 
+export async function importGrades(
+  assessmentId: string,
+  entries: { admissionNo: string; score: number; remark?: string }[]
+) {
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== "teacher") throw new Error("Only teachers can import grades.");
+  if (!entries.length) throw new Error("Add at least one grade row to import.");
+
+  const supabase = createClient();
+  const { data: assessment } = await supabase
+    .from("assessments")
+    .select("subject_id, class_id, max_score")
+    .eq("id", assessmentId)
+    .single();
+
+  if (!assessment) throw new Error("Assessment not found.");
+
+  const { data: assignment } = await supabase
+    .from("timetable_entries")
+    .select("id")
+    .eq("teacher_id", profile.id)
+    .eq("subject_id", assessment.subject_id)
+    .eq("class_id", assessment.class_id)
+    .maybeSingle();
+
+  if (!assignment) throw new Error("You aren't assigned to this assessment's class and subject.");
+
+  const admissionNumbers = entries.map((entry) => entry.admissionNo.trim());
+  if (admissionNumbers.some((number) => !number))
+    throw new Error("Every row needs an admission number.");
+  if (new Set(admissionNumbers).size !== admissionNumbers.length) {
+    throw new Error("Each admission number may only appear once in an import.");
+  }
+  if (
+    entries.some(
+      (entry) =>
+        !Number.isFinite(entry.score) || entry.score < 0 || entry.score > assessment.max_score
+    )
+  ) {
+    throw new Error(`Scores must be between 0 and ${assessment.max_score}.`);
+  }
+
+  const { data: roster } = await supabase
+    .from("student_profiles")
+    .select("id, admission_no")
+    .eq("class_id", assessment.class_id)
+    .in("admission_no", admissionNumbers);
+
+  const studentByAdmission = new Map(
+    (roster ?? []).map((student) => [student.admission_no, student.id])
+  );
+  const unknown = admissionNumbers.filter((number) => !studentByAdmission.has(number));
+  if (unknown.length)
+    throw new Error(`No student in this class has admission number: ${unknown.join(", ")}.`);
+
+  const { error } = await supabase.from("grades").upsert(
+    entries.map((entry) => ({
+      assessment_id: assessmentId,
+      student_id: studentByAdmission.get(entry.admissionNo.trim())!,
+      score: entry.score,
+      remark: entry.remark?.trim() || null,
+      graded_by: profile.id,
+    })),
+    { onConflict: "assessment_id,student_id" }
+  );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/teacher/grades/${assessmentId}`);
+  revalidatePath("/dashboard/admin/grades");
+}
+
 // ---------- Note authoring ----------
 
 export async function saveTopicNote(

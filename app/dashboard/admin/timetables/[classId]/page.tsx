@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { TimetableEntryForm } from "@/components/TimetableEntryForm";
 import { DeleteEntryButton } from "@/components/DeleteEntryButton";
 import { CopyTimetableButton } from "@/components/CopyTimetableButton";
+import { PrintButton } from "@/components/PrintButton";
 import Link from "next/link";
 
 const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -83,9 +84,10 @@ export default async function ClassTimetablePage({
           </h1>
           <p className="text-sm text-ink-soft">{classRow?.academic_year}</p>
         </div>
+        <PrintButton />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-4">
+      <div className="mb-4 flex flex-wrap items-center gap-4 print:hidden">
         <div className="flex gap-2">
           {TERMS.map((t) => (
             <Link
@@ -116,13 +118,15 @@ export default async function ClassTimetablePage({
         )}
       </div>
 
-      <TimetableEntryForm
-        classId={params.classId}
-        academicYear={classRow?.academic_year ?? ""}
-        term={term}
-        subjects={subjects ?? []}
-        teachers={teachers}
-      />
+      <div className="print:hidden">
+        <TimetableEntryForm
+          classId={params.classId}
+          academicYear={classRow?.academic_year ?? ""}
+          term={term}
+          subjects={subjects ?? []}
+          teachers={teachers}
+        />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         {[1, 2, 3, 4, 5].map((day) => (
@@ -141,7 +145,7 @@ export default async function ClassTimetablePage({
                     {entry.start_time}–{entry.end_time}
                     {entry.room ? ` · ${entry.room}` : ""}
                   </p>
-                  <div className="mt-1">
+                  <div className="mt-1 print:hidden">
                     <DeleteEntryButton entryId={entry.id} />
                   </div>
                 </div>

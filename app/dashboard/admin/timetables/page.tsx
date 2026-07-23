@@ -15,9 +15,17 @@ export default async function AdminTimetablesPage() {
   return (
     <div>
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Timetables</h1>
-      <p className="mb-6 text-sm text-ink-soft">
-        Select a class to view or build its weekly schedule.
-      </p>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink-soft">
+          Select a class to view or build its weekly schedule.
+        </p>
+        <Link
+          href="/dashboard/admin/timetables/teachers"
+          className="rounded-lg border border-leaf px-4 py-2 text-sm font-medium text-leaf hover:bg-leaf-soft"
+        >
+          Teacher schedule view
+        </Link>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {classes?.map((cls) => (

@@ -1,13 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { EditStudentForm } from "@/components/EditStudentForm";
+import { StudentPhotoUpload } from "@/components/StudentPhotoUpload";
 import { formatLevel } from "@/types/database";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function StudentInfoPage({ params }: { params: { studentId: string } }) {
   const supabase = createClient();
 
   const { data: student } = await supabase
     .from("student_profiles")
-    .select("*, profiles(full_name, email), classes(id, name, arm, education_level, level_number)")
+    .select(
+      "*, profiles(full_name, email, avatar_url), classes(id, name, arm, education_level, level_number)"
+    )
     .eq("id", params.studentId)
     .single();
 
@@ -20,6 +24,12 @@ export default async function StudentInfoPage({ params }: { params: { studentId:
 
   const profile = student?.profiles;
   const cls = student?.classes;
+  const photoPath = profile?.avatar_url;
+  const { data: signedPhoto } = photoPath
+    ? await createAdminClient()
+        .storage.from("student-photos")
+        .createSignedUrl(photoPath, 60 * 60)
+    : { data: null };
 
   return (
     <div>
@@ -34,15 +44,22 @@ export default async function StudentInfoPage({ params }: { params: { studentId:
       </p>
 
       {student ? (
-        <EditStudentForm
-          studentId={params.studentId}
-          currentFullName={profile?.full_name ?? ""}
-          currentAdmissionNo={student.admission_no}
-          currentGuardianName={student.guardian_name}
-          currentGuardianPhone={student.guardian_phone}
-          currentClassId={student.class_id}
-          classes={classes ?? []}
-        />
+        <div className="space-y-4">
+          <StudentPhotoUpload
+            studentId={params.studentId}
+            fullName={profile?.full_name ?? "Student"}
+            photoUrl={signedPhoto?.signedUrl ?? null}
+          />
+          <EditStudentForm
+            studentId={params.studentId}
+            currentFullName={profile?.full_name ?? ""}
+            currentAdmissionNo={student.admission_no}
+            currentGuardianName={student.guardian_name}
+            currentGuardianPhone={student.guardian_phone}
+            currentClassId={student.class_id}
+            classes={classes ?? []}
+          />
+        </div>
       ) : (
         <p className="text-sm text-clay">Student not found.</p>
       )}

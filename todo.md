@@ -42,11 +42,11 @@
 - [x] Promotion workflow — promote/repeat/graduate, writes real enrollment history
 - [~] Timetable grid is weekday-columns-with-list, not a true row×column grid table
 - [x] Copy timetable from previous term/year — implemented via the `CopyTimetableButton` on the class timetable page
-- [ ] Timetable PDF export
-- [ ] Admin-facing teacher conflict view
-- [ ] `timetable_entries.period_number > 0` check constraint — **done** (added along with the DB trigger)
+- [x] Timetable PDF export — class timetables have a print-optimised “Print / Save as PDF” action; editing and navigation controls are excluded from the printed output
+- [x] Admin-facing teacher conflict view — per-teacher weekly schedules, free periods, and duplicate period warnings are available from the timetable index
+- [x] `timetable_entries.period_number > 0` check constraint — added alongside the timetable conflict trigger
 - [~] Enrollment unique index — current constraint is `(student_id, class_id, academic_year, term)`; whether that's the right shape for the promotion model wasn't revisited
-- [ ] **`promoteStudents` / `createStudentsBulk` loop row-by-row with sequential `await`s** — fine at current scale, but N round trips instead of a batched write will get slow with large class lists.
+- [x] Bulk promotion and student creation avoid sequential loops — promotions use one student update plus a batched enrollment upsert; bulk account creation uses a bounded five-account concurrency pool and one batched enrollment write.
 
 ---
 
@@ -58,7 +58,7 @@
 - [x] CSV export (full list, not just current page) and CSV file import
 - [x] Server-side search (name/email/admission no.) + pagination (25/page)
 - [x] Reset password, deactivate/reactivate
-- [ ] Student photo upload
+- [x] Student photo upload — admins can upload/replace JPEG, PNG, or WebP photos (up to 5 MB); images live in a private Storage bucket and display through short-lived signed URLs
 - [x] Email editing — deliberately excluded; changing it requires syncing Auth + profile, and the app intentionally leaves that workflow as a recreate-only operation rather than a partial implementation
 
 ---
@@ -69,8 +69,8 @@
 - [x] Reset password, deactivate/reactivate
 - [x] Server-side search (name/email)
 - [x] `EditTeacherSubjectsForm` shows subject names, not raw IDs
-- [ ] Pagination on staff page (students/invoices/payments got it; staff didn't)
-- [ ] Teacher profile page (workload hours, classes overview beyond the home page)
+- [x] Pagination on staff page (shared `Pagination` component with server-side count and search-aware page links)
+- [x] Teacher profile page — workload hours, assigned subjects, class-teacher responsibilities, and full term schedule are available at `/dashboard/admin/staff/[teacherId]`
 - [ ] Staff sub-roles (HOD, bursar)
 
 ---
@@ -84,9 +84,9 @@
 - [x] Author curriculum notes (draft/published workflow)
 - [x] Homework feed (given/reviewed status toggle)
 - [ ] Homework "mark as graded" beyond the given/reviewed binary
-- [ ] Attendance history chart, "copy from last lesson," export register
+- [~] Attendance tools — CSV register export is available from each lesson; attendance history chart and “copy from last lesson” remain outstanding
 - [ ] Grade moderation is admin-only — no HOD-level intermediate approval step
-- [ ] CSV grade import
+- [x] CSV grade import — teachers can import `Admission No`, `Score`, and optional `Remark` columns; class membership, score range, and subject assignment are verified before the batch upsert
 - [ ] Assessment "type" as a real enum (currently free-text titles)
 - [x] `weight_percent` — now used in report-card scoring (`lib/report-card.ts` reads `weight_percent` and applies the weighted-average path when available)
 - [ ] Curriculum notes: file/image/video upload wiring (Storage bucket), version history, `pdf`/`audio` resource-type rendering in `TopicContent`
@@ -136,7 +136,7 @@
 - [x] Messaging — inbox grouped by conversation partner, unread badges, name-search to start new threads, chat-bubble thread view, read-receipt marking on open
 - [x] Student notes — staff create/view (behavioral/academic/commendation/disciplinary types), student sees only notes marked visible-to-them
 - [x] Announcements — audience targeting (all/students/teachers/specific class), feed
-- [ ] Messaging: no Realtime — refresh-based, not live-updating
+- [x] Messaging Realtime — inbox and open threads subscribe to new message inserts, with immediate read marking while a thread is open
 - [x] Announcements: attachments, scheduled publish, and read tracking are now partially addressed with a lightweight client-side read state on the announcement feed
 - [x] **`sendMessage` now validates `recipientId`** before inserting, showing a clear user-facing error for missing, self, or inactive recipients instead of falling through to a Postgres error path.
 
@@ -154,7 +154,7 @@
 - [x] Global `TermYearSelector` sync is now implemented via shared localStorage-backed state across report-card pages
 - [ ] Responsive table handling for mobile — untested
 - [x] Zod validation is now present in `lib/validation.ts` and used in the create/edit form paths (`CreateStudentForm`, `CreateClassForm`, `AnnouncementForm`)
-- [ ] Toast system / optimistic updates (current pattern is inline "Saved" text after the fact)
+- [~] Toast system — shared `ToastProvider` and `emitToast()` feedback are in place for key save flows; optimistic updates are not yet broadly implemented
 - [x] `DeleteEntryButton` now has a confirm/cancel flow with auto-cancel behavior, so the confirm step exists in code and is not purely implicit
 - [x] Consistent empty-state component with CTA (`components/EmptyState.tsx` exists and is reusable)
 - [ ] New-admin onboarding checklist
@@ -191,13 +191,13 @@ CBT/quiz builder, library module, hostel module, transport module, inventory/ass
 ## Dev, Docs, Quality
 
 - [x] `.env.local.example` includes `SUPABASE_SERVICE_ROLE_KEY` (confirmed present)
-- [ ] `README.md` — still the original scaffold version, badly out of date
+- [x] `README.md` — rewritten to document the current product, setup, scripts, and role-based areas
 - [ ] Demo seed script (only a single first-admin SQL snippet exists)
 - [ ] Unit tests — none, including for the report-card ranking/averaging logic
 - [ ] GitHub Actions (lint/typecheck/build on PR)
-- [ ] `prettier`/`eslint` config
+- [x] `prettier`/`eslint` config (`.eslintrc.json`, Prettier scripts and Tailwind plugin)
 - [ ] Switch to `supabase gen types` now that the schema has stabilized, instead of hand-maintaining `database.ts`
-- [ ] **Empty `middleware.ts` sitting alongside `proxy.ts`** — the real middleware logic lives in `proxy.ts`, but Next.js's convention is to look for `middleware.ts` specifically. Confirm this is intentionally aliased (e.g. via `next.config.mjs` or a re-export) rather than a stray leftover file, and either wire it up explicitly or delete it to avoid confusing future contributors.
+- [x] Middleware entry point — `middleware.ts` now re-exports the existing request guard from `proxy.ts`, so Next.js 14 discovers and runs the auth/password-change redirects.
 
 ---
 

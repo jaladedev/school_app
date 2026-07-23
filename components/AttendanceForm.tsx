@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { markAttendance } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
+import { ExportAttendanceRegisterButton } from "@/components/ExportAttendanceRegisterButton";
 import type { AttendanceStatus } from "@/types/database";
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string }[] = [
@@ -16,10 +17,14 @@ export function AttendanceForm({
   lessonId,
   students,
   initialStatus,
+  lessonDate,
+  className,
 }: {
   lessonId: string;
   students: { id: string; full_name: string }[];
   initialStatus: Record<string, AttendanceStatus>;
+  lessonDate: string;
+  className: string;
 }) {
   const [statuses, setStatuses] = useState<Record<string, AttendanceStatus>>(() => {
     const base: Record<string, AttendanceStatus> = {};
@@ -48,13 +53,19 @@ export function AttendanceForm({
 
   return (
     <div>
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() => setAll("present")}
           className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-leaf-soft"
         >
           Mark all present
         </button>
+        <ExportAttendanceRegisterButton
+          lessonDate={lessonDate}
+          className={className}
+          students={students}
+          statuses={statuses}
+        />
       </div>
 
       <div className="space-y-2">

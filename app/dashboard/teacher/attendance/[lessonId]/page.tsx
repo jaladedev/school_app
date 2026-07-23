@@ -52,6 +52,8 @@ export default async function AttendancePage({ params }: { params: { lessonId: s
           lessonId={params.lessonId}
           students={students}
           initialStatus={initialStatus}
+          lessonDate={lesson?.lesson_date ?? "attendance"}
+          className={`${lesson?.classes?.name ?? "Class"} ${lesson?.classes?.arm ?? ""}`.trim()}
         />
       ) : (
         <EmptyState message="No students found in this class." />

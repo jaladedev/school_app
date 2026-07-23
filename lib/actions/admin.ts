@@ -128,17 +128,48 @@ async function recordEnrollment(
   studentId: string,
   classId: string
 ) {
+  await recordEnrollments(admin, [studentId], classId);
+}
+
+async function recordEnrollments(
+  admin: ReturnType<typeof createAdminClient>,
+  studentIds: string[],
+  classId: string
+) {
+  if (!studentIds.length) return;
+
   const { academicYear, term } = await getCurrentTermYear(admin);
 
-  await admin.from("enrollments").upsert(
-    {
+  const { error } = await admin.from("enrollments").upsert(
+    studentIds.map((studentId) => ({
       student_id: studentId,
       class_id: classId,
       academic_year: academicYear,
       term,
-    },
+    })),
     { onConflict: "student_id,class_id,academic_year,term" }
   );
+
+  if (error) throw new Error(error.message);
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  limit: number,
+  mapper: (value: T) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < values.length) {
+      const index = nextIndex++;
+      results[index] = await mapper(values[index]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, values.length) }, worker));
+  return results;
 }
 
 export async function createTeacherAccount(input: {
@@ -283,6 +314,13 @@ export type BulkStudentResult = {
   error?: string;
 };
 
+type BulkCreationAttempt =
+  | BulkStudentResult
+  | {
+      result: BulkStudentResult;
+      userId: string;
+    };
+
 export async function createStudentsBulk(input: {
   classId: string;
   students: BulkStudentRow[];
@@ -304,110 +342,128 @@ export async function createStudentsBulk(input: {
     throw new Error("Shared password must be at least 8 characters.");
   }
 
-  const results: BulkStudentResult[] = [];
+  const emails = input.students.map((student) => student.email.trim().toLowerCase());
+  const duplicateInputEmails = new Set(
+    emails.filter((email, index) => emails.indexOf(email) !== index)
+  );
+  const { data: existingProfiles, error: existingProfilesError } = await admin
+    .from("profiles")
+    .select("email")
+    .in(
+      "email",
+      input.students.map((student) => student.email)
+    );
 
-  for (const row of input.students) {
-    const password =
-      input.passwordStrategy === "shared" ? input.sharedPassword! : generateTempPassword();
+  if (existingProfilesError) throw new Error(existingProfilesError.message);
 
-    try {
-      const emailTaken = await admin
-        .from("profiles")
-        .select("id")
-        .ilike("email", row.email)
-        .maybeSingle()
-        .then(({ data }) => !!data);
+  const existingEmails = new Set(
+    (existingProfiles ?? []).map((profile) => profile.email.toLowerCase())
+  );
 
-      if (emailTaken) {
-        results.push({
-          email: row.email,
-          fullName: row.fullName,
-          success: false,
-          error: `An account with the email "${row.email}" already exists.`,
-        });
-        continue;
-      }
+  const created = await mapWithConcurrency<BulkStudentRow, BulkCreationAttempt>(
+    input.students,
+    5,
+    async (row) => {
+      const password =
+        input.passwordStrategy === "shared" ? input.sharedPassword! : generateTempPassword();
 
-      const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email: row.email,
-        password,
-        email_confirm: true,
-      });
-
-      if (createError || !created.user) {
-        results.push({
-          email: row.email,
-          fullName: row.fullName,
-          success: false,
-          error: createError?.message ?? "Account creation failed.",
-        });
-        continue;
-      }
-
-      const userId = created.user.id;
-
-      const { error: profileError } = await admin.from("profiles").insert({
-        id: userId,
-        role: "student",
-        full_name: row.fullName,
-        email: row.email,
-      });
-
-      if (profileError) {
-        try {
-          await admin.auth.admin.deleteUser(userId);
-        } catch {
-          await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+      try {
+        const email = row.email.trim().toLowerCase();
+        if (existingEmails.has(email) || duplicateInputEmails.has(email)) {
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: `An account with the email "${row.email}" already exists.`,
+          } satisfies BulkStudentResult;
         }
-        results.push({
+
+        const { data: created, error: createError } = await admin.auth.admin.createUser({
           email: row.email,
-          fullName: row.fullName,
-          success: false,
-          error: profileError.message,
+          password,
+          email_confirm: true,
         });
-        continue;
-      }
 
-      const { error: studentError } = await admin.from("student_profiles").insert({
-        id: userId,
-        class_id: input.classId,
-        admission_no: row.admissionNo ?? null,
-        guardian_name: row.guardianName ?? null,
-        guardian_phone: row.guardianPhone ?? null,
-      });
-
-      if (studentError) {
-        try {
-          await admin.auth.admin.deleteUser(userId);
-        } catch {
-          await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+        if (createError || !created.user) {
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: createError?.message ?? "Account creation failed.",
+          } satisfies BulkStudentResult;
         }
-        results.push({
+
+        const userId = created.user.id;
+
+        const { error: profileError } = await admin.from("profiles").insert({
+          id: userId,
+          role: "student",
+          full_name: row.fullName,
+          email: row.email,
+        });
+
+        if (profileError) {
+          try {
+            await admin.auth.admin.deleteUser(userId);
+          } catch {
+            await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+          }
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: profileError.message,
+          } satisfies BulkStudentResult;
+        }
+
+        const { error: studentError } = await admin.from("student_profiles").insert({
+          id: userId,
+          class_id: input.classId,
+          admission_no: row.admissionNo ?? null,
+          guardian_name: row.guardianName ?? null,
+          guardian_phone: row.guardianPhone ?? null,
+        });
+
+        if (studentError) {
+          try {
+            await admin.auth.admin.deleteUser(userId);
+          } catch {
+            await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+          }
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: studentError.message,
+          } satisfies BulkStudentResult;
+        }
+
+        return {
+          result: { email: row.email, fullName: row.fullName, success: true, password },
+          userId,
+        };
+      } catch (err: any) {
+        return {
           email: row.email,
           fullName: row.fullName,
           success: false,
-          error: studentError.message,
-        });
-        continue;
+          error: err.message ?? "Unexpected error.",
+        } satisfies BulkStudentResult;
       }
-
-      await recordEnrollment(admin, userId, input.classId);
-
-      results.push({
-        email: row.email,
-        fullName: row.fullName,
-        success: true,
-        password,
-      });
-    } catch (err: any) {
-      results.push({
-        email: row.email,
-        fullName: row.fullName,
-        success: false,
-        error: err.message ?? "Unexpected error.",
-      });
     }
-  }
+  );
+
+  const successful = created.filter(
+    (row): row is { result: BulkStudentResult; userId: string } => "userId" in row
+  );
+
+  await recordEnrollments(
+    admin,
+    successful.map((row) => row.userId),
+    input.classId
+  );
+
+  const results = created.map((row) => ("result" in row ? row.result : row));
 
   revalidatePath("/dashboard/admin/students");
   return results;
@@ -471,6 +527,72 @@ export async function updateStudentAccount(input: {
   }
 
   revalidatePath(`/dashboard/admin/students/${input.studentId}`);
+  revalidatePath("/dashboard/admin/students");
+}
+
+const STUDENT_PHOTO_BUCKET = "student-photos";
+const MAX_STUDENT_PHOTO_BYTES = 5 * 1024 * 1024;
+const ALLOWED_STUDENT_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+async function ensureStudentPhotoBucket(admin: ReturnType<typeof createAdminClient>) {
+  const { error } = await admin.storage.createBucket(STUDENT_PHOTO_BUCKET, {
+    public: false,
+    fileSizeLimit: `${MAX_STUDENT_PHOTO_BYTES}`,
+    allowedMimeTypes: [...ALLOWED_STUDENT_PHOTO_TYPES],
+  });
+
+  if (error && !/already exists/i.test(error.message)) {
+    throw new Error(`Could not prepare student photo storage: ${error.message}`);
+  }
+}
+
+export async function uploadStudentPhoto(studentId: string, formData: FormData) {
+  await assertRole(["admin"], "Only an admin can upload student photos.");
+
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || !photo.size) throw new Error("Choose an image to upload.");
+  if (!ALLOWED_STUDENT_PHOTO_TYPES.has(photo.type)) {
+    throw new Error("Use a JPEG, PNG, or WebP image.");
+  }
+  if (photo.size > MAX_STUDENT_PHOTO_BYTES) throw new Error("The photo must be 5 MB or smaller.");
+
+  const admin = createAdminClient();
+  await ensureStudentPhotoBucket(admin);
+
+  const { data: profile, error: profileReadError } = await admin
+    .from("profiles")
+    .select("avatar_url")
+    .eq("id", studentId)
+    .single();
+
+  if (profileReadError || !profile) throw new Error("Student profile not found.");
+
+  const extension = photo.type === "image/jpeg" ? "jpg" : photo.type.split("/")[1];
+  const objectPath = `${studentId}/profile.${extension}`;
+  const { error: uploadError } = await admin.storage
+    .from(STUDENT_PHOTO_BUCKET)
+    .upload(objectPath, photo, {
+      contentType: photo.type,
+      upsert: true,
+    });
+
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { error: updateError } = await admin
+    .from("profiles")
+    .update({ avatar_url: objectPath })
+    .eq("id", studentId);
+
+  if (updateError) {
+    await admin.storage.from(STUDENT_PHOTO_BUCKET).remove([objectPath]);
+    throw new Error(updateError.message);
+  }
+
+  if (profile.avatar_url && profile.avatar_url !== objectPath) {
+    await admin.storage.from(STUDENT_PHOTO_BUCKET).remove([profile.avatar_url]);
+  }
+
+  revalidatePath(`/dashboard/admin/students/${studentId}`);
   revalidatePath("/dashboard/admin/students");
 }
 
@@ -630,52 +752,29 @@ export async function promoteStudents(input: {
     throw new Error("Select a target class for promotion or repeat.");
   }
 
-  const { academicYear, term } = await getCurrentTermYear(admin);
+  const studentIds = [...new Set(input.studentIds)];
+  if (!studentIds.length) return { succeeded: 0, failed: 0, errors: [] };
 
-  let succeeded = 0;
-  const errors: string[] = [];
+  const { data: updatedStudents, error: updateError } = await admin
+    .from("student_profiles")
+    .update({ class_id: input.outcome === "graduate" ? null : input.targetClassId! })
+    .in("id", studentIds)
+    .select("id");
 
-  for (const studentId of input.studentIds) {
-    if (input.outcome === "graduate") {
-      const { error } = await admin
-        .from("student_profiles")
-        .update({ class_id: null })
-        .eq("id", studentId);
-      if (error) {
-        errors.push(`${studentId}: ${error.message}`);
-        continue;
-      }
-      succeeded += 1;
-      continue;
-    }
+  if (updateError) throw new Error(updateError.message);
 
-    const { error: updateError } = await admin
-      .from("student_profiles")
-      .update({ class_id: input.targetClassId })
-      .eq("id", studentId);
+  const updatedIds = (updatedStudents ?? []).map((student) => student.id);
+  const missingIds = studentIds.filter((id) => !updatedIds.includes(id));
+  const errors = missingIds.map((id) => `${id}: Student not found or could not be updated.`);
 
-    if (updateError) {
-      errors.push(`${studentId}: ${updateError.message}`);
-      continue;
-    }
-
-    await admin.from("enrollments").upsert(
-      {
-        student_id: studentId,
-        class_id: input.targetClassId!,
-        academic_year: academicYear,
-        term,
-      },
-      { onConflict: "student_id,class_id,academic_year,term" }
-    );
-
-    succeeded += 1;
+  if (input.outcome !== "graduate" && updatedIds.length) {
+    await recordEnrollments(admin, updatedIds, input.targetClassId!);
   }
 
   revalidatePath("/dashboard/admin/classes");
   revalidatePath("/dashboard/admin/students");
 
-  return { succeeded, failed: errors.length, errors };
+  return { succeeded: updatedIds.length, failed: errors.length, errors };
 }
 
 // ---------- Password reset ----------

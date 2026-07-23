@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { GradeEntryForm } from "@/components/GradeEntryForm";
+import { GradeCsvImport } from "@/components/GradeCsvImport";
 import { EmptyState } from "@/components/EmptyState";
 
 export default async function GradeEntryPage({ params }: { params: { assessmentId: string } }) {
@@ -50,12 +51,15 @@ export default async function GradeEntryPage({ params }: { params: { assessmentI
       </h1>
 
       {students.length ? (
-        <GradeEntryForm
-          assessmentId={params.assessmentId}
-          maxScore={assessment?.max_score ?? 100}
-          students={students}
-          initialGrades={initialGrades}
-        />
+        <>
+          <GradeCsvImport assessmentId={params.assessmentId} />
+          <GradeEntryForm
+            assessmentId={params.assessmentId}
+            maxScore={assessment?.max_score ?? 100}
+            students={students}
+            initialGrades={initialGrades}
+          />
+        </>
       ) : (
         <EmptyState message="No students found in this class." />
       )}
