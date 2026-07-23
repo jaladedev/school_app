@@ -14,7 +14,9 @@ export default async function AdminParentsPage() {
 
   const { data: links } = await supabase
     .from("guardian_links")
-    .select("parent_id, relationship, is_primary, student_profiles(profiles(full_name), classes(name, arm))");
+    .select(
+      "parent_id, relationship, is_primary, student_profiles(profiles(full_name), classes(name, arm))"
+    );
 
   const childrenByParent = new Map<
     string,
@@ -55,7 +57,9 @@ export default async function AdminParentsPage() {
                 <div>
                   <p className="font-medium text-ink">
                     {p.full_name}
-                    {!p.is_active && <span className="ml-2 text-xs font-normal text-clay">(deactivated)</span>}
+                    {!p.is_active && (
+                      <span className="ml-2 text-xs font-normal text-clay">(deactivated)</span>
+                    )}
                   </p>
                   <p className="text-sm text-ink-soft">{p.email}</p>
                 </div>
@@ -66,10 +70,7 @@ export default async function AdminParentsPage() {
               </div>
               <div className="mt-2 flex flex-wrap gap-1">
                 {children.map((c, i) => (
-                  <span
-                    key={i}
-                    className="rounded-full bg-leaf-soft px-2.5 py-1 text-xs text-leaf"
-                  >
+                  <span key={i} className="rounded-full bg-leaf-soft px-2.5 py-1 text-xs text-leaf">
                     {c.name}
                     {c.relationship ? ` (${c.relationship})` : ""}
                     {c.className ? ` · ${c.className}` : ""}

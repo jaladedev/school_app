@@ -149,8 +149,8 @@
 - [x] Pagination — students, invoices, payments (shared `Pagination` component + helpers)
 - [x] Server-side search — students, staff
 - [ ] Pagination still missing: staff page, teacher attendance/notes pages
-- [ ] Active link state in Sidebar
-- [ ] Breadcrumbs for deep routes
+- [x] Active link state in Sidebar
+- [x] Breadcrumbs for deep routes
 - [ ] Global `TermYearSelector` sync (each page currently has its own independent one)
 - [ ] Responsive table handling for mobile — untested
 - [x] Zod validation is now present in `lib/validation.ts` and used in the create/edit form paths (`CreateStudentForm`, `CreateClassForm`, `AnnouncementForm`)

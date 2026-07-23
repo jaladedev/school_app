@@ -124,7 +124,8 @@ export default async function ParentFeesPage({
             <div>
               <p className="text-sm text-ink">{p.invoices?.fee_structures?.title ?? "Payment"}</p>
               <p className="text-xs text-ink-soft">
-                {METHOD_LABELS[p.method as PaymentMethod]} · {new Date(p.paid_at).toLocaleDateString()}
+                {METHOD_LABELS[p.method as PaymentMethod]} ·{" "}
+                {new Date(p.paid_at).toLocaleDateString()}
               </p>
             </div>
             <div className="flex items-center gap-3">

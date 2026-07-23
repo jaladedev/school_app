@@ -63,8 +63,8 @@ export default async function ParentAttendancePage({
 
       {percent !== null && (
         <p className="mb-6 text-sm text-ink-soft">
-          Overall attendance rate: <span className="font-medium text-ink">{percent}%</span>{" "}
-          across {total} recorded lessons.
+          Overall attendance rate: <span className="font-medium text-ink">{percent}%</span> across{" "}
+          {total} recorded lessons.
         </p>
       )}
 

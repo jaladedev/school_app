@@ -17,9 +17,9 @@ export function CreateParentForm() {
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<StudentResult[]>([]);
-  const [linkedChildren, setLinkedChildren] = useState<
-    (ParentChildLink & { fullName: string })[]
-  >([]);
+  const [linkedChildren, setLinkedChildren] = useState<(ParentChildLink & { fullName: string })[]>(
+    []
+  );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<string | null>(null);
@@ -52,7 +52,12 @@ export function CreateParentForm() {
     if (linkedChildren.some((c) => c.studentId === student.id)) return;
     setLinkedChildren((prev) => [
       ...prev,
-      { studentId: student.id, fullName: student.full_name, relationship: "", isPrimary: prev.length === 0 },
+      {
+        studentId: student.id,
+        fullName: student.full_name,
+        relationship: "",
+        isPrimary: prev.length === 0,
+      },
     ]);
     setQuery("");
     setResults([]);
@@ -107,7 +112,10 @@ export function CreateParentForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mb-6 space-y-3 rounded-xl border border-rule bg-white p-4">
+    <form
+      onSubmit={handleSubmit}
+      className="mb-6 space-y-3 rounded-xl border border-rule bg-white p-4"
+    >
       <div className="grid grid-cols-2 gap-3">
         <input
           required

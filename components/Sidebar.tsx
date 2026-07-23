@@ -64,8 +64,9 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
 function findActiveHref(pathname: string, items: { href: string }[]): string | null {
   let best: string | null = null;
   for (const item of items) {
-    const isMatch = pathname === item.href || pathname.startsWith(`${item.href}/`);
-    if (isMatch && (best === null || item.href.length > best.length)) {
+    const isExactOrNested = pathname === item.href || pathname.startsWith(`${item.href}/`);
+    const isMoreSpecific = best === null || item.href.length > best.length;
+    if (isExactOrNested && isMoreSpecific) {
       best = item.href;
     }
   }

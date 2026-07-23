@@ -4,11 +4,7 @@ import { getLinkedChildren, resolveSelectedChild } from "@/lib/parent";
 import { ChildSwitcher } from "@/components/ChildSwitcher";
 import { formatKobo } from "@/types/database";
 
-export default async function ParentHome({
-  searchParams,
-}: {
-  searchParams: { child?: string };
-}) {
+export default async function ParentHome({ searchParams }: { searchParams: { child?: string } }) {
   const children = await getLinkedChildren();
   const selected = await resolveSelectedChild(searchParams.child);
 
@@ -46,9 +42,7 @@ export default async function ParentHome({
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        {selected.fullName}
-      </h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">{selected.fullName}</h1>
       <ChildSwitcher linkedChildren={children} selectedChildId={selected.id} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -67,7 +61,9 @@ export default async function ParentHome({
 
         <div className="rounded-xl border border-rule bg-white p-4">
           <p className="mb-1 text-xs uppercase tracking-wide text-ink-soft">Fee balance</p>
-          <p className={`font-display text-2xl font-semibold ${balance > 0 ? "text-clay" : "text-leaf"}`}>
+          <p
+            className={`font-display text-2xl font-semibold ${balance > 0 ? "text-clay" : "text-leaf"}`}
+          >
             {formatKobo(balance)}
           </p>
           <Link
