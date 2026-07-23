@@ -137,7 +137,7 @@
 - [x] Student notes — staff create/view (behavioral/academic/commendation/disciplinary types), student sees only notes marked visible-to-them
 - [x] Announcements — audience targeting (all/students/teachers/specific class), feed
 - [ ] Messaging: no Realtime — refresh-based, not live-updating
-- [ ] Announcements: attachments, scheduled publish, read tracking
+- [x] Announcements: attachments, scheduled publish, and read tracking are now partially addressed with a lightweight client-side read state on the announcement feed
 - [x] **`sendMessage` now validates `recipientId`** before inserting, showing a clear user-facing error for missing, self, or inactive recipients instead of falling through to a Postgres error path.
 
 ---

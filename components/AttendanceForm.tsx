@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { markAttendance } from "@/lib/actions/teacher";
+import { emitToast } from "@/lib/toast";
 import type { AttendanceStatus } from "@/types/database";
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string }[] = [
@@ -28,7 +29,6 @@ export function AttendanceForm({
     return base;
   });
   const [isPending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
 
   function setAll(status: AttendanceStatus) {
     const next: Record<string, AttendanceStatus> = {};
@@ -37,13 +37,12 @@ export function AttendanceForm({
   }
 
   function handleSave() {
-    setSaved(false);
     startTransition(async () => {
       await markAttendance(
         lessonId,
         students.map((s) => ({ studentId: s.id, status: statuses[s.id] }))
       );
-      setSaved(true);
+      emitToast("Attendance saved.");
     });
   }
 
@@ -91,8 +90,6 @@ export function AttendanceForm({
       >
         {isPending ? "Saving…" : "Save attendance"}
       </button>
-
-      {saved && <p className="mt-2 text-sm text-leaf">Attendance saved.</p>}
     </div>
   );
 }

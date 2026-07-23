@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { saveGrade } from "@/lib/actions/teacher";
+import { emitToast } from "@/lib/toast";
 
 const COMMENT_BANK = [
   "Excellent work",
@@ -39,7 +40,6 @@ export function GradeEntryForm({
   });
   const [openCommentBank, setOpenCommentBank] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [savedId, setSavedId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -52,14 +52,13 @@ export function GradeEntryForm({
       return;
     }
 
-    setSavedId(null);
     setErrorId(null);
     setErrorMessage(null);
 
     startTransition(async () => {
       try {
         await saveGrade(assessmentId, studentId, score, remarks[studentId] || undefined);
-        setSavedId(studentId);
+        emitToast("Grade saved.");
       } catch (err: any) {
         // Previously unhandled — a rejected saveGrade() call here (e.g.
         // the "you aren't assigned to teach this subject" RLS pre-check)
@@ -98,7 +97,6 @@ export function GradeEntryForm({
               >
                 {isPending ? "Saving…" : "Save"}
               </button>
-              {savedId === student.id && <span className="text-xs text-leaf">Saved</span>}
             </div>
           </div>
 

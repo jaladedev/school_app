@@ -1,5 +1,6 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { AnnouncementForm } from "@/components/AnnouncementForm";
+import { AnnouncementCard } from "@/components/AnnouncementCard";
 import { redirect } from "next/navigation";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage } from "@/components/Pagination";
 import { EmptyState } from "@/components/EmptyState";
@@ -84,17 +85,16 @@ export default async function AnnouncementsPage({
 
       <div className="space-y-3">
         {pageItems.map((a) => (
-          <div key={a.id} className="rounded-xl border border-rule bg-white p-4">
-            <div className="mb-1 flex items-center justify-between">
-              <p className="font-display text-lg font-semibold text-ink">{a.title}</p>
-              <span className="text-xs text-ink-soft">{timeAgo(a.created_at)}</span>
-            </div>
-            <p className="mb-2 text-sm text-ink">{a.content}</p>
-            <p className="text-xs text-ink-soft">
-              {a.profiles?.full_name ?? "School"} ·{" "}
-              {a.audience === "class" ? "This class" : a.audience}
-            </p>
-          </div>
+          <AnnouncementCard
+            key={a.id}
+            id={a.id}
+            title={a.title}
+            content={a.content}
+            authorName={a.profiles?.full_name ?? "School"}
+            audience={a.audience}
+            createdAt={a.created_at}
+            timeAgo={timeAgo(a.created_at)}
+          />
         ))}
 
         {!visible.length && <EmptyState message="No announcements yet." />}

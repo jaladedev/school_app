@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateStudentAccount } from "@/lib/actions/admin";
+import { emitToast } from "@/lib/toast";
 
 export function EditStudentForm({
   studentId,
@@ -28,13 +29,11 @@ export function EditStudentForm({
   const [guardianPhone, setGuardianPhone] = useState(currentGuardianPhone ?? "");
   const [classId, setClassId] = useState(currentClassId ?? "");
   const [isPending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSaved(false);
 
     startTransition(async () => {
       try {
@@ -46,7 +45,7 @@ export function EditStudentForm({
           guardianPhone: guardianPhone || undefined,
           classId: classId !== currentClassId ? classId : undefined,
         });
-        setSaved(true);
+        emitToast("Student updated.");
         router.refresh();
       } catch (err: any) {
         setError(err.message ?? "Something went wrong.");
@@ -128,7 +127,6 @@ export function EditStudentForm({
       >
         {isPending ? "Saving…" : "Save changes"}
       </button>
-      {saved && <span className="ml-3 text-sm text-leaf">Saved.</span>}
       {error && <p className="mt-2 text-sm text-clay">{error}</p>}
     </form>
   );

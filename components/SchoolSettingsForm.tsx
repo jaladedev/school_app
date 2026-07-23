@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { saveSchoolSettings } from "@/lib/actions/settings";
+import { emitToast } from "@/lib/toast";
 import type { GradeScaleEntry, SchoolSettings } from "@/types/database";
 
 export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
@@ -13,7 +14,6 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
   const [term, setTerm] = useState(settings.current_term);
   const [gradeScale, setGradeScale] = useState<GradeScaleEntry[]>(settings.grade_scale);
   const [isPending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function updateGrade(index: number, field: "grade" | "min", value: string) {
@@ -26,7 +26,6 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
 
   function handleSave() {
     setError(null);
-    setSaved(false);
     startTransition(async () => {
       try {
         await saveSchoolSettings({
@@ -38,7 +37,7 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
           currentTerm: term,
           gradeScale,
         });
-        setSaved(true);
+        emitToast("School settings saved.");
       } catch (err: any) {
         setError(err.message ?? "Something went wrong.");
       }
@@ -179,7 +178,6 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
         >
           {isPending ? "Saving…" : "Save settings"}
         </button>
-        {saved && <span className="ml-3 text-sm text-leaf">Saved.</span>}
         {error && <p className="mt-2 text-sm text-clay">{error}</p>}
       </div>
     </div>

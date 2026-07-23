@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { saveTopicNote } from "@/lib/actions/teacher";
+import { emitToast } from "@/lib/toast";
 
 export function NoteEditor({
   topicId,
@@ -18,13 +19,11 @@ export function NoteEditor({
 }) {
   const [content, setContent] = useState(initialContent);
   const [isPending, startTransition] = useTransition();
-  const [savedAs, setSavedAs] = useState<string | null>(null);
 
   function handleSave(status: "draft" | "published") {
-    setSavedAs(null);
     startTransition(async () => {
       await saveTopicNote(topicId, content, status, existingNoteId);
-      setSavedAs(status);
+      emitToast(status === "published" ? "Topic note published." : "Draft saved.");
     });
   }
 
@@ -49,13 +48,6 @@ export function NoteEditor({
           </button>
         </div>
       </div>
-
-      {savedAs && (
-        <p className="mb-3 text-sm text-leaf">
-          Saved as {savedAs}
-          {savedAs === "published" ? " — now visible to students." : "."}
-        </p>
-      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div>

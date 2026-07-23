@@ -88,9 +88,7 @@ async function getCurrentTermYear(admin: ReturnType<typeof createAdminClient>) {
 }
 
 async function cleanupOrphanedAuthUsers(admin: ReturnType<typeof createAdminClient>) {
-  const { data: profileRows, error: profileListError } = await admin
-    .from("profiles")
-    .select("id");
+  const { data: profileRows, error: profileListError } = await admin.from("profiles").select("id");
 
   if (profileListError) {
     throw new Error(profileListError.message);

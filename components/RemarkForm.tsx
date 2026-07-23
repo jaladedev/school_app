@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveReportCardRemark } from "@/lib/actions/reportCard";
+import { emitToast } from "@/lib/toast";
 
 export function RemarkForm({
   studentId,
@@ -21,12 +22,10 @@ export function RemarkForm({
   const [classTeacherRemark, setClassTeacherRemark] = useState(initialClassTeacherRemark ?? "");
   const [adminRemark, setAdminRemark] = useState(initialAdminRemark ?? "");
   const [isPending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handleSave() {
     setError(null);
-    setSaved(false);
     startTransition(async () => {
       try {
         await saveReportCardRemark({
@@ -36,7 +35,7 @@ export function RemarkForm({
           classTeacherRemark,
           adminRemark,
         });
-        setSaved(true);
+        emitToast("Remarks saved.");
         router.refresh();
       } catch (err: any) {
         setError(err.message ?? "Something went wrong.");
@@ -76,7 +75,6 @@ export function RemarkForm({
         {isPending ? "Saving…" : "Save remarks"}
       </button>
 
-      {saved && <p className="mt-2 text-sm text-leaf">Saved.</p>}
       {error && <p className="mt-2 text-sm text-clay">{error}</p>}
     </div>
   );
