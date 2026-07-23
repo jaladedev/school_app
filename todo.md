@@ -89,7 +89,7 @@
 - [x] CSV grade import — teachers can import `Admission No`, `Score`, and optional `Remark` columns; class membership, score range, and subject assignment are verified before the batch upsert
 - [ ] Assessment "type" as a real enum (currently free-text titles)
 - [x] `weight_percent` — now used in report-card scoring (`lib/report-card.ts` reads `weight_percent` and applies the weighted-average path when available)
-- [~] Curriculum notes — teachers can upload private image, PDF, audio, and video resources, while `pdf` and `audio` render in `TopicContent`; version-history UI remains outstanding
+- [x] Curriculum notes — teachers can upload private image, PDF, audio, and video resources; `pdf`/`audio` render in `TopicContent`; each save creates an immutable version shown in the editor history
 
 ---
 

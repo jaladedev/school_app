@@ -8,12 +8,10 @@ import { emitToast } from "@/lib/toast";
 
 export function NoteEditor({
   topicId,
-  existingNoteId,
   initialContent,
   initialStatus,
 }: {
   topicId: string;
-  existingNoteId?: string;
   initialContent: string;
   initialStatus: "draft" | "published" | "archived" | "unwritten";
 }) {
@@ -22,7 +20,7 @@ export function NoteEditor({
 
   function handleSave(status: "draft" | "published") {
     startTransition(async () => {
-      await saveTopicNote(topicId, content, status, existingNoteId);
+        await saveTopicNote(topicId, content, status);
       emitToast(status === "published" ? "Topic note published." : "Draft saved.");
     });
   }

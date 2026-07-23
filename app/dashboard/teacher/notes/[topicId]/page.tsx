@@ -22,6 +22,12 @@ export default async function TeacherNoteEditPage({ params }: { params: { topicI
     .limit(1)
     .maybeSingle();
 
+  const { data: versions } = await supabase
+    .from("topic_notes")
+    .select("id, version, status, updated_at")
+    .eq("topic_id", params.topicId)
+    .order("version", { ascending: false });
+
   return (
     <div>
       <Link
@@ -38,7 +44,6 @@ export default async function TeacherNoteEditPage({ params }: { params: { topicI
 
       <NoteEditor
         topicId={params.topicId}
-        existingNoteId={note?.id}
         initialContent={note?.content ?? `## Introduction\n\nWrite about "${topic?.title}" here.\n`}
         initialStatus={note?.status ?? "unwritten"}
       />
@@ -46,6 +51,24 @@ export default async function TeacherNoteEditPage({ params }: { params: { topicI
         <TopicResourceUpload topicId={params.topicId} noteId={note.id} />
       ) : (
         <p className="mt-4 text-sm text-ink-soft">Save the note once before attaching resources.</p>
+      )}
+      {!!versions?.length && (
+        <section className="mt-6 rounded-xl border border-rule bg-white p-4">
+          <h2 className="font-display text-lg font-semibold text-ink">Version history</h2>
+          <div className="mt-3 space-y-2">
+            {versions.map((version) => (
+              <div
+                key={version.id}
+                className="flex items-center justify-between rounded-lg bg-paper px-3 py-2 text-sm"
+              >
+                <span className="font-medium text-ink">Version {version.version}</span>
+                <span className="text-xs text-ink-soft">
+                  {version.status} · {new Date(version.updated_at).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );
