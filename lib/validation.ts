@@ -54,6 +54,9 @@ export const createAssessmentSchema = z.object({
     .string()
     .trim()
     .regex(/^\d{4}\/\d{4}$/, "Use the format 2025/2026."),
+  assessmentType: z
+    .enum(["first_ca", "second_ca", "exam", "test", "assignment", "project", "practical", "other"])
+    .optional(),
   customTitle: z.string().trim().optional(),
   customMaxScore: z.coerce.number().int().min(1, "Max score must be at least 1.").optional(),
 });

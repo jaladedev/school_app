@@ -4,6 +4,15 @@ export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disciplinary";
 export type AnnouncementAudience = "all" | "students" | "teachers" | "class";
 export type HomeworkStatus = "given" | "reviewed" | "graded";
+export type AssessmentType =
+  | "first_ca"
+  | "second_ca"
+  | "exam"
+  | "test"
+  | "assignment"
+  | "project"
+  | "practical"
+  | "other";
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
 export type StaffRole = "teacher" | "hod" | "bursar";
@@ -170,6 +179,7 @@ export type Assessment = {
   subject_id: string;
   class_id: string;
   title: string;
+  assessment_type: AssessmentType;
   max_score: number;
   weight_percent: number | null;
   term: number;

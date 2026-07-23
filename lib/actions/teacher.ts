@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { AttendanceStatus, HomeworkStatus, ResourceType } from "@/types/database";
+import type { AssessmentType, AttendanceStatus, HomeworkStatus, ResourceType } from "@/types/database";
 
 // ---------- Lessons ----------
 
@@ -267,6 +267,119 @@ export async function importGrades(
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/teacher/grades/${assessmentId}`);
+  revalidatePath("/dashboard/admin/grades");
+}
+
+// ---------- Assessments ----------
+
+async function assertTeacherAssignedTo(
+  supabase: ReturnType<typeof createClient>,
+  teacherId: string,
+  subjectId: string,
+  classId: string
+) {
+  const { data: assignment } = await supabase
+    .from("timetable_entries")
+    .select("id")
+    .eq("teacher_id", teacherId)
+    .eq("subject_id", subjectId)
+    .eq("class_id", classId)
+    .maybeSingle();
+
+  if (!assignment) {
+    throw new Error("You aren't assigned to teach this subject for this class.");
+  }
+}
+
+export async function createStandardAssessmentSet(input: {
+  subjectId: string;
+  classId: string;
+  term: number;
+  academicYear: string;
+}) {
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== "teacher") {
+    throw new Error("Only teachers can create assessments.");
+  }
+
+  const supabase = createClient();
+  await assertTeacherAssignedTo(supabase, profile.id, input.subjectId, input.classId);
+
+  const STANDARD_ASSESSMENTS = [
+    { title: "1st CA", max_score: 20, assessment_type: "first_ca" as const },
+    { title: "2nd CA", max_score: 20, assessment_type: "second_ca" as const },
+    { title: "Exam", max_score: 60, assessment_type: "exam" as const },
+  ];
+
+  const { data: existing } = await supabase
+    .from("assessments")
+    .select("assessment_type")
+    .eq("subject_id", input.subjectId)
+    .eq("class_id", input.classId)
+    .eq("term", input.term)
+    .eq("academic_year", input.academicYear);
+
+  const existingTypes = new Set((existing ?? []).map((a) => a.assessment_type));
+  const toCreate = STANDARD_ASSESSMENTS.filter((a) => !existingTypes.has(a.assessment_type));
+
+  if (!toCreate.length) {
+    return { created: [] as string[] };
+  }
+
+  const { error } = await supabase.from("assessments").insert(
+    toCreate.map((a) => ({
+      subject_id: input.subjectId,
+      class_id: input.classId,
+      title: a.title,
+      assessment_type: a.assessment_type,
+      max_score: a.max_score,
+      term: input.term,
+      academic_year: input.academicYear,
+      created_by: profile.id,
+    }))
+  );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/teacher/grades");
+  revalidatePath("/dashboard/admin/grades");
+  return { created: toCreate.map((a) => `${a.title} (${a.max_score})`) };
+}
+
+export async function createCustomAssessment(input: {
+  subjectId: string;
+  classId: string;
+  term: number;
+  academicYear: string;
+  assessmentType: AssessmentType;
+  title: string;
+  maxScore: number;
+}) {
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== "teacher") {
+    throw new Error("Only teachers can create assessments.");
+  }
+  if (!input.title.trim()) {
+    throw new Error("Enter a title for this assessment.");
+  }
+
+  const supabase = createClient();
+  await assertTeacherAssignedTo(supabase, profile.id, input.subjectId, input.classId);
+
+  const { error } = await supabase.from("assessments").insert({
+    subject_id: input.subjectId,
+    class_id: input.classId,
+    title: input.title,
+    assessment_type: input.assessmentType,
+    max_score: input.maxScore,
+    term: input.term,
+    academic_year: input.academicYear,
+    created_by: profile.id,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/teacher/grades");
   revalidatePath("/dashboard/admin/grades");
 }
 

@@ -2,13 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createStandardAssessmentSet, createCustomAssessment } from "@/lib/actions/teacher";
 import { createAssessmentSchema, fieldErrorsFrom } from "@/lib/validation";
+import type { AssessmentType } from "@/types/database";
 
-const STANDARD_ASSESSMENTS = [
-  { title: "1st CA", max_score: 20 },
-  { title: "2nd CA", max_score: 20 },
-  { title: "Exam", max_score: 60 },
+const CUSTOM_ASSESSMENT_TYPES: { value: AssessmentType; label: string }[] = [
+  { value: "test", label: "Test" },
+  { value: "assignment", label: "Assignment" },
+  { value: "project", label: "Project" },
+  { value: "practical", label: "Practical" },
+  { value: "other", label: "Other" },
 ];
 
 export function CreateAssessmentForm({
@@ -21,13 +24,13 @@ export function CreateAssessmentForm({
   classes: { id: string; name: string; arm: string | null }[];
 }) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [open, setOpen] = useState(false);
   const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
   const [term, setTerm] = useState(1);
   const [academicYear, setAcademicYear] = useState(defaultAcademicYear());
+  const [customType, setCustomType] = useState<AssessmentType>("other");
   const [customTitle, setCustomTitle] = useState("");
   const [customMaxScore, setCustomMaxScore] = useState(20);
   const [isPending, startTransition] = useTransition();
@@ -59,43 +62,24 @@ export function CreateAssessmentForm({
     setFieldErrors({});
 
     startTransition(async () => {
-      // Skip any that already exist for this subject/class/term/year, so
-      // clicking this twice doesn't create duplicates.
-      const { data: existing } = await supabase
-        .from("assessments")
-        .select("title")
-        .eq("subject_id", subjectId)
-        .eq("class_id", classId)
-        .eq("term", term)
-        .eq("academic_year", academicYear);
-
-      const existingTitles = new Set((existing ?? []).map((a) => a.title));
-      const toCreate = STANDARD_ASSESSMENTS.filter((a) => !existingTitles.has(a.title));
-
-      if (!toCreate.length) {
-        setMessage("1st CA, 2nd CA, and Exam already exist for this subject/class/term.");
-        return;
-      }
-
-      const { error: insertError } = await supabase.from("assessments").insert(
-        toCreate.map((a) => ({
-          subject_id: subjectId,
-          class_id: classId,
-          title: a.title,
-          max_score: a.max_score,
+      try {
+        const { created } = await createStandardAssessmentSet({
+          subjectId,
+          classId,
           term,
-          academic_year: academicYear,
-          created_by: teacherId,
-        }))
-      );
+          academicYear,
+        });
 
-      if (insertError) {
-        setError(insertError.message);
-        return;
+        if (!created.length) {
+          setMessage("1st CA, 2nd CA, and Exam already exist for this subject/class/term.");
+          return;
+        }
+
+        setMessage(`Created: ${created.join(", ")}.`);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong.");
       }
-
-      setMessage(`Created: ${toCreate.map((a) => `${a.title} (${a.max_score})`).join(", ")}.`);
-      router.refresh();
     });
   }
 
@@ -109,6 +93,7 @@ export function CreateAssessmentForm({
       classId,
       term,
       academicYear,
+      assessmentType: customType,
       customTitle,
       customMaxScore,
     });
@@ -123,24 +108,23 @@ export function CreateAssessmentForm({
     setFieldErrors({});
 
     startTransition(async () => {
-      const { error: insertError } = await supabase.from("assessments").insert({
-        subject_id: subjectId,
-        class_id: classId,
-        title: customTitle,
-        max_score: customMaxScore,
-        term,
-        academic_year: academicYear,
-        created_by: teacherId,
-      });
+      try {
+        await createCustomAssessment({
+          subjectId,
+          classId,
+          term,
+          academicYear,
+          assessmentType: customType,
+          title: customTitle,
+          maxScore: customMaxScore,
+        });
 
-      if (insertError) {
-        setError(insertError.message);
-        return;
+        setMessage(`Created "${customTitle}" (${customMaxScore} marks).`);
+        setCustomTitle("");
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong.");
       }
-
-      setMessage(`Created "${customTitle}" (${customMaxScore} marks).`);
-      setCustomTitle("");
-      router.refresh();
     });
   }
 
@@ -215,8 +199,19 @@ export function CreateAssessmentForm({
       </div>
 
       <form onSubmit={handleCreateCustom} className="rounded-lg bg-paper p-3">
-        <p className="mb-2 text-sm font-medium text-ink">Or add a custom assessment</p>
+        <p className="mb-2 text-sm font-medium text-ink">Or add another assessment</p>
         <div className="flex gap-2">
+          <select
+            value={customType}
+            onChange={(e) => setCustomType(e.target.value as AssessmentType)}
+            className="rounded-lg border border-rule px-3 py-2 text-sm"
+          >
+            {CUSTOM_ASSESSMENT_TYPES.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
+            ))}
+          </select>
           <div className="flex-1">
             <input
               placeholder="Title (e.g. Mid-term Test)"
