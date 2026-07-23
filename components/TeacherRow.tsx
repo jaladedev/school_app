@@ -7,6 +7,8 @@ import { EditTeacherSubjectsForm } from "@/components/EditTeacherSubjectsForm";
 import { ResetPasswordButton } from "@/components/ResetPasswordButton";
 import { DeactivateUserButton } from "@/components/DeactivateUserButton";
 import { updateTeacherAccount } from "@/lib/actions/admin";
+import { EditTeacherRoleSelect } from "@/components/EditTeacherRoleSelect";
+import type { StaffRole } from "@/types/database";
 import type { PickableSubject } from "@/components/SubjectPicker";
 
 export function TeacherRow({
@@ -17,6 +19,7 @@ export function TeacherRow({
   subjectNames,
   currentSubjectIds,
   allSubjects,
+  staffRole,
 }: {
   teacherId: string;
   fullName: string;
@@ -25,6 +28,7 @@ export function TeacherRow({
   subjectNames: string[];
   currentSubjectIds: string[];
   allSubjects: PickableSubject[];
+  staffRole: StaffRole;
 }) {
   const router = useRouter();
   const [editingName, setEditingName] = useState(false);
@@ -101,6 +105,7 @@ export function TeacherRow({
             currentSubjectIds={currentSubjectIds}
             allSubjects={allSubjects}
           />
+          <EditTeacherRoleSelect teacherId={teacherId} currentRole={staffRole} />
         </div>
       </div>
     </div>

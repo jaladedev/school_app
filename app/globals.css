@@ -71,10 +71,13 @@ h4 {
 }
 
 .topic-prose table {
+  display: block;
   width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   margin: 1rem 0;
   font-size: 0.9rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .topic-prose th {
@@ -88,6 +91,15 @@ h4 {
 .topic-prose td {
   padding: 0.5rem 0.75rem;
   border: 1px solid #d9d3c4;
+}
+
+/* Keep dense admin/report tables usable on phones instead of forcing
+   columns to collapse into unreadable widths. Their wrappers provide the
+   horizontal scroll; this retains natural table sizing inside them. */
+@media (max-width: 640px) {
+  table {
+    min-width: max-content;
+  }
 }
 
 .topic-prose strong {

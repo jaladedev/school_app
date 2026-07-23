@@ -20,7 +20,7 @@ export function NoteEditor({
 
   function handleSave(status: "draft" | "published") {
     startTransition(async () => {
-        await saveTopicNote(topicId, content, status);
+      await saveTopicNote(topicId, content, status);
       emitToast(status === "published" ? "Topic note published." : "Draft saved.");
     });
   }

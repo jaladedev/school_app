@@ -79,6 +79,7 @@ export default async function AdminStaffPage({
               subjectNames={subjectIds.map((id: string) => subjectNameById.get(id) ?? "Unknown")}
               currentSubjectIds={subjectIds}
               allSubjects={subjects ?? []}
+              staffRole={teacher.staff_role ?? "teacher"}
             />
           );
         })}

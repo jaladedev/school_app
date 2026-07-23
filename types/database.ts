@@ -6,6 +6,7 @@ export type AnnouncementAudience = "all" | "students" | "teachers" | "class";
 export type HomeworkStatus = "given" | "reviewed";
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
+export type StaffRole = "teacher" | "hod" | "bursar";
 export type GradeModerationStatus = "pending" | "approved";
 export type ResourceType = "image" | "diagram_mermaid" | "video" | "pdf" | "link" | "audio";
 
@@ -48,6 +49,7 @@ export type TeacherProfile = {
   staff_id: string | null;
   subjects_taught: string[] | null;
   hire_date: string | null;
+  staff_role: StaffRole;
 };
 
 export type GuardianLink = {

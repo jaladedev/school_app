@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
+import type { StaffRole } from "@/types/database";
 
 const TEMP_PASSWORD_WORDS = [
   "acorn",
@@ -611,6 +612,18 @@ export async function updateTeacherAccount(input: { teacherId: string; fullName:
 
   revalidatePath("/dashboard/admin/staff");
   revalidatePath(`/dashboard/admin/staff/${input.teacherId}`);
+}
+
+export async function updateTeacherStaffRole(teacherId: string, staffRole: StaffRole) {
+  await assertRole(["admin"], "Only an admin can assign staff roles.");
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("teacher_profiles")
+    .update({ staff_role: staffRole })
+    .eq("id", teacherId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/admin/staff");
+  revalidatePath(`/dashboard/admin/staff/${teacherId}`);
 }
 
 // ---------- Parent accounts ----------

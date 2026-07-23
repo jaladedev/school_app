@@ -71,7 +71,7 @@
 - [x] `EditTeacherSubjectsForm` shows subject names, not raw IDs
 - [x] Pagination on staff page (shared `Pagination` component with server-side count and search-aware page links)
 - [x] Teacher profile page — workload hours, assigned subjects, class-teacher responsibilities, and full term schedule are available at `/dashboard/admin/staff/[teacherId]`
-- [ ] Staff sub-roles (HOD, bursar)
+- [x] Staff sub-roles (HOD, bursar) — admins can assign Teacher, HOD, and Bursar roles from staff management; schema and change protection are enforced in the database
 
 ---
 
@@ -85,7 +85,7 @@
 - [x] Homework feed (given/reviewed status toggle)
 - [ ] Homework "mark as graded" beyond the given/reviewed binary
 - [x] Attendance tools — teacher attendance includes a recent-history chart, CSV register export, and “copy from last lesson”
-- [ ] Grade moderation is admin-only — no HOD-level intermediate approval step
+- [~] Grade moderation — `all.md` adds an HOD subject-scoped grade-update policy via `is_hod_of_subject()`; a distinct HOD moderation/approval UI and workflow are still outstanding
 - [x] CSV grade import — teachers can import `Admission No`, `Score`, and optional `Remark` columns; class membership, score range, and subject assignment are verified before the batch upsert
 - [ ] Assessment "type" as a real enum (currently free-text titles)
 - [x] `weight_percent` — now used in report-card scoring (`lib/report-card.ts` reads `weight_percent` and applies the weighted-average path when available)
@@ -152,7 +152,7 @@
 - [x] Active link state in Sidebar
 - [x] Breadcrumbs for deep routes
 - [x] Global `TermYearSelector` sync is now implemented via shared localStorage-backed state across report-card pages
-- [ ] Responsive table handling for mobile — untested
+- [x] Responsive table handling for mobile — dense tables use horizontal-scroll wrappers and retain natural column widths; markdown tables scroll horizontally on narrow screens
 - [x] Zod validation is now present in `lib/validation.ts` and used in the create/edit form paths (`CreateStudentForm`, `CreateClassForm`, `AnnouncementForm`)
 - [~] Toast system — shared `ToastProvider` and `emitToast()` feedback are in place for key save flows; optimistic updates are not yet broadly implemented
 - [x] `DeleteEntryButton` now has a confirm/cancel flow with auto-cancel behavior, so the confirm step exists in code and is not purely implicit
