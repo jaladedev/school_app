@@ -1,15 +1,61 @@
 "use server";
 
+import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 
+const TEMP_PASSWORD_WORDS = [
+  "acorn",
+  "amber",
+  "atlas",
+  "basil",
+  "birch",
+  "cedar",
+  "cobalt",
+  "coral",
+  "daisy",
+  "delta",
+  "ember",
+  "fern",
+  "fable",
+  "glade",
+  "harbor",
+  "honey",
+  "ivory",
+  "juniper",
+  "lagoon",
+  "lumen",
+  "maple",
+  "marble",
+  "meadow",
+  "noble",
+  "ocean",
+  "olive",
+  "orchid",
+  "pearl",
+  "pine",
+  "quartz",
+  "river",
+  "rose",
+  "sable",
+  "spruce",
+  "stone",
+  "tulip",
+  "verve",
+  "willow",
+  "zenith",
+];
+
 function generateTempPassword() {
-  const words = ["river", "otter", "cedar", "maple", "coral", "amber", "birch", "delta"];
-  const word = words[Math.floor(Math.random() * words.length)];
-  const num = Math.floor(10 + Math.random() * 89);
-  return `${word}-${num}-${words[Math.floor(Math.random() * words.length)]}`;
+  const segments = Array.from({ length: 4 }, () => {
+    const index = crypto.randomInt(TEMP_PASSWORD_WORDS.length);
+    return TEMP_PASSWORD_WORDS[index];
+  });
+  const suffix = crypto.randomInt(100, 999).toString();
+
+  return `${segments.join("-")}-${suffix}`;
 }
 
 // Supabase Auth would reject a true duplicate anyway, but checking first
@@ -39,6 +85,44 @@ async function getCurrentTermYear(admin: ReturnType<typeof createAdminClient>) {
     academicYear: data?.current_academic_year ?? "unknown",
     term: data?.current_term ?? 1,
   };
+}
+
+async function cleanupOrphanedAuthUsers(admin: ReturnType<typeof createAdminClient>) {
+  const { data: profileRows, error: profileListError } = await admin
+    .from("profiles")
+    .select("id");
+
+  if (profileListError) {
+    throw new Error(profileListError.message);
+  }
+
+  const profileIds = new Set((profileRows ?? []).map((row) => row.id));
+
+  const { data: usersPage, error: listUsersError } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
+
+  if (listUsersError) {
+    throw new Error(listUsersError.message);
+  }
+
+  const deletedIds: string[] = [];
+  const errors: string[] = [];
+
+  for (const user of usersPage?.users ?? []) {
+    if (profileIds.has(user.id)) continue;
+
+    const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
+    if (deleteError) {
+      errors.push(`${user.id}: ${deleteError.message}`);
+      continue;
+    }
+
+    deletedIds.push(user.id);
+  }
+
+  return { deletedIds, errors };
 }
 
 async function recordEnrollment(
@@ -89,7 +173,11 @@ export async function createTeacherAccount(input: {
   });
 
   if (profileError) {
-    await admin.auth.admin.deleteUser(userId);
+    try {
+      await admin.auth.admin.deleteUser(userId);
+    } catch {
+      await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+    }
     throw new Error(profileError.message);
   }
 
@@ -100,7 +188,11 @@ export async function createTeacherAccount(input: {
   });
 
   if (teacherError) {
-    await admin.auth.admin.deleteUser(userId);
+    try {
+      await admin.auth.admin.deleteUser(userId);
+    } catch {
+      await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+    }
     throw new Error(teacherError.message);
   }
 
@@ -146,7 +238,11 @@ export async function createStudentAccount(input: {
   });
 
   if (profileError) {
-    await admin.auth.admin.deleteUser(userId);
+    try {
+      await admin.auth.admin.deleteUser(userId);
+    } catch {
+      await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+    }
     throw new Error(profileError.message);
   }
 
@@ -159,7 +255,11 @@ export async function createStudentAccount(input: {
   });
 
   if (studentError) {
-    await admin.auth.admin.deleteUser(userId);
+    try {
+      await admin.auth.admin.deleteUser(userId);
+    } catch {
+      await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+    }
     throw new Error(studentError.message);
   }
 
@@ -256,7 +356,11 @@ export async function createStudentsBulk(input: {
       });
 
       if (profileError) {
-        await admin.auth.admin.deleteUser(userId);
+        try {
+          await admin.auth.admin.deleteUser(userId);
+        } catch {
+          await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+        }
         results.push({
           email: row.email,
           fullName: row.fullName,
@@ -275,7 +379,11 @@ export async function createStudentsBulk(input: {
       });
 
       if (studentError) {
-        await admin.auth.admin.deleteUser(userId);
+        try {
+          await admin.auth.admin.deleteUser(userId);
+        } catch {
+          await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+        }
         results.push({
           email: row.email,
           fullName: row.fullName,

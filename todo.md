@@ -26,10 +26,10 @@
 - [x] Logout button
 - [ ] Rate limiting on `/login` and account creation actions
 - [x] Friendly pre-check for email-uniqueness before account creation (`assertEmailAvailable()` in `lib/actions/admin.ts` now surfaces a clear duplicate-email error before the Auth create call)
-- [ ] Invalidate other sessions when a password is reset/changed
+- [x] Invalidate other sessions when a password is reset/changed
 - [~] `assertIsAdmin()` hardening — current pattern (session-checked role, service-role action) is reasonable as-is; deeper re-verification per action not done
-- [ ] **`generateTempPassword()` has weak entropy** — 8-word list × 2 slots × 2-digit number ≈ 5,760 possible combinations, brute-forceable for real production logins. Widen the wordlist substantially or switch to a `crypto`-based random generator.
-- [ ] **Orphaned-auth-user cleanup path** — `createTeacherAccount` / `createStudentAccount` / `createStudentsBulk` create the Supabase Auth user first, then insert profile rows, calling `deleteUser` to compensate on failure. If that compensating `deleteUser` call itself fails (network blip, etc.), an auth user with no profile is left behind with no cleanup job to catch it. Needs either a Postgres function that does everything in one transaction, or a periodic job that finds/removes orphaned auth users.
+- [x] **`generateTempPassword()` has weak entropy** — now uses `node:crypto` plus a broader wordlist to produce a much stronger temporary password.
+- [x] **Orphaned-auth-user cleanup path** — added a service-role cleanup helper that scans auth users against `profiles` and prunes orphans, and the create-account failure paths now invoke that cleanup if the compensation `deleteUser` step itself fails.
 
 ---
 
@@ -41,7 +41,7 @@
 - [x] Timetable builder with conflict checking — client-side pre-check AND a real DB-level trigger (`check_timetable_conflict()`) as backstop
 - [x] Promotion workflow — promote/repeat/graduate, writes real enrollment history
 - [~] Timetable grid is weekday-columns-with-list, not a true row×column grid table
-- [ ] Copy timetable from previous term/year
+- [x] Copy timetable from previous term/year — implemented via the `CopyTimetableButton` on the class timetable page
 - [ ] Timetable PDF export
 - [ ] Admin-facing teacher conflict view
 - [ ] `timetable_entries.period_number > 0` check constraint — **done** (added along with the DB trigger)
@@ -138,7 +138,7 @@
 - [x] Announcements — audience targeting (all/students/teachers/specific class), feed
 - [ ] Messaging: no Realtime — refresh-based, not live-updating
 - [ ] Announcements: attachments, scheduled publish, read tracking
-- [ ] **`sendMessage` doesn't validate `recipientId`** before inserting — it relies entirely on RLS/FK constraints to reject bad or unauthorized recipient IDs, so a bad ID currently surfaces as an opaque Postgres error instead of a clean "recipient not found" message. Add an explicit existence/permission check before the insert.
+- [x] **`sendMessage` now validates `recipientId`** before inserting, showing a clear user-facing error for missing, self, or inactive recipients instead of falling through to a Postgres error path.
 
 ---
 
@@ -148,10 +148,10 @@
 - [x] Loading states on 6+ key pages (student subjects/homework implicitly, admin students/staff, announcements, topic detail) via `PageLoader`/`Skeleton` components
 - [x] Pagination — students, invoices, payments (shared `Pagination` component + helpers)
 - [x] Server-side search — students, staff
-- [ ] Pagination still missing: staff page, teacher attendance/notes pages
+- [x] Pagination now present on staff page and teacher attendance/notes pages
 - [x] Active link state in Sidebar
 - [x] Breadcrumbs for deep routes
-- [ ] Global `TermYearSelector` sync (each page currently has its own independent one)
+- [x] Global `TermYearSelector` sync is now implemented via shared localStorage-backed state across report-card pages
 - [ ] Responsive table handling for mobile — untested
 - [x] Zod validation is now present in `lib/validation.ts` and used in the create/edit form paths (`CreateStudentForm`, `CreateClassForm`, `AnnouncementForm`)
 - [ ] Toast system / optimistic updates (current pattern is inline "Saved" text after the fact)

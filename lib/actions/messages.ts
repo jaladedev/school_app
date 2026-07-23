@@ -15,6 +15,24 @@ export async function sendMessage(recipientId: string, content: string) {
 
   const supabase = createClient();
 
+  const { data: recipient, error: recipientError } = await supabase
+    .from("profiles")
+    .select("id, is_active")
+    .eq("id", recipientId)
+    .single();
+
+  if (recipientError || !recipient) {
+    throw new Error("Recipient not found.");
+  }
+
+  if (recipient.id === profile.id) {
+    throw new Error("You can't message yourself.");
+  }
+
+  if (!recipient.is_active) {
+    throw new Error("That account is no longer active.");
+  }
+
   const { error } = await supabase.from("messages").insert({
     sender_id: profile.id,
     recipient_id: recipientId,
