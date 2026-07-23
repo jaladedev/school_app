@@ -104,34 +104,19 @@ export async function recordPayment(input: {
     throw new Error("Payment amount must be greater than zero.");
   }
 
-  const { data: invoice } = await admin
-    .from("invoices")
-    .select("*")
-    .eq("id", input.invoiceId)
-    .single();
-
-  if (!invoice) throw new Error("Invoice not found.");
-
-  const { error: paymentError } = await admin.from("payments").insert({
-    invoice_id: input.invoiceId,
-    student_id: invoice.student_id,
-    amount_kobo: input.amountKobo,
-    method: input.method,
-    reference: input.reference || null,
-    verified_by: id,
+  const { data: result, error } = await admin.rpc("record_invoice_payment", {
+    p_invoice_id: input.invoiceId,
+    p_amount_kobo: input.amountKobo,
+    p_method: input.method,
+    p_reference: input.reference?.trim() || null,
+    p_verified_by: id,
+    p_enforce_balance: false,
   });
 
-  if (paymentError) throw new Error(paymentError.message);
-
-  const newPaidKobo = invoice.amount_paid_kobo + input.amountKobo;
-  const newStatus = computeStatus(invoice.total_amount_kobo, invoice.discount_kobo, newPaidKobo);
-
-  const { error: invoiceError } = await admin
-    .from("invoices")
-    .update({ amount_paid_kobo: newPaidKobo, status: newStatus })
-    .eq("id", input.invoiceId);
-
-  if (invoiceError) throw new Error(invoiceError.message);
+  if (error) throw new Error(error.message);
+  if (result?.[0]?.already_recorded) {
+    throw new Error("A payment with this reference has already been recorded.");
+  }
 
   revalidatePath("/dashboard/admin/fees");
   revalidatePath("/dashboard/student/fees");
@@ -247,38 +232,20 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
   // Paystack amounts are already in kobo for NGN transactions, matching
   // this schema's convention — no conversion needed either direction.
   const paidAmountKobo: number = verifyData.data.amount;
-  const owed = invoice.total_amount_kobo - invoice.discount_kobo;
-  const currentBalance = owed - invoice.amount_paid_kobo;
-
-  if (paidAmountKobo > currentBalance + 100) {
-    // Small tolerance for rounding; otherwise reject amounts that don't
-    // make sense against the actual outstanding balance.
-    throw new Error("The verified payment amount doesn't match what's owed on this invoice.");
-  }
-
-  const { error: paymentError } = await admin.from("payments").insert({
-    invoice_id: input.invoiceId,
-    student_id: invoice.student_id,
-    amount_kobo: paidAmountKobo,
-    method: "card",
-    reference: input.reference,
-    verified_by: null, // system-verified via Paystack, not a staff member
+  const { data: result, error } = await admin.rpc("record_invoice_payment", {
+    p_invoice_id: input.invoiceId,
+    p_amount_kobo: paidAmountKobo,
+    p_method: "card",
+    p_reference: input.reference,
+    p_verified_by: null,
+    p_enforce_balance: true,
   });
 
-  if (paymentError) throw new Error(paymentError.message);
-
-  const newPaidKobo = invoice.amount_paid_kobo + paidAmountKobo;
-  const newStatus = computeStatus(invoice.total_amount_kobo, invoice.discount_kobo, newPaidKobo);
-
-  const { error: invoiceError } = await admin
-    .from("invoices")
-    .update({ amount_paid_kobo: newPaidKobo, status: newStatus })
-    .eq("id", input.invoiceId);
-
-  if (invoiceError) throw new Error(invoiceError.message);
+  if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/student/fees");
+  revalidatePath("/dashboard/parent/fees");
   revalidatePath("/dashboard/admin/fees/invoices");
 
-  return { alreadyRecorded: false, amountKobo: paidAmountKobo };
+  return { alreadyRecorded: result?.[0]?.already_recorded ?? false, amountKobo: paidAmountKobo };
 }

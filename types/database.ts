@@ -802,6 +802,24 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      record_invoice_payment: {
+        Args: {
+          p_amount_kobo: number;
+          p_enforce_balance: boolean;
+          p_invoice_id: string;
+          p_method: PaymentMethod;
+          p_reference: string | null;
+          p_verified_by: string | null;
+        };
+        Returns: {
+          already_recorded: boolean;
+          amount_paid_kobo: number;
+          payment_id: string;
+          status: InvoiceStatus;
+          student_id: string;
+        }[];
+      };
+    };
   };
 };

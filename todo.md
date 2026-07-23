@@ -115,7 +115,7 @@
 - [x] Defaulters export to CSV
 - [x] Discount/scholarship support (`discount_kobo` per invoice)
 - [x] **Bug fixed mid-build**: `verifyPaystackPayment`'s authorization only checked "is this the invoice's own student or admin" — which would have silently rejected a parent trying to pay for their child. Patched to also check `guardian_links`.
-- [ ] **Race condition on `amount_paid_kobo`** — `recordPayment` and `verifyPaystackPayment` both do a read-then-write on the invoice as two separate round trips, not atomically. Two concurrent payments on the same invoice (e.g. admin recording cash while a Paystack callback lands at the same time) can lose an update — one payment's contribution gets overwritten instead of summed. Fix with a Postgres function/RPC doing `amount_paid_kobo = amount_paid_kobo + :amount` atomically (or a transaction with row locking) instead of the current select-then-update pattern.
+- [x] **Atomic invoice payment updates** — manual and Paystack payments now use `record_invoice_payment`, which locks the invoice and records the payment plus balance/status update in one transaction; payment references are idempotent.
 - [ ] Flutterwave (Paystack only)
 - [ ] Receipt PDF via a real library (currently print-to-PDF, same as report cards)
 
