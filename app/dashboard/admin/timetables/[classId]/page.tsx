@@ -74,6 +74,12 @@ export default async function ClassTimetablePage({
   for (const entry of entries ?? []) {
     entriesByDay.set(entry.weekday, [...(entriesByDay.get(entry.weekday) ?? []), entry]);
   }
+  const entryBySlot = new Map(
+    (entries ?? []).map((entry) => [`${entry.period_number}-${entry.weekday}`, entry])
+  );
+  const periodNumbers = [...new Set((entries ?? []).map((entry) => entry.period_number))].sort(
+    (a, b) => a - b
+  );
 
   return (
     <div>
@@ -128,7 +134,7 @@ export default async function ClassTimetablePage({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+      <div className="hidden">
         {[1, 2, 3, 4, 5].map((day) => (
           <div key={day}>
             <h2 className="mb-2 font-display text-sm font-semibold uppercase tracking-wide text-leaf">
@@ -156,6 +162,66 @@ export default async function ClassTimetablePage({
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-rule bg-white">
+        <table className="w-full min-w-[900px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-rule bg-paper text-left">
+              <th className="w-28 px-3 py-3 text-xs uppercase tracking-wide text-ink-soft">
+                Period
+              </th>
+              {[1, 2, 3, 4, 5].map((day) => (
+                <th
+                  key={day}
+                  className="min-w-40 px-3 py-3 text-xs uppercase tracking-wide text-leaf"
+                >
+                  {WEEKDAY_NAMES[day]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {periodNumbers.map((periodNumber) => (
+              <tr key={periodNumber} className="border-b border-rule last:border-0">
+                <th className="whitespace-nowrap bg-paper/50 px-3 py-3 text-left align-top text-xs font-medium text-ink-soft">
+                  P{periodNumber}
+                </th>
+                {[1, 2, 3, 4, 5].map((day) => {
+                  const entry = entryBySlot.get(`${periodNumber}-${day}`);
+                  return (
+                    <td key={day} className="border-l border-rule p-2 align-top">
+                      {entry ? (
+                        <div className="rounded-lg bg-leaf-soft/40 p-2">
+                          <p className="font-medium text-ink">{entry.subjects?.name}</p>
+                          <p className="text-xs text-ink-soft">
+                            {entry.teacher_profiles?.profiles?.full_name}
+                          </p>
+                          <p className="mt-1 text-xs text-ink-soft">
+                            {entry.start_time}–{entry.end_time}
+                            {entry.room ? ` · ${entry.room}` : ""}
+                          </p>
+                          <div className="mt-2 print:hidden">
+                            <DeleteEntryButton entryId={entry.id} />
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-ink-soft">—</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            {!periodNumbers.length && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-ink-soft">
+                  No periods have been added for this term.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

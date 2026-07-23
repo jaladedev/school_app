@@ -40,7 +40,7 @@
 - [x] Create subject (admin UI, stage + level range)
 - [x] Timetable builder with conflict checking — client-side pre-check AND a real DB-level trigger (`check_timetable_conflict()`) as backstop
 - [x] Promotion workflow — promote/repeat/graduate, writes real enrollment history
-- [~] Timetable grid is weekday-columns-with-list, not a true row×column grid table
+- [x] Timetable grid — the class timetable is a period-by-weekday table, making empty slots and the full weekly sequence easy to scan and print
 - [x] Copy timetable from previous term/year — implemented via the `CopyTimetableButton` on the class timetable page
 - [x] Timetable PDF export — class timetables have a print-optimised “Print / Save as PDF” action; editing and navigation controls are excluded from the printed output
 - [x] Admin-facing teacher conflict view — per-teacher weekly schedules, free periods, and duplicate period warnings are available from the timetable index
@@ -89,7 +89,7 @@
 - [x] CSV grade import — teachers can import `Admission No`, `Score`, and optional `Remark` columns; class membership, score range, and subject assignment are verified before the batch upsert
 - [ ] Assessment "type" as a real enum (currently free-text titles)
 - [x] `weight_percent` — now used in report-card scoring (`lib/report-card.ts` reads `weight_percent` and applies the weighted-average path when available)
-- [ ] Curriculum notes: file/image/video upload wiring (Storage bucket), version history, `pdf`/`audio` resource-type rendering in `TopicContent`
+- [~] Curriculum notes — `pdf` and `audio` resources now render in `TopicContent`; upload wiring and version-history UI remain outstanding
 
 ---
 
@@ -101,7 +101,7 @@
 - [x] Class teacher + admin remarks per term
 - [x] **Grade moderation** — grades default `pending`, admin approves per-assessment before students can see them; report cards only count `approved` grades
 - [x] **Critical bug fixed**: report-card ranking was silently computing "1st of 1" for every student — RLS only ever returned a student's own grades when queried through their session, so classmates' scores for ranking were invisibly missing the entire time. Fixed by using the admin client for that specific cross-student read (safe since calling pages control whose report is generated).
-- [ ] Report card school logo / signature lines / stamp area for printing
+- [x] Report card school logo / signature lines / stamp area for printing — uses the configured school logo and includes printable teacher/admin signature lines plus an official-stamp placeholder
 
 ---
 
@@ -157,7 +157,7 @@
 - [~] Toast system — shared `ToastProvider` and `emitToast()` feedback are in place for key save flows; optimistic updates are not yet broadly implemented
 - [x] `DeleteEntryButton` now has a confirm/cancel flow with auto-cancel behavior, so the confirm step exists in code and is not purely implicit
 - [x] Consistent empty-state component with CTA (`components/EmptyState.tsx` exists and is reusable)
-- [ ] New-admin onboarding checklist
+- [x] New-admin onboarding checklist — the admin overview shows setup progress and links to remaining school-settings, subject, class, teacher, and student tasks
 
 ---
 
@@ -194,7 +194,7 @@ CBT/quiz builder, library module, hostel module, transport module, inventory/ass
 - [x] `README.md` — rewritten to document the current product, setup, scripts, and role-based areas
 - [ ] Demo seed script (only a single first-admin SQL snippet exists)
 - [ ] Unit tests — none, including for the report-card ranking/averaging logic
-- [ ] GitHub Actions (lint/typecheck/build on PR)
+- [x] GitHub Actions — CI runs formatting, linting, type checks, and production builds on pull requests and pushes to `main`
 - [x] `prettier`/`eslint` config (`.eslintrc.json`, Prettier scripts and Tailwind plugin)
 - [ ] Switch to `supabase gen types` now that the schema has stabilized, instead of hand-maintaining `database.ts`
 - [x] Middleware entry point — `middleware.ts` now re-exports the existing request guard from `proxy.ts`, so Next.js 14 discovers and runs the auth/password-change redirects.

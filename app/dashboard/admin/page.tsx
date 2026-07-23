@@ -23,12 +23,31 @@ export default async function AdminOverview() {
     .order("created_at", { ascending: false })
     .limit(5);
 
+  const { data: settings } = await supabase
+    .from("school_settings")
+    .select("name")
+    .eq("id", 1)
+    .maybeSingle();
+
   const stats = [
     { label: "Students", value: studentCount, href: "/dashboard/admin/students" },
     { label: "Teachers", value: teacherCount, href: "/dashboard/admin/staff" },
     { label: "Classes", value: classCount, href: "/dashboard/admin/classes" },
     { label: "Subjects", value: subjectCount, href: "/dashboard/admin/subjects" },
   ];
+
+  const onboardingSteps = [
+    {
+      label: "Confirm school settings",
+      href: "/dashboard/admin/settings",
+      complete: !!settings?.name,
+    },
+    { label: "Create subjects", href: "/dashboard/admin/subjects", complete: subjectCount > 0 },
+    { label: "Create classes", href: "/dashboard/admin/classes", complete: classCount > 0 },
+    { label: "Add teachers", href: "/dashboard/admin/staff", complete: teacherCount > 0 },
+    { label: "Enroll students", href: "/dashboard/admin/students", complete: studentCount > 0 },
+  ];
+  const remainingSteps = onboardingSteps.filter((step) => !step.complete);
 
   return (
     <div>
@@ -49,6 +68,48 @@ export default async function AdminOverview() {
           </Link>
         ))}
       </div>
+
+      {remainingSteps.length > 0 && (
+        <section className="mb-10 rounded-xl border border-rule bg-white p-5">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <div>
+              <h2 className="font-display text-lg font-semibold text-ink">Get your school ready</h2>
+              <p className="text-sm text-ink-soft">
+                {remainingSteps.length} setup step{remainingSteps.length === 1 ? "" : "s"}{" "}
+                remaining.
+              </p>
+            </div>
+            <span className="text-xs font-medium text-leaf">
+              {onboardingSteps.length - remainingSteps.length}/{onboardingSteps.length} complete
+            </span>
+          </div>
+          <ol className="space-y-2">
+            {onboardingSteps.map((step, index) => (
+              <li key={step.label}>
+                <Link
+                  href={step.href}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+                    step.complete ? "text-ink-soft" : "bg-paper text-ink hover:bg-leaf-soft"
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                      step.complete
+                        ? "bg-leaf text-white"
+                        : "border border-rule bg-white text-ink-soft"
+                    }`}
+                  >
+                    {step.complete ? "✓" : index + 1}
+                  </span>
+                  <span className={step.complete ? "line-through" : "font-medium"}>
+                    {step.label}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <Link
