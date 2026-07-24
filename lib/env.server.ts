@@ -4,9 +4,12 @@ const serverEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
-  PAYSTACK_SECRET_KEY: z.string().min(1).refine((k) => k.startsWith("sk_"), {
-    message: "PAYSTACK_SECRET_KEY should start with 'sk_'.",
-  }),
+  PAYSTACK_SECRET_KEY: z
+    .string()
+    .min(1)
+    .refine((k) => k.startsWith("sk_"), {
+      message: "PAYSTACK_SECRET_KEY should start with 'sk_'.",
+    }),
 });
 
 const parsed = serverEnvSchema.safeParse({

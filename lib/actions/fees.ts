@@ -212,7 +212,7 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
     return { alreadyRecorded: true };
   }
 
-  const secretKey = serverEnv.PAYSTACK_SECRET_KEY; 
+  const secretKey = serverEnv.PAYSTACK_SECRET_KEY;
 
   const verifyResponse = await fetch(
     `https://api.paystack.co/transaction/verify/${encodeURIComponent(input.reference)}`,

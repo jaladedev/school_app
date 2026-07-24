@@ -5,7 +5,7 @@ import { serverEnv } from "@/lib/env.server";
 
 export function createClient() {
   const cookieStorePromise = cookies();
-  
+
   return createServerClient<Database>(
     serverEnv.NEXT_PUBLIC_SUPABASE_URL,
     serverEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,

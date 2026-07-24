@@ -32,7 +32,7 @@ function hasValidSignature(payload: string, signature: string | null, secret: st
 }
 
 export async function POST(request: Request) {
-  const secret = serverEnv.PAYSTACK_SECRET_KEY; 
+  const secret = serverEnv.PAYSTACK_SECRET_KEY;
   const payload = await request.text();
   if (!hasValidSignature(payload, request.headers.get("x-paystack-signature"), secret)) {
     return NextResponse.json({ error: "Invalid signature." }, { status: 401 });
