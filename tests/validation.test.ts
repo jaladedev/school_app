@@ -45,13 +45,43 @@ describe("form validation", () => {
   });
 
   it("coerces valid numeric inputs and rejects invalid class, assessment, and timetable values", () => {
-    expect(createClassSchema.parse({ educationLevel: "jss", levelNumber: "2", academicYear: "2025/2026" }).levelNumber).toBe(2);
-    expect(createAssessmentSchema.safeParse({ subjectId: "s", classId: "c", term: 4, academicYear: "2025/2026" }).success).toBe(false);
-    expect(timetableEntrySchema.safeParse({ weekday: 1, periodNumber: 1, startTime: "10:00", endTime: "09:00", subjectId: "s", teacherId: "t" }).success).toBe(false);
-    expect(announcementSchema.safeParse({ title: "Hi", content: "Too short", audience: "all" }).success).toBe(false);
+    expect(
+      createClassSchema.parse({
+        educationLevel: "jss",
+        levelNumber: "2",
+        academicYear: "2025/2026",
+      }).levelNumber
+    ).toBe(2);
+    expect(
+      createAssessmentSchema.safeParse({
+        subjectId: "s",
+        classId: "c",
+        term: 4,
+        academicYear: "2025/2026",
+      }).success
+    ).toBe(false);
+    expect(
+      timetableEntrySchema.safeParse({
+        weekday: 1,
+        periodNumber: 1,
+        startTime: "10:00",
+        endTime: "09:00",
+        subjectId: "s",
+        teacherId: "t",
+      }).success
+    ).toBe(false);
+    expect(
+      announcementSchema.safeParse({ title: "Hi", content: "Too short", audience: "all" }).success
+    ).toBe(false);
   });
 
   it("returns null when a form is valid", () => {
-    expect(fieldErrorsFrom(announcementSchema, { title: "School meeting", content: "Parents should attend the school meeting.", audience: "all" })).toBeNull();
+    expect(
+      fieldErrorsFrom(announcementSchema, {
+        title: "School meeting",
+        content: "Parents should attend the school meeting.",
+        audience: "all",
+      })
+    ).toBeNull();
   });
 });

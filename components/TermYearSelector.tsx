@@ -12,9 +12,13 @@ type StoredTermYear = {
 
 type SearchParamsLike = string | { toString(): string } | undefined;
 
-export function buildTermYearQueryParams(searchParams: SearchParamsLike, term: number, year: string) {
+export function buildTermYearQueryParams(
+  searchParams: SearchParamsLike,
+  term: number,
+  year: string
+) {
   const params = new URLSearchParams(
-    typeof searchParams === "string" ? searchParams : searchParams?.toString() ?? ""
+    typeof searchParams === "string" ? searchParams : (searchParams?.toString() ?? "")
   );
   params.set("term", String(term));
   params.set("year", year);

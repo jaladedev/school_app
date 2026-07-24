@@ -55,8 +55,8 @@ export async function POST(request: Request) {
 
   const reference = event.data?.reference;
   const amountKobo = event.data?.amount;
-  const invoiceId = event.data?.metadata?.invoiceId ??
-    (reference ? invoiceIdFromReference(reference) : null);
+  const invoiceId =
+    event.data?.metadata?.invoiceId ?? (reference ? invoiceIdFromReference(reference) : null);
 
   if (
     !invoiceId ||

@@ -17,7 +17,9 @@ export function createClient() {
         async setAll(cookiesToSet) {
           try {
             const cookieStore = await cookieStorePromise;
-            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
           } catch {
             // Called from a Server Component — safe to ignore when
             // middleware is refreshing sessions.

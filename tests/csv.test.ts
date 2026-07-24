@@ -14,8 +14,14 @@ describe("CSV helpers", () => {
   });
 
   it("builds headers and rows using the same escaping rules", () => {
-    expect(buildCsv(["Name", "Score"], [["Ada", 90], ["=cmd", 75]])).toBe(
-      "Name,Score\nAda,90\n'=cmd,75"
-    );
+    expect(
+      buildCsv(
+        ["Name", "Score"],
+        [
+          ["Ada", 90],
+          ["=cmd", 75],
+        ]
+      )
+    ).toBe("Name,Score\nAda,90\n'=cmd,75");
   });
 });

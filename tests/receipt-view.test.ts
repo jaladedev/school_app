@@ -20,7 +20,7 @@ describe("ReceiptView", () => {
         reference: null,
         paidAt: "2024-09-06T10:00:00.000Z",
         recordedBy: "Admin User",
-      }),
+      })
     );
 
     expect(html).not.toContain("Download PDF");

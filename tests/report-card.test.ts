@@ -7,8 +7,14 @@ describe("report-card scoring and ranking", () => {
       computeSubjectPercent(
         "student-1",
         ["ca", "exam"],
-        new Map([["ca", 20], ["exam", 80]]),
-        new Map([["ca", null], ["exam", null]]),
+        new Map([
+          ["ca", 20],
+          ["exam", 80],
+        ]),
+        new Map([
+          ["ca", null],
+          ["exam", null],
+        ]),
         [
           { assessment_id: "ca", student_id: "student-1", score: 16 },
           { assessment_id: "exam", student_id: "student-1", score: 56 },
@@ -22,8 +28,14 @@ describe("report-card scoring and ranking", () => {
       computeSubjectPercent(
         "student-1",
         ["ca", "exam"],
-        new Map([["ca", 20], ["exam", 100]]),
-        new Map([["ca", 30], ["exam", 70]]),
+        new Map([
+          ["ca", 20],
+          ["exam", 100],
+        ]),
+        new Map([
+          ["ca", 30],
+          ["exam", 70],
+        ]),
         [
           { assessment_id: "ca", student_id: "student-1", score: 10 },
           { assessment_id: "exam", student_id: "student-1", score: 80 },
@@ -33,7 +45,15 @@ describe("report-card scoring and ranking", () => {
   });
 
   it("returns null when the student has no approved grades for a subject", () => {
-    expect(computeSubjectPercent("student-1", ["exam"], new Map([["exam", 100]]), new Map([["exam", null]]), [])).toBeNull();
+    expect(
+      computeSubjectPercent(
+        "student-1",
+        ["exam"],
+        new Map([["exam", 100]]),
+        new Map([["exam", null]]),
+        []
+      )
+    ).toBeNull();
   });
 
   it("uses competition ranking and correct ordinal suffixes", () => {
