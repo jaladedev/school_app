@@ -23,9 +23,9 @@ export async function createFeeStructure(input: {
   dueDate?: string;
 }) {
   const { id } = await assertRole(["admin"], "Only an admin can manage fees.");
-  const supabase = createClient();
+  const admin = createAdminClient();
 
-  const { error } = await supabase.from("fee_structures").insert({
+  const { error } = await admin.from("fee_structures").insert({
     education_level: input.educationLevel,
     level_number: input.levelNumber,
     term: input.term,

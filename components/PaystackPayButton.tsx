@@ -68,6 +68,7 @@ export function PaystackPayButton({
       amount: amountKobo, // Paystack expects kobo directly for NGN
       currency: "NGN",
       ref: `inv_${invoiceId}_${Date.now()}`,
+      metadata: { invoiceId },
       callback: (response: { reference: string }) => {
         // This callback firing is a UI cue only — verifyPaystackPayment
         // re-checks the transaction against Paystack's own API server-side
