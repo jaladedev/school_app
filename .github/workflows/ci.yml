@@ -22,10 +22,10 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
       SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
-      # Must start with "sk_" to satisfy lib/env.server.ts's schema — this
-      # placeholder never talks to real Paystack; the webhook route only
-      # uses it to compute an HMAC that will legitimately reject all
-      # requests, which is fine since CI never receives real webhooks.
+      # Must start with "pk_" / "sk_" respectively to satisfy the Zod
+      # schemas in lib/env.client.ts and lib/env.server.ts. These never
+      # talk to real Paystack — CI only needs the build to compile.
+      NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: pk_test_ci-placeholder-0000000000000
       PAYSTACK_SECRET_KEY: sk_test_ci-placeholder-0000000000000000
     steps:
       - name: Check out repository
