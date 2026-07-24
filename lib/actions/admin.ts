@@ -124,6 +124,22 @@ async function cleanupOrphanedAuthUsers(admin: ReturnType<typeof createAdminClie
   return { deletedIds, errors };
 }
 
+// Deletes the auth user, falling back to an orphan sweep if the delete
+// itself fails, and always surfaces the *original* error to the caller
+// rather than whatever went wrong during cleanup. Shared by every
+// account-creation flow so the failure-handling behavior stays identical
+// across teacher/student/parent creation instead of drifting between them.
+async function deleteUserAfterFailedSetup(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string
+) {
+  try {
+    await admin.auth.admin.deleteUser(userId);
+  } catch {
+    await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
+  }
+}
+
 async function recordEnrollment(
   admin: ReturnType<typeof createAdminClient>,
   studentId: string,
@@ -148,7 +164,7 @@ async function recordEnrollments(
       academic_year: academicYear,
       term,
     })),
-    { onConflict: "student_id,class_id,academic_year,term" }
+    { onConflict: "student_id,academic_year,term" }
   );
 
   if (error) throw new Error(error.message);
@@ -203,11 +219,7 @@ export async function createTeacherAccount(input: {
   });
 
   if (profileError) {
-    try {
-      await admin.auth.admin.deleteUser(userId);
-    } catch {
-      await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
-    }
+    await deleteUserAfterFailedSetup(admin, userId);
     throw new Error(profileError.message);
   }
 
@@ -218,11 +230,7 @@ export async function createTeacherAccount(input: {
   });
 
   if (teacherError) {
-    try {
-      await admin.auth.admin.deleteUser(userId);
-    } catch {
-      await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
-    }
+    await deleteUserAfterFailedSetup(admin, userId);
     throw new Error(teacherError.message);
   }
 
@@ -268,11 +276,7 @@ export async function createStudentAccount(input: {
   });
 
   if (profileError) {
-    try {
-      await admin.auth.admin.deleteUser(userId);
-    } catch {
-      await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
-    }
+    await deleteUserAfterFailedSetup(admin, userId);
     throw new Error(profileError.message);
   }
 
@@ -285,11 +289,7 @@ export async function createStudentAccount(input: {
   });
 
   if (studentError) {
-    try {
-      await admin.auth.admin.deleteUser(userId);
-    } catch {
-      await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
-    }
+    await deleteUserAfterFailedSetup(admin, userId);
     throw new Error(studentError.message);
   }
 
@@ -347,19 +347,20 @@ export async function createStudentsBulk(input: {
   const duplicateInputEmails = new Set(
     emails.filter((email, index) => emails.indexOf(email) !== index)
   );
-  const { data: existingProfiles, error: existingProfilesError } = await admin
+
+  // Fetch every existing profile email and compare case-insensitively in
+  // JS. A `.in("email", [...])` query does an exact-case match, so it
+  // would silently miss a DB row like "John@Example.com" against an
+  // import row of "john@example.com" — this avoids that gap. Fine at
+  // school-roster scale; if `profiles` ever got huge, this would want to
+  // become a targeted case-insensitive query instead.
+  const { data: allProfiles, error: existingProfilesError } = await admin
     .from("profiles")
-    .select("email")
-    .in(
-      "email",
-      input.students.map((student) => student.email)
-    );
+    .select("email");
 
   if (existingProfilesError) throw new Error(existingProfilesError.message);
 
-  const existingEmails = new Set(
-    (existingProfiles ?? []).map((profile) => profile.email.toLowerCase())
-  );
+  const existingEmails = new Set((allProfiles ?? []).map((profile) => profile.email.toLowerCase()));
 
   const created = await mapWithConcurrency<BulkStudentRow, BulkCreationAttempt>(
     input.students,
@@ -404,11 +405,7 @@ export async function createStudentsBulk(input: {
         });
 
         if (profileError) {
-          try {
-            await admin.auth.admin.deleteUser(userId);
-          } catch {
-            await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
-          }
+          await deleteUserAfterFailedSetup(admin, userId);
           return {
             email: row.email,
             fullName: row.fullName,
@@ -426,11 +423,7 @@ export async function createStudentsBulk(input: {
         });
 
         if (studentError) {
-          try {
-            await admin.auth.admin.deleteUser(userId);
-          } catch {
-            await cleanupOrphanedAuthUsers(admin).catch(() => undefined);
-          }
+          await deleteUserAfterFailedSetup(admin, userId);
           return {
             email: row.email,
             fullName: row.fullName,
@@ -614,6 +607,32 @@ export async function updateTeacherAccount(input: { teacherId: string; fullName:
   revalidatePath(`/dashboard/admin/staff/${input.teacherId}`);
 }
 
+export async function updateTeacherSubjects(teacherId: string, subjectIds: string[]) {
+  await assertRole(["admin"], "Only an admin can update teacher subjects.");
+  const admin = createAdminClient();
+  const uniqueSubjectIds = [...new Set(subjectIds.filter(Boolean))];
+
+  const { data: subjects, error: subjectsError } = uniqueSubjectIds.length
+    ? await admin.from("subjects").select("id").in("id", uniqueSubjectIds)
+    : { data: [], error: null };
+
+  if (subjectsError) throw new Error(subjectsError.message);
+  if ((subjects ?? []).length !== uniqueSubjectIds.length) {
+    throw new Error("One or more selected subjects no longer exist.");
+  }
+
+  const { error } = await admin
+    .from("teacher_profiles")
+    .update({ subjects_taught: uniqueSubjectIds })
+    .eq("id", teacherId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/admin/staff/${teacherId}`);
+  revalidatePath("/dashboard/admin/staff");
+  revalidatePath("/dashboard/admin/classes");
+}
+
 export async function updateTeacherStaffRole(teacherId: string, staffRole: StaffRole) {
   await assertRole(["admin"], "Only an admin can assign staff roles.");
   const admin = createAdminClient();
@@ -669,7 +688,7 @@ export async function createParentAccount(input: {
   });
 
   if (profileError) {
-    await admin.auth.admin.deleteUser(userId);
+    await deleteUserAfterFailedSetup(admin, userId);
     throw new Error(profileError.message);
   }
 
@@ -683,7 +702,7 @@ export async function createParentAccount(input: {
   );
 
   if (linksError) {
-    await admin.auth.admin.deleteUser(userId);
+    await deleteUserAfterFailedSetup(admin, userId);
     throw new Error(linksError.message);
   }
 

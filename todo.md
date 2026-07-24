@@ -168,7 +168,7 @@
 - [x] Class-teacher broader grade visibility (additive policy, doesn't touch existing rules)
 - [x] **Critical fix**: `profiles` RLS originally only allowed `id = auth.uid()` — silently breaking every embedded `profiles(...)` join for non-admin users (teacher names on student timetables, etc., showing empty) since the very first migration. Broadened to authenticated-read.
 - [x] Parent access added additively across 7 tables via `is_parent_of()`, no existing policy touched
-- [ ] Full manual RLS audit pass (spot-fixes done throughout, no single comprehensive review)
+- [x] Full manual RLS audit — closed direct profile-table privilege-escalation paths: only admins can create or mutate student/teacher/profile records, while narrowly scoped server actions handle password completion and subject assignments.
 
 ---
 

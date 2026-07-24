@@ -5,14 +5,7 @@ export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disc
 export type AnnouncementAudience = "all" | "students" | "teachers" | "class";
 export type HomeworkStatus = "given" | "reviewed" | "graded";
 export type AssessmentType =
-  | "first_ca"
-  | "second_ca"
-  | "exam"
-  | "test"
-  | "assignment"
-  | "project"
-  | "practical"
-  | "other";
+  "first_ca" | "second_ca" | "exam" | "test" | "assignment" | "project" | "practical" | "other";
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
 export type StaffRole = "teacher" | "hod" | "bursar";

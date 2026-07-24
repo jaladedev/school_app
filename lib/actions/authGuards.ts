@@ -42,3 +42,21 @@ export async function assertRole(
 
   return { id: user.id };
 }
+
+/** Clears only the current user's first-login password-change flag. */
+export async function clearMustChangePassword() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("You must be signed in.");
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("profiles")
+    .update({ must_change_password: false })
+    .eq("id", user.id);
+
+  if (error) throw new Error(error.message);
+}

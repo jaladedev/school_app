@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { SubjectPicker, type PickableSubject } from "@/components/SubjectPicker";
+import { updateTeacherSubjects } from "@/lib/actions/admin";
 
 export function EditTeacherSubjectsForm({
   teacherId,
@@ -15,7 +15,6 @@ export function EditTeacherSubjectsForm({
   allSubjects: PickableSubject[];
 }) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [open, setOpen] = useState(false);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(currentSubjectIds);
@@ -33,20 +32,15 @@ export function EditTeacherSubjectsForm({
     setSaving(true);
     setError(null);
 
-    // Allowed by the existing "teacher_profiles_update_self_or_admin" RLS
-    // policy — no service-role client needed for a subject-list update.
-    const { error: updateError } = await supabase
-      .from("teacher_profiles")
-      .update({ subjects_taught: selectedSubjects })
-      .eq("id", teacherId);
-
-    setSaving(false);
-
-    if (updateError) {
-      setError(updateError.message);
+    try {
+      await updateTeacherSubjects(teacherId, selectedSubjects);
+    } catch (err: any) {
+      setSaving(false);
+      setError(err.message ?? "Could not save subjects.");
       return;
     }
 
+    setSaving(false);
     setOpen(false);
     router.refresh();
   }

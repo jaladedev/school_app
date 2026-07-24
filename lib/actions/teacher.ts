@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { AssessmentType, AttendanceStatus, HomeworkStatus, ResourceType } from "@/types/database";
+import type {
+  AssessmentType,
+  AttendanceStatus,
+  HomeworkStatus,
+  ResourceType,
+} from "@/types/database";
 
 // ---------- Lessons ----------
 

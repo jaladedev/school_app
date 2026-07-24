@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { clearMustChangePassword } from "@/lib/actions/authGuards";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -38,21 +39,12 @@ export default function ChangePasswordPage() {
       return;
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ must_change_password: false })
-        .eq("id", user.id);
-
-      if (profileError) {
-        setLoading(false);
-        setError(profileError.message);
-        return;
-      }
+    try {
+      await clearMustChangePassword();
+    } catch (err: any) {
+      setLoading(false);
+      setError(err.message ?? "Could not complete the password update.");
+      return;
     }
 
     // Important: the custom access token hook (if enabled) bakes
