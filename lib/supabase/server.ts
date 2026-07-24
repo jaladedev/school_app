@@ -41,5 +41,13 @@ export async function getCurrentProfile() {
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
 
+  if (!profile || !profile.is_active) {
+    // Deactivated (or profile missing entirely) — clear the session so a
+    // stale-but-valid cookie doesn't keep silently granting access on
+    // every subsequent request until it naturally expires.
+    await supabase.auth.signOut();
+    return null;
+  }
+
   return profile;
 }
