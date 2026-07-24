@@ -1,3 +1,4 @@
+import React from "react";
 import { PrintButton } from "@/components/PrintButton";
 import { ReceiptPdfButton } from "@/components/ReceiptPdfButton";
 import { formatKobo, type PaymentMethod } from "@/types/database";

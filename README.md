@@ -56,15 +56,17 @@ npm install
 
 ### 2. Configure environment variables
 
-Create a local environment file with the Supabase values used by the app.
+Create a local environment file with the Supabase and Paystack values used by the app.
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=your-paystack-public-key
+PAYSTACK_SECRET_KEY=your-paystack-secret-key
 ```
 
-These values come from your Supabase project in the Project Settings → API section.
+These values come from your Supabase project in the Project Settings → API section and your Paystack dashboard settings.
 
 ### 3. Start the app
 

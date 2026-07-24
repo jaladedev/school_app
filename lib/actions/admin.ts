@@ -653,6 +653,38 @@ export type ParentChildLink = {
   isPrimary: boolean;
 };
 
+async function assertValidParentChildLinks(
+  admin: ReturnType<typeof createAdminClient>,
+  children: ParentChildLink[]
+) {
+  if (!children.length) {
+    throw new Error("Link at least one child before creating the account.");
+  }
+
+  const studentIds = children.map((child) => child.studentId.trim()).filter(Boolean);
+  if (studentIds.length !== new Set(studentIds).size) {
+    throw new Error("Each child can only be linked once.");
+  }
+
+  if (studentIds.some((studentId) => studentId.length < 1)) {
+    throw new Error("Each linked child needs a valid student id.");
+  }
+
+  const { data: students, error } = await admin
+    .from("student_profiles")
+    .select("id")
+    .in("id", studentIds);
+
+  if (error) throw new Error(error.message);
+
+  const existingIds = new Set((students ?? []).map((student) => student.id));
+  const missingIds = studentIds.filter((studentId) => !existingIds.has(studentId));
+
+  if (missingIds.length) {
+    throw new Error(`The following student ids are invalid: ${missingIds.join(", ")}`);
+  }
+}
+
 export async function createParentAccount(input: {
   fullName: string;
   email: string;
@@ -661,11 +693,8 @@ export async function createParentAccount(input: {
 }) {
   await assertRole(["admin"], "Only an admin can perform this action.");
 
-  if (!input.children.length) {
-    throw new Error("Link at least one child before creating the account.");
-  }
-
   const admin = createAdminClient();
+  await assertValidParentChildLinks(admin, input.children);
   await assertEmailAvailable(admin, input.email);
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -713,6 +742,15 @@ export async function createParentAccount(input: {
 export async function addChildToParent(parentId: string, studentId: string, relationship?: string) {
   await assertRole(["admin"], "Only an admin can perform this action.");
   const admin = createAdminClient();
+
+  const { data: student, error: studentError } = await admin
+    .from("student_profiles")
+    .select("id")
+    .eq("id", studentId)
+    .maybeSingle();
+
+  if (studentError) throw new Error(studentError.message);
+  if (!student) throw new Error("The selected student does not exist.");
 
   const { error } = await admin.from("guardian_links").insert({
     parent_id: parentId,

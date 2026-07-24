@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 const STORAGE_KEY = "school-app-term-year-selector";
@@ -9,6 +9,17 @@ type StoredTermYear = {
   term: number;
   year: string;
 };
+
+type SearchParamsLike = string | { toString(): string } | undefined;
+
+export function buildTermYearQueryParams(searchParams: SearchParamsLike, term: number, year: string) {
+  const params = new URLSearchParams(
+    typeof searchParams === "string" ? searchParams : searchParams?.toString() ?? ""
+  );
+  params.set("term", String(term));
+  params.set("year", year);
+  return params;
+}
 
 export function TermYearSelector({
   currentTerm,
@@ -43,11 +54,28 @@ export function TermYearSelector({
       const nextYear = params.get("year") ?? currentYear;
 
       if (nextTerm !== currentTerm || nextYear !== currentYear) {
-        router.replace(`${pathname}?${params.toString()}`);
+        const nextUrl = `${pathname}?${params.toString()}`;
+        router.replace(nextUrl);
+        router.refresh();
       }
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
     }
+  }, [currentTerm, currentYear, pathname, router, searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const nextTerm = params.get("term");
+    const nextYear = params.get("year");
+
+    if (nextTerm === String(currentTerm) && nextYear === currentYear) {
+      return;
+    }
+
+    const nextParams = buildTermYearQueryParams(params, currentTerm, currentYear);
+    const nextUrl = `${pathname}?${nextParams.toString()}`;
+    router.replace(nextUrl);
+    router.refresh();
   }, [currentTerm, currentYear, pathname, router, searchParams]);
 
   useEffect(() => {
@@ -61,10 +89,10 @@ export function TermYearSelector({
   }, [currentTerm, currentYear]);
 
   function update(term: number, year: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("term", String(term));
-    params.set("year", year);
-    router.push(`${pathname}?${params.toString()}`);
+    const params = buildTermYearQueryParams(searchParams, term, year);
+    const nextUrl = `${pathname}?${params.toString()}`;
+    router.push(nextUrl);
+    router.refresh();
   }
 
   return (
