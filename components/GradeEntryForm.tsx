@@ -47,8 +47,10 @@ export function GradeEntryForm({
     const raw = scores[studentId];
     const score = parseFloat(raw);
     if (isNaN(score) || score < 0 || score > maxScore) {
+      const message = `Enter a score between 0 and ${maxScore}.`;
       setErrorId(studentId);
-      setErrorMessage(`Enter a score between 0 and ${maxScore}.`);
+      setErrorMessage(message);
+      emitToast(message, "error");
       return;
     }
 
@@ -63,8 +65,10 @@ export function GradeEntryForm({
         // Previously unhandled — a rejected saveGrade() call here (e.g.
         // the "you aren't assigned to teach this subject" RLS pre-check)
         // would silently do nothing. Now it surfaces per-row.
+        const message = err.message ?? "Something went wrong saving this grade.";
         setErrorId(studentId);
-        setErrorMessage(err.message ?? "Something went wrong saving this grade.");
+        setErrorMessage(message);
+        emitToast(message, "error");
       }
     });
   }

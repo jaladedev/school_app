@@ -2,13 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { scoreToLetterGrade, type GradeScaleEntry, type AttendanceStatus } from "@/types/database";
 
-function ordinal(n: number): string {
+export function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
   return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
 }
 
-function rankDescending(values: number[]): number[] {
+export function rankDescending(values: number[]): number[] {
   const sorted = [...values].sort((a, b) => b - a);
   return values.map((v) => sorted.indexOf(v) + 1);
 }
@@ -62,7 +62,7 @@ type LessonWithTimetableEntry = {
   timetable_entries: { term: number; academic_year: string } | null;
 };
 
-function computeSubjectPercent(
+export function computeSubjectPercent(
   studentId: string,
   assessmentIds: string[],
   maxScores: Map<string, number>,

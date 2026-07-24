@@ -36,6 +36,7 @@ export function AttendanceForm({
     return base;
   });
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function setAll(status: AttendanceStatus) {
     const next: Record<string, AttendanceStatus> = {};
@@ -55,12 +56,19 @@ export function AttendanceForm({
   }
 
   function handleSave() {
+    setError(null);
     startTransition(async () => {
-      await markAttendance(
-        lessonId,
-        students.map((s) => ({ studentId: s.id, status: statuses[s.id] }))
-      );
-      emitToast("Attendance saved.");
+      try {
+        await markAttendance(
+          lessonId,
+          students.map((s) => ({ studentId: s.id, status: statuses[s.id] }))
+        );
+        emitToast("Attendance saved.");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Unable to save attendance.";
+        setError(message);
+        emitToast(message, "error");
+      }
     });
   }
 
@@ -122,6 +130,7 @@ export function AttendanceForm({
       >
         {isPending ? "Saving…" : "Save attendance"}
       </button>
+      {error && <p className="mt-2 text-sm text-clay">{error}</p>}
     </div>
   );
 }

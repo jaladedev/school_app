@@ -17,11 +17,19 @@ export function NoteEditor({
 }) {
   const [content, setContent] = useState(initialContent);
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function handleSave(status: "draft" | "published") {
+    setError(null);
     startTransition(async () => {
-      await saveTopicNote(topicId, content, status);
-      emitToast(status === "published" ? "Topic note published." : "Draft saved.");
+      try {
+        await saveTopicNote(topicId, content, status);
+        emitToast(status === "published" ? "Topic note published." : "Draft saved.");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Unable to save the topic note.";
+        setError(message);
+        emitToast(message, "error");
+      }
     });
   }
 
@@ -70,6 +78,7 @@ export function NoteEditor({
         Diagrams and other resources (images, Mermaid diagrams, videos) are attached separately
         after publishing — this editor covers the written note and tables.
       </p>
+      {error && <p className="mt-2 text-sm text-clay">{error}</p>}
     </div>
   );
 }

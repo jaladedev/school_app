@@ -1,5 +1,6 @@
 node_modules
 .next
+*.tsbuildinfo
 /supabase/
 .env
 all.md

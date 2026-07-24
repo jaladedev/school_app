@@ -38,7 +38,9 @@ export function RemarkForm({
         emitToast("Remarks saved.");
         router.refresh();
       } catch (err: any) {
-        setError(err.message ?? "Something went wrong.");
+        const message = err.message ?? "Something went wrong.";
+        setError(message);
+        emitToast(message, "error");
       }
     });
   }

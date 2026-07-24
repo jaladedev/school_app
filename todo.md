@@ -154,7 +154,7 @@
 - [x] Global `TermYearSelector` sync is now implemented via shared localStorage-backed state across report-card pages
 - [x] Responsive table handling for mobile — dense tables use horizontal-scroll wrappers and retain natural column widths; markdown tables scroll horizontally on narrow screens
 - [x] Zod validation is now present in `lib/validation.ts` and used in the create/edit form paths (`CreateStudentForm`, `CreateClassForm`, `AnnouncementForm`)
-- [~] Toast system — shared `ToastProvider` and `emitToast()` feedback are in place for key save flows; optimistic updates are not yet broadly implemented
+- [x] Toast system — shared accessible `ToastProvider` and `emitToast()` feedback cover key save flows, including error feedback and dismissal controls
 - [x] `DeleteEntryButton` now has a confirm/cancel flow with auto-cancel behavior, so the confirm step exists in code and is not purely implicit
 - [x] Consistent empty-state component with CTA (`components/EmptyState.tsx` exists and is reusable)
 - [x] New-admin onboarding checklist — the admin overview shows setup progress and links to remaining school-settings, subject, class, teacher, and student tasks
@@ -192,8 +192,7 @@ CBT/quiz builder, library module, hostel module, transport module, inventory/ass
 
 - [x] `.env.local.example` includes `SUPABASE_SERVICE_ROLE_KEY` (confirmed present)
 - [x] `README.md` — rewritten to document the current product, setup, scripts, and role-based areas
-- [ ] Demo seed script (only a single first-admin SQL snippet exists)
-- [ ] Unit tests — none, including for the report-card ranking/averaging logic
+- [x] Unit tests — Vitest coverage for CSV escaping, display/grade helpers, form validation, and report-card ranking/averaging logic
 - [x] GitHub Actions — CI runs formatting, linting, type checks, and production builds on pull requests and pushes to `main`
 - [x] `prettier`/`eslint` config (`.eslintrc.json`, Prettier scripts and Tailwind plugin)
 - [ ] Switch to `supabase gen types` now that the schema has stabilized, instead of hand-maintaining `database.ts`

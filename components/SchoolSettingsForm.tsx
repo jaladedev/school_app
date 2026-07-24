@@ -39,7 +39,9 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
         });
         emitToast("School settings saved.");
       } catch (err: any) {
-        setError(err.message ?? "Something went wrong.");
+        const message = err.message ?? "Something went wrong.";
+        setError(message);
+        emitToast(message, "error");
       }
     });
   }
