@@ -10,6 +10,18 @@ import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/component
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
+// Escape Postgres ILIKE wildcards so a search term is matched literally,
+// and avoid building a raw PostgREST filter-grammar string (.or()) from
+// user input — an unescaped comma/paren in q could otherwise smuggle in
+// extra filter clauses via PostgREST's .or() syntax.
+function escapeIlike(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+function sanitizeSearchQuery(raw: string): string {
+  return raw.trim().slice(0, 100);
+}
+
 export default async function AdminStudentsPage({
   searchParams,
 }: {
@@ -18,26 +30,26 @@ export default async function AdminStudentsPage({
   const supabase = createClient();
   const page = parsePage(searchParams.page);
   const { from, to } = pageRange(page, PAGE_SIZE);
-  const q = searchParams.q?.trim();
+  const qRaw = searchParams.q?.trim() ?? "";
+  const q = sanitizeSearchQuery(qRaw);
 
   let matchingIds: string[] | null = null;
 
   if (q) {
-    const { data: matchingProfiles } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("role", "student")
-      .or(`full_name.ilike.%${q}%,email.ilike.%${q}%`);
+    const safe = escapeIlike(q);
+    const pattern = `%${safe}%`;
 
-    const { data: matchingByAdmission } = await supabase
-      .from("student_profiles")
-      .select("id")
-      .ilike("admission_no", `%${q}%`);
+    const [byFullName, byEmail, byAdmission] = await Promise.all([
+      supabase.from("profiles").select("id").eq("role", "student").ilike("full_name", pattern),
+      supabase.from("profiles").select("id").eq("role", "student").ilike("email", pattern),
+      supabase.from("student_profiles").select("id").ilike("admission_no", pattern),
+    ]);
 
     matchingIds = [
       ...new Set([
-        ...(matchingProfiles ?? []).map((p) => p.id),
-        ...(matchingByAdmission ?? []).map((s) => s.id),
+        ...(byFullName.data ?? []).map((p) => p.id),
+        ...(byEmail.data ?? []).map((p) => p.id),
+        ...(byAdmission.data ?? []).map((s) => s.id),
       ]),
     ];
   }
@@ -71,7 +83,7 @@ export default async function AdminStudentsPage({
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Students</h1>
           <p className="text-sm text-ink-soft">
-            {count ?? 0} students{q ? ` matching "${q}"` : " enrolled"} · page {page} of{" "}
+            {count ?? 0} students{q ? ` matching "${qRaw}"` : " enrolled"} · page {page} of{" "}
             {totalPages}
           </p>
         </div>
@@ -129,7 +141,7 @@ export default async function AdminStudentsPage({
 
         {!students?.length && (
           <p className="text-sm text-ink-soft">
-            {q ? `No students match "${q}".` : "No students yet."}
+            {q ? `No students match "${qRaw}".` : "No students yet."}
           </p>
         )}
       </div>
@@ -138,7 +150,7 @@ export default async function AdminStudentsPage({
         basePath="/dashboard/admin/students"
         page={page}
         totalPages={totalPages}
-        searchParams={{ q }}
+        searchParams={{ q: qRaw }}
       />
     </div>
   );

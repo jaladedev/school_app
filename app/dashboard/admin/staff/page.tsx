@@ -4,26 +4,42 @@ import { TeacherRow } from "@/components/TeacherRow";
 import { SearchInput } from "@/components/SearchInput";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 
+function escapeIlike(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+function sanitizeSearchQuery(raw: string): string {
+  return raw.trim().slice(0, 100);
+}
+
 export default async function AdminStaffPage({
   searchParams,
 }: {
   searchParams: { q?: string; page?: string };
 }) {
   const supabase = createClient();
-  const q = searchParams.q?.trim();
+  const qRaw = searchParams.q?.trim() ?? "";
+  const q = sanitizeSearchQuery(qRaw);
   const page = parsePage(searchParams.page);
   const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   let matchingIds: string[] | null = null;
 
   if (q) {
-    const { data: matchingProfiles } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("role", "teacher")
-      .or(`full_name.ilike.%${q}%,email.ilike.%${q}%`);
+    const safe = escapeIlike(q);
+    const pattern = `%${safe}%`;
 
-    matchingIds = (matchingProfiles ?? []).map((p) => p.id);
+    const [byFullName, byEmail] = await Promise.all([
+      supabase.from("profiles").select("id").eq("role", "teacher").ilike("full_name", pattern),
+      supabase.from("profiles").select("id").eq("role", "teacher").ilike("email", pattern),
+    ]);
+
+    matchingIds = [
+      ...new Set([
+        ...(byFullName.data ?? []).map((p) => p.id),
+        ...(byEmail.data ?? []).map((p) => p.id),
+      ]),
+    ];
   }
 
   let teacherQuery = supabase
@@ -54,7 +70,7 @@ export default async function AdminStaffPage({
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Staff</h1>
           <p className="text-sm text-ink-soft">
-            {count ?? 0} teachers{q ? ` matching "${q}"` : " on record"} · page {page} of{" "}
+            {count ?? 0} teachers{q ? ` matching "${qRaw}"` : " on record"} · page {page} of{" "}
             {totalPages}
           </p>
         </div>
@@ -86,7 +102,7 @@ export default async function AdminStaffPage({
 
         {!teachers?.length && (
           <p className="text-sm text-ink-soft">
-            {q ? `No teachers match "${q}".` : "No teachers yet."}
+            {q ? `No teachers match "${qRaw}".` : "No teachers yet."}
           </p>
         )}
       </div>
@@ -95,7 +111,7 @@ export default async function AdminStaffPage({
         basePath="/dashboard/admin/staff"
         page={page}
         totalPages={totalPages}
-        searchParams={{ q }}
+        searchParams={{ q: qRaw }}
       />
     </div>
   );
