@@ -152,12 +152,16 @@ export async function saveGrade(
 
   const { data: assessment } = await supabase
     .from("assessments")
-    .select("subject_id, class_id, subjects(name), classes(name, arm)")
+    .select("subject_id, class_id, max_score, subjects(name), classes(name, arm)")
     .eq("id", assessmentId)
     .single();
 
   if (!assessment) {
     throw new Error("Assessment not found.");
+  }
+
+  if (!Number.isFinite(score) || score < 0 || score > assessment.max_score) {
+    throw new Error(`Score must be between 0 and ${assessment.max_score}.`);
   }
 
   const { data: assignment } = await supabase

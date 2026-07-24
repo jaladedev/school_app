@@ -35,7 +35,7 @@ export default async function TeacherNotesPage({
     .order("education_level", { ascending: true })
     .order("level_number", { ascending: true })
     .order("term", { ascending: true })
-    .order("sequence_order", { ascending: true })
+    .order("week_number", { ascending: true })
     .range(from, to);
 
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / DEFAULT_PAGE_SIZE));
@@ -69,7 +69,7 @@ export default async function TeacherNotesPage({
                 <p className="text-ink">{topic.title}</p>
                 <p className="text-xs text-ink-soft">
                   {topic.subjects?.name} · {formatLevel(topic.education_level, topic.level_number)}{" "}
-                  · Term {topic.term}
+                  · Term {topic.term} · Week {topic.week_number}
                 </p>
               </div>
               <span

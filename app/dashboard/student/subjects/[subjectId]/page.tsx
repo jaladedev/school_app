@@ -42,7 +42,7 @@ export default async function SubjectTopicsPage({
     .eq("education_level", classRow?.education_level ?? "primary")
     .eq("level_number", classRow?.level_number ?? 0)
     .order("term", { ascending: true })
-    .order("sequence_order", { ascending: true });
+    .order("week_number", { ascending: true });
 
   const topicsByTerm = (topics ?? []).reduce<Record<number, typeof topics>>((acc, topic) => {
     acc[topic.term] = [...(acc[topic.term] ?? []), topic];
@@ -71,7 +71,7 @@ export default async function SubjectTopicsPage({
                   className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 transition hover:border-leaf"
                 >
                   <span className="text-ink">{topic.title}</span>
-                  <span className="text-sm text-ink-soft">{topic.sequence_order}</span>
+                  <span className="text-sm text-ink-soft">Week {topic.week_number}</span>
                 </Link>
               </li>
             ))}

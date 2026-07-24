@@ -90,7 +90,17 @@ export function GradeEntryForm({
                 min={0}
                 max={maxScore}
                 value={scores[student.id]}
-                onChange={(e) => setScores((prev) => ({ ...prev, [student.id]: e.target.value }))}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    setScores((prev) => ({ ...prev, [student.id]: "" }));
+                    return;
+                  }
+                  const parsed = parseFloat(raw);
+                  if (isNaN(parsed)) return;
+                  const clamped = Math.min(Math.max(parsed, 0), maxScore);
+                  setScores((prev) => ({ ...prev, [student.id]: clamped.toString() }));
+                }}
                 className="w-20 rounded-md border border-rule px-2 py-1 text-sm outline-none focus-visible:border-marigold"
                 placeholder={`/ ${maxScore}`}
               />
