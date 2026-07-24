@@ -7,15 +7,17 @@ import { redirect } from "next/navigation";
 export default async function MessagesInboxPage({
   searchParams,
 }: {
-  searchParams: { view?: string };
+  searchParams: Promise<{ view?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const profile = await getCurrentProfile();
 
   if (!profile) {
     redirect("/login");
   }
   const supabase = createClient();
-  const view = searchParams.view === "archived" ? "archived" : "active";
+  const view = resolvedSearchParams.view === "archived" ? "archived" : "active";
 
   const { data: messages } = await supabase
     .from("messages")

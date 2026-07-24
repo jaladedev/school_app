@@ -7,10 +7,12 @@ import { EmptyState } from "@/components/EmptyState";
 export default async function ArchivedClassesPage({
   searchParams,
 }: {
-  searchParams: { page?: string };
+  searchParams: Promise<{ page?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const supabase = createClient();
-  const page = parsePage(searchParams.page);
+  const page = parsePage(resolvedSearchParams.page);
   const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   const { data: classes, count } = await supabase

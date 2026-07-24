@@ -7,10 +7,12 @@ import { EmptyState } from "@/components/EmptyState";
 export default async function AdminGradesModerationPage({
   searchParams,
 }: {
-  searchParams: { page?: string };
+  searchParams: Promise<{ page?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const supabase = createClient();
-  const page = parsePage(searchParams.page);
+  const page = parsePage(resolvedSearchParams.page);
 
   const { data: assessments } = await supabase
     .from("assessments")

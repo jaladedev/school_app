@@ -16,10 +16,12 @@ function timeAgo(dateStr: string) {
 export default async function AnnouncementsPage({
   searchParams,
 }: {
-  searchParams: { page?: string };
+  searchParams: Promise<{ page?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const profile = await getCurrentProfile();
-  const page = parsePage(searchParams.page);
+  const page = parsePage(resolvedSearchParams.page);
 
   if (!profile) {
     redirect("/login");

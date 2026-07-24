@@ -15,8 +15,10 @@ type LessonRowData = {
 export default async function AttendanceLandingPage({
   searchParams,
 }: {
-  searchParams: { page?: string };
+  searchParams: Promise<{ page?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const profile = await getCurrentProfile();
 
   if (!profile) {
@@ -25,7 +27,7 @@ export default async function AttendanceLandingPage({
   const supabase = createClient();
 
   const today = new Date().toISOString().slice(0, 10);
-  const page = parsePage(searchParams.page);
+  const page = parsePage(resolvedSearchParams.page);
   const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   const { data: todaysLessons } = await supabase

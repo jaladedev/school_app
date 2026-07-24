@@ -3,7 +3,13 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/EmptyState";
 
-export default async function SubjectTopicsPage({ params }: { params: { subjectId: string } }) {
+export default async function SubjectTopicsPage({
+  params,
+}: {
+  params: Promise<{ subjectId: string }>;
+}) {
+  const resolvedParams = await params;
+
   const profile = await getCurrentProfile();
 
   if (!profile) {
@@ -26,13 +32,13 @@ export default async function SubjectTopicsPage({ params }: { params: { subjectI
   const { data: subject } = await supabase
     .from("subjects")
     .select("*")
-    .eq("id", params.subjectId)
+    .eq("id", resolvedParams.subjectId)
     .single();
 
   const { data: topics } = await supabase
     .from("curriculum_topics")
     .select("*")
-    .eq("subject_id", params.subjectId)
+    .eq("subject_id", resolvedParams.subjectId)
     .eq("education_level", classRow?.education_level ?? "primary")
     .eq("level_number", classRow?.level_number ?? 0)
     .order("term", { ascending: true })

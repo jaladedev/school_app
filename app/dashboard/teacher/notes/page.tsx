@@ -7,15 +7,17 @@ import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/component
 export default async function TeacherNotesPage({
   searchParams,
 }: {
-  searchParams: { page?: string };
+  searchParams: Promise<{ page?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const profile = await getCurrentProfile();
 
   if (!profile) {
     redirect("/login");
   }
   const supabase = createClient();
-  const page = parsePage(searchParams.page);
+  const page = parsePage(resolvedSearchParams.page);
   const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   const { data: teacherProfile } = await supabase

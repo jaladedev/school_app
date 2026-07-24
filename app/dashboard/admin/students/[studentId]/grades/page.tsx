@@ -1,13 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/EmptyState";
 
-export default async function StudentGradesTabPage({ params }: { params: { studentId: string } }) {
+export default async function StudentGradesTabPage({
+  params,
+}: {
+  params: Promise<{ studentId: string }>;
+}) {
+  const resolvedParams = await params;
+
   const supabase = createClient();
 
   const { data: grades } = await supabase
     .from("grades")
     .select("*, assessments(title, max_score, term, academic_year, subjects(name))")
-    .eq("student_id", params.studentId)
+    .eq("student_id", resolvedParams.studentId)
     .order("graded_at", { ascending: false });
 
   const bySubject = new Map<string, typeof grades>();

@@ -17,13 +17,15 @@ const VALID_STATUSES: InvoiceStatus[] = ["unpaid", "partial", "paid"];
 export default async function AdminInvoicesPage({
   searchParams,
 }: {
-  searchParams: { status?: string; page?: string };
+  searchParams: Promise<{ status?: string; page?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const supabase = createClient();
-  const statusFilter = VALID_STATUSES.includes(searchParams.status as InvoiceStatus)
-    ? (searchParams.status as InvoiceStatus)
+  const statusFilter = VALID_STATUSES.includes(resolvedSearchParams.status as InvoiceStatus)
+    ? (resolvedSearchParams.status as InvoiceStatus)
     : undefined;
-  const page = parsePage(searchParams.page);
+  const page = parsePage(resolvedSearchParams.page);
   const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   const { data: settings } = await supabase

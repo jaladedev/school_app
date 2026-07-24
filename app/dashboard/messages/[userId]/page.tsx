@@ -7,7 +7,13 @@ import { ArchiveConversationButton } from "@/components/ArchiveConversationButto
 import { DeleteConversationButton } from "@/components/DeleteConversationButton";
 import { redirect } from "next/navigation";
 
-export default async function MessageThreadPage({ params }: { params: { userId: string } }) {
+export default async function MessageThreadPage({
+  params,
+}: {
+  params: Promise<{ userId: string }>;
+}) {
+  const resolvedParams = await params;
+
   const profile = await getCurrentProfile();
 
   if (!profile) {
@@ -18,14 +24,14 @@ export default async function MessageThreadPage({ params }: { params: { userId: 
   const { data: partner } = await supabase
     .from("profiles")
     .select("full_name, role")
-    .eq("id", params.userId)
+    .eq("id", resolvedParams.userId)
     .single();
 
   const { data: messages } = await supabase
     .from("messages")
     .select("id, sender_id, content, sent_at")
     .or(
-      `and(sender_id.eq.${profile.id},recipient_id.eq.${params.userId}),and(sender_id.eq.${params.userId},recipient_id.eq.${profile.id})`
+      `and(sender_id.eq.${profile.id},recipient_id.eq.${resolvedParams.userId}),and(sender_id.eq.${resolvedParams.userId},recipient_id.eq.${profile.id})`
     )
     .order("sent_at", { ascending: true });
 
@@ -33,12 +39,12 @@ export default async function MessageThreadPage({ params }: { params: { userId: 
     .from("conversation_archives")
     .select("partner_id")
     .eq("user_id", profile.id)
-    .eq("partner_id", params.userId)
+    .eq("partner_id", resolvedParams.userId)
     .maybeSingle();
 
   // Mark any unread messages from this partner as read now that the
   // thread is being viewed.
-  await markThreadRead(params.userId);
+  await markThreadRead(resolvedParams.userId);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] max-w-xl flex-col">
@@ -53,19 +59,19 @@ export default async function MessageThreadPage({ params }: { params: { userId: 
           <p className="text-xs capitalize text-ink-soft">{partner?.role}</p>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <ArchiveConversationButton partnerId={params.userId} isArchived={!!archiveRow} />
-          <DeleteConversationButton partnerId={params.userId} />
+          <ArchiveConversationButton partnerId={resolvedParams.userId} isArchived={!!archiveRow} />
+          <DeleteConversationButton partnerId={resolvedParams.userId} />
         </div>
       </div>
 
       <RealtimeMessageThread
         currentUserId={profile.id}
-        partnerId={params.userId}
+        partnerId={resolvedParams.userId}
         initialMessages={messages ?? []}
       />
 
       <div className="mt-4">
-        <MessageComposer recipientId={params.userId} />
+        <MessageComposer recipientId={resolvedParams.userId} />
       </div>
     </div>
   );

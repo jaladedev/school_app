@@ -4,20 +4,26 @@ import { NoteEditor } from "@/components/NoteEditor";
 import { TopicResourceUpload } from "@/components/TopicResourceUpload";
 import { formatLevel } from "@/types/database";
 
-export default async function TeacherNoteEditPage({ params }: { params: { topicId: string } }) {
+export default async function TeacherNoteEditPage({
+  params,
+}: {
+  params: Promise<{ topicId: string }>;
+}) {
+  const resolvedParams = await params;
+
   const profile = await getCurrentProfile();
   const supabase = createClient();
 
   const { data: topic } = await supabase
     .from("curriculum_topics")
     .select("*, subjects(name)")
-    .eq("id", params.topicId)
+    .eq("id", resolvedParams.topicId)
     .single();
 
   const { data: note } = await supabase
     .from("topic_notes")
     .select("*")
-    .eq("topic_id", params.topicId)
+    .eq("topic_id", resolvedParams.topicId)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -25,7 +31,7 @@ export default async function TeacherNoteEditPage({ params }: { params: { topicI
   const { data: versions } = await supabase
     .from("topic_notes")
     .select("id, version, status, updated_at")
-    .eq("topic_id", params.topicId)
+    .eq("topic_id", resolvedParams.topicId)
     .order("version", { ascending: false });
 
   return (
@@ -43,12 +49,12 @@ export default async function TeacherNoteEditPage({ params }: { params: { topicI
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">{topic?.title}</h1>
 
       <NoteEditor
-        topicId={params.topicId}
+        topicId={resolvedParams.topicId}
         initialContent={note?.content ?? `## Introduction\n\nWrite about "${topic?.title}" here.\n`}
         initialStatus={note?.status ?? "unwritten"}
       />
       {note ? (
-        <TopicResourceUpload topicId={params.topicId} noteId={note.id} />
+        <TopicResourceUpload topicId={resolvedParams.topicId} noteId={note.id} />
       ) : (
         <p className="mt-4 text-sm text-ink-soft">Save the note once before attaching resources.</p>
       )}

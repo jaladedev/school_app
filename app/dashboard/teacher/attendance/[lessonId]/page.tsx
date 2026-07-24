@@ -4,13 +4,19 @@ import { AttendanceForm } from "@/components/AttendanceForm";
 import type { AttendanceStatus } from "@/types/database";
 import { EmptyState } from "@/components/EmptyState";
 
-export default async function AttendancePage({ params }: { params: { lessonId: string } }) {
+export default async function AttendancePage({
+  params,
+}: {
+  params: Promise<{ lessonId: string }>;
+}) {
+  const resolvedParams = await params;
+
   const supabase = createClient();
 
   const { data: lesson } = await supabase
     .from("lessons")
     .select("*, classes(id, name, arm)")
-    .eq("id", params.lessonId)
+    .eq("id", resolvedParams.lessonId)
     .single();
 
   const classId = lesson?.classes?.id;
@@ -27,7 +33,7 @@ export default async function AttendancePage({ params }: { params: { lessonId: s
   const { data: existing } = await supabase
     .from("attendance")
     .select("student_id, status")
-    .eq("lesson_id", params.lessonId);
+    .eq("lesson_id", resolvedParams.lessonId);
 
   const initialStatus: Record<string, AttendanceStatus> = {};
   for (const row of existing ?? []) {
@@ -73,7 +79,7 @@ export default async function AttendancePage({ params }: { params: { lessonId: s
 
       {students.length ? (
         <AttendanceForm
-          lessonId={params.lessonId}
+          lessonId={resolvedParams.lessonId}
           students={students}
           initialStatus={initialStatus}
           previousStatus={previousLesson ? previousStatus : undefined}

@@ -4,19 +4,21 @@ import { TopicContent } from "@/components/TopicContent";
 import { formatLevel } from "@/types/database";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export default async function TopicPage({ params }: { params: { topicId: string } }) {
+export default async function TopicPage({ params }: { params: Promise<{ topicId: string }> }) {
+  const resolvedParams = await params;
+
   const supabase = createClient();
 
   const { data: topic } = await supabase
     .from("curriculum_topics")
     .select("*, subjects(name)")
-    .eq("id", params.topicId)
+    .eq("id", resolvedParams.topicId)
     .single();
 
   const { data: note } = await supabase
     .from("topic_notes")
     .select("*")
-    .eq("topic_id", params.topicId)
+    .eq("topic_id", resolvedParams.topicId)
     .eq("status", "published")
     .order("version", { ascending: false })
     .limit(1)
@@ -25,7 +27,7 @@ export default async function TopicPage({ params }: { params: { topicId: string 
   const { data: resources } = await supabase
     .from("topic_resources")
     .select("*")
-    .eq("topic_id", params.topicId)
+    .eq("topic_id", resolvedParams.topicId)
     .order("sequence_order", { ascending: true });
 
   const admin = createAdminClient();

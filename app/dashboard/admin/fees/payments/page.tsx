@@ -14,10 +14,12 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
 export default async function AdminPaymentsPage({
   searchParams,
 }: {
-  searchParams: { page?: string };
+  searchParams: Promise<{ page?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const supabase = createClient();
-  const page = parsePage(searchParams.page);
+  const page = parsePage(resolvedSearchParams.page);
   const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   const { data: payments, count } = await supabase

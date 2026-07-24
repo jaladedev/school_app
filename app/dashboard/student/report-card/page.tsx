@@ -14,15 +14,17 @@ function defaultAcademicYear() {
 export default async function StudentReportCardPage({
   searchParams,
 }: {
-  searchParams: { term?: string; year?: string };
+  searchParams: Promise<{ term?: string; year?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const profile = await getCurrentProfile();
 
   if (!profile) {
     redirect("/login");
   }
-  const term = Number(searchParams.term ?? 1);
-  const academicYear = searchParams.year ?? defaultAcademicYear();
+  const term = Number(resolvedSearchParams.term ?? 1);
+  const academicYear = resolvedSearchParams.year ?? defaultAcademicYear();
 
   const data = await getReportCardData(profile.id, term, academicYear);
 

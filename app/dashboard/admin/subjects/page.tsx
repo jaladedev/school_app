@@ -14,10 +14,12 @@ const STAGE_LABELS: Record<EducationLevel, string> = {
 export default async function AdminSubjectsPage({
   searchParams,
 }: {
-  searchParams: { page?: string };
+  searchParams: Promise<{ page?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const supabase = createClient();
-  const page = parsePage(searchParams.page);
+  const page = parsePage(resolvedSearchParams.page);
   const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   const { data: subjects, count } = await supabase

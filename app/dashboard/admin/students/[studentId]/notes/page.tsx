@@ -2,13 +2,19 @@ import { createClient } from "@/lib/supabase/server";
 import { StudentNoteForm } from "@/components/StudentNoteForm";
 import { StudentNotesList } from "@/components/StudentNotesList";
 
-export default async function AdminStudentNotesPage({ params }: { params: { studentId: string } }) {
+export default async function AdminStudentNotesPage({
+  params,
+}: {
+  params: Promise<{ studentId: string }>;
+}) {
+  const resolvedParams = await params;
+
   const supabase = createClient();
 
   const { data: notes } = await supabase
     .from("student_notes")
     .select("id, note_type, content, created_at, profiles(full_name)")
-    .eq("student_id", params.studentId)
+    .eq("student_id", resolvedParams.studentId)
     .order("created_at", { ascending: false });
 
   const formattedNotes = (notes ?? []).map((n) => ({
@@ -24,7 +30,7 @@ export default async function AdminStudentNotesPage({ params }: { params: { stud
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">Notes</h1>
 
       <div className="mb-6">
-        <StudentNoteForm studentId={params.studentId} />
+        <StudentNoteForm studentId={resolvedParams.studentId} />
       </div>
 
       <StudentNotesList notes={formattedNotes} />

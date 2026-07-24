@@ -7,14 +7,16 @@ export default async function StudentDetailLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { studentId: string };
+  params: Promise<{ studentId: string }>;
 }) {
+  const resolvedParams = await params;
+
   const supabase = createClient();
 
   const { data: student } = await supabase
     .from("student_profiles")
     .select("admission_no, profiles(full_name)")
-    .eq("id", params.studentId)
+    .eq("id", resolvedParams.studentId)
     .single();
 
   return (
@@ -30,7 +32,7 @@ export default async function StudentDetailLayout({
         </span>
       </div>
 
-      <StudentDetailTabs studentId={params.studentId} />
+      <StudentDetailTabs studentId={resolvedParams.studentId} />
 
       {children}
     </div>

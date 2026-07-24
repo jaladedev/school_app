@@ -4,7 +4,13 @@ import { StudentPhotoUpload } from "@/components/StudentPhotoUpload";
 import { formatLevel } from "@/types/database";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export default async function StudentInfoPage({ params }: { params: { studentId: string } }) {
+export default async function StudentInfoPage({
+  params,
+}: {
+  params: Promise<{ studentId: string }>;
+}) {
+  const resolvedParams = await params;
+
   const supabase = createClient();
 
   const { data: student } = await supabase
@@ -12,7 +18,7 @@ export default async function StudentInfoPage({ params }: { params: { studentId:
     .select(
       "*, profiles(full_name, email, avatar_url), classes(id, name, arm, education_level, level_number)"
     )
-    .eq("id", params.studentId)
+    .eq("id", resolvedParams.studentId)
     .single();
 
   const { data: classes } = await supabase
@@ -46,12 +52,12 @@ export default async function StudentInfoPage({ params }: { params: { studentId:
       {student ? (
         <div className="space-y-4">
           <StudentPhotoUpload
-            studentId={params.studentId}
+            studentId={resolvedParams.studentId}
             fullName={profile?.full_name ?? "Student"}
             photoUrl={signedPhoto?.signedUrl ?? null}
           />
           <EditStudentForm
-            studentId={params.studentId}
+            studentId={resolvedParams.studentId}
             currentFullName={profile?.full_name ?? ""}
             currentAdmissionNo={student.admission_no}
             currentGuardianName={student.guardian_name}

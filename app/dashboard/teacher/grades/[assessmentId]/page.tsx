@@ -4,13 +4,19 @@ import { GradeEntryForm } from "@/components/GradeEntryForm";
 import { GradeCsvImport } from "@/components/GradeCsvImport";
 import { EmptyState } from "@/components/EmptyState";
 
-export default async function GradeEntryPage({ params }: { params: { assessmentId: string } }) {
+export default async function GradeEntryPage({
+  params,
+}: {
+  params: Promise<{ assessmentId: string }>;
+}) {
+  const resolvedParams = await params;
+
   const supabase = createClient();
 
   const { data: assessment } = await supabase
     .from("assessments")
     .select("*, classes(id, name, arm)")
-    .eq("id", params.assessmentId)
+    .eq("id", resolvedParams.assessmentId)
     .single();
 
   const classId = assessment?.classes?.id;
@@ -27,7 +33,7 @@ export default async function GradeEntryPage({ params }: { params: { assessmentI
   const { data: existingGrades } = await supabase
     .from("grades")
     .select("student_id, score, remark")
-    .eq("assessment_id", params.assessmentId);
+    .eq("assessment_id", resolvedParams.assessmentId);
 
   const initialGrades: Record<string, { score: number; remark: string | null }> = {};
   for (const g of existingGrades ?? []) {
@@ -52,9 +58,9 @@ export default async function GradeEntryPage({ params }: { params: { assessmentI
 
       {students.length ? (
         <>
-          <GradeCsvImport assessmentId={params.assessmentId} />
+          <GradeCsvImport assessmentId={resolvedParams.assessmentId} />
           <GradeEntryForm
-            assessmentId={params.assessmentId}
+            assessmentId={resolvedParams.assessmentId}
             maxScore={assessment?.max_score ?? 100}
             students={students}
             initialGrades={initialGrades}

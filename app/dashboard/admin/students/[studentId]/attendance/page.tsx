@@ -2,13 +2,19 @@ import { createClient } from "@/lib/supabase/server";
 import type { AttendanceStatus } from "@/types/database";
 import { EmptyState } from "@/components/EmptyState";
 
-export default async function StudentAttendancePage({ params }: { params: { studentId: string } }) {
+export default async function StudentAttendancePage({
+  params,
+}: {
+  params: Promise<{ studentId: string }>;
+}) {
+  const resolvedParams = await params;
+
   const supabase = createClient();
 
   const { data: rows } = await supabase
     .from("attendance")
     .select("status, marked_at, lessons(lesson_date, classes(name, arm), curriculum_topics(title))")
-    .eq("student_id", params.studentId)
+    .eq("student_id", resolvedParams.studentId)
     .order("marked_at", { ascending: false })
     .limit(100);
 

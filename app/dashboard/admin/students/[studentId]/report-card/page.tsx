@@ -14,13 +14,16 @@ export default async function AdminStudentReportCardPage({
   params,
   searchParams,
 }: {
-  params: { studentId: string };
-  searchParams: { term?: string; year?: string };
+  params: Promise<{ studentId: string }>;
+  searchParams: Promise<{ term?: string; year?: string }>;
 }) {
-  const term = Number(searchParams.term ?? 1);
-  const academicYear = searchParams.year ?? defaultAcademicYear();
+  const resolvedSearchParams = await searchParams;
+  const resolvedParams = await params;
 
-  const data = await getReportCardData(params.studentId, term, academicYear);
+  const term = Number(resolvedSearchParams.term ?? 1);
+  const academicYear = resolvedSearchParams.year ?? defaultAcademicYear();
+
+  const data = await getReportCardData(resolvedParams.studentId, term, academicYear);
 
   return (
     <div>
@@ -32,7 +35,7 @@ export default async function AdminStudentReportCardPage({
           data={data}
           editRemarkSlot={
             <RemarkForm
-              studentId={params.studentId}
+              studentId={resolvedParams.studentId}
               term={term}
               academicYear={academicYear}
               initialClassTeacherRemark={data.remark?.classTeacherRemark ?? null}

@@ -15,12 +15,14 @@ function sanitizeSearchQuery(raw: string): string {
 export default async function AdminStaffPage({
   searchParams,
 }: {
-  searchParams: { q?: string; page?: string };
+  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const supabase = createClient();
-  const qRaw = searchParams.q?.trim() ?? "";
+  const qRaw = resolvedSearchParams.q?.trim() ?? "";
   const q = sanitizeSearchQuery(qRaw);
-  const page = parsePage(searchParams.page);
+  const page = parsePage(resolvedSearchParams.page);
   const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
   let matchingIds: string[] | null = null;

@@ -25,9 +25,12 @@ export default async function TeacherProfilePage({
   params,
   searchParams,
 }: {
-  params: { teacherId: string };
-  searchParams: { term?: string };
+  params: Promise<{ teacherId: string }>;
+  searchParams: Promise<{ term?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+  const resolvedParams = await params;
+
   const supabase = createClient();
 
   const { data: settings } = await supabase
@@ -36,13 +39,15 @@ export default async function TeacherProfilePage({
     .eq("id", 1)
     .single();
 
-  const term = searchParams.term ? Number(searchParams.term) : (settings?.current_term ?? 1);
+  const term = resolvedSearchParams.term
+    ? Number(resolvedSearchParams.term)
+    : (settings?.current_term ?? 1);
   const selectedTerm = TERMS.includes(term) ? term : 1;
 
   const { data: teacherProfile } = await supabase
     .from("teacher_profiles")
     .select("*, profiles(full_name, email, is_active)")
-    .eq("id", params.teacherId)
+    .eq("id", resolvedParams.teacherId)
     .single();
 
   if (!teacherProfile) {
@@ -62,12 +67,12 @@ export default async function TeacherProfilePage({
   const { data: classTeacherOf } = await supabase
     .from("classes")
     .select("id, name, arm")
-    .eq("class_teacher_id", params.teacherId);
+    .eq("class_teacher_id", resolvedParams.teacherId);
 
   const { data: entries } = await supabase
     .from("timetable_entries")
     .select("*, classes(id, name, arm), subjects(name)")
-    .eq("teacher_id", params.teacherId)
+    .eq("teacher_id", resolvedParams.teacherId)
     .eq("term", selectedTerm)
     .order("weekday", { ascending: true })
     .order("period_number", { ascending: true })
@@ -128,7 +133,7 @@ export default async function TeacherProfilePage({
         {TERMS.map((t) => (
           <Link
             key={t}
-            href={`/dashboard/admin/staff/${params.teacherId}?term=${t}`}
+            href={`/dashboard/admin/staff/${resolvedParams.teacherId}?term=${t}`}
             className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
               selectedTerm === t
                 ? "border-leaf bg-leaf-soft text-leaf"

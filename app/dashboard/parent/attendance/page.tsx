@@ -6,10 +6,12 @@ import type { AttendanceStatus } from "@/types/database";
 export default async function ParentAttendancePage({
   searchParams,
 }: {
-  searchParams: { child?: string };
+  searchParams: Promise<{ child?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const children = await getLinkedChildren();
-  const selected = await resolveSelectedChild(searchParams.child);
+  const selected = await resolveSelectedChild(resolvedSearchParams.child);
 
   if (!selected) {
     return <p className="text-sm text-ink-soft">No children linked to your account.</p>;

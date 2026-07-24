@@ -24,10 +24,12 @@ function parseTerm(raw: string | undefined): number {
 export default async function TeacherSchedulePage({
   searchParams,
 }: {
-  searchParams: { term?: string };
+  searchParams: Promise<{ term?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const supabase = createClient();
-  const term = parseTerm(searchParams.term);
+  const term = parseTerm(resolvedSearchParams.term);
 
   const { data: settings } = await supabase
     .from("school_settings")

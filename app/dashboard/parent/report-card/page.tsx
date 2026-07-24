@@ -14,17 +14,19 @@ function defaultAcademicYear() {
 export default async function ParentReportCardPage({
   searchParams,
 }: {
-  searchParams: { child?: string; term?: string; year?: string };
+  searchParams: Promise<{ child?: string; term?: string; year?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const children = await getLinkedChildren();
-  const selected = await resolveSelectedChild(searchParams.child);
+  const selected = await resolveSelectedChild(resolvedSearchParams.child);
 
   if (!selected) {
     return <p className="text-sm text-ink-soft">No children linked to your account.</p>;
   }
 
-  const term = Number(searchParams.term ?? 1);
-  const academicYear = searchParams.year ?? defaultAcademicYear();
+  const term = Number(resolvedSearchParams.term ?? 1);
+  const academicYear = resolvedSearchParams.year ?? defaultAcademicYear();
 
   const data = await getReportCardData(selected.id, term, academicYear);
 

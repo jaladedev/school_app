@@ -28,22 +28,25 @@ export default async function ClassTimetablePage({
   params,
   searchParams,
 }: {
-  params: { classId: string };
-  searchParams: { term?: string };
+  params: Promise<{ classId: string }>;
+  searchParams: Promise<{ term?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+  const resolvedParams = await params;
+
   const supabase = createClient();
-  const term = parseTerm(searchParams.term);
+  const term = parseTerm(resolvedSearchParams.term);
 
   const { data: classRow } = await supabase
     .from("classes")
     .select("*")
-    .eq("id", params.classId)
+    .eq("id", resolvedParams.classId)
     .single();
 
   const { data: entries } = await supabase
     .from("timetable_entries")
     .select("*, subjects(name), teacher_profiles(profiles(full_name))")
-    .eq("class_id", params.classId)
+    .eq("class_id", resolvedParams.classId)
     .eq("term", term)
     .order("weekday", { ascending: true })
     .order("period_number", { ascending: true })
@@ -54,7 +57,7 @@ export default async function ClassTimetablePage({
   const { data: termCounts } = await supabase
     .from("timetable_entries")
     .select("term")
-    .eq("class_id", params.classId)
+    .eq("class_id", resolvedParams.classId)
     .neq("term", term);
 
   const termsWithData = [...new Set((termCounts ?? []).map((t) => t.term))].sort();
@@ -98,7 +101,7 @@ export default async function ClassTimetablePage({
           {TERMS.map((t) => (
             <Link
               key={t}
-              href={`/dashboard/admin/timetables/${params.classId}?term=${t}`}
+              href={`/dashboard/admin/timetables/${resolvedParams.classId}?term=${t}`}
               className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
                 term === t
                   ? "border-leaf bg-leaf-soft text-leaf"
@@ -115,7 +118,7 @@ export default async function ClassTimetablePage({
             {termsWithData.map((sourceTerm) => (
               <CopyTimetableButton
                 key={sourceTerm}
-                classId={params.classId}
+                classId={resolvedParams.classId}
                 fromTerm={sourceTerm}
                 toTerm={term}
               />
@@ -126,7 +129,7 @@ export default async function ClassTimetablePage({
 
       <div className="print:hidden">
         <TimetableEntryForm
-          classId={params.classId}
+          classId={resolvedParams.classId}
           academicYear={classRow?.academic_year ?? ""}
           term={term}
           subjects={subjects ?? []}

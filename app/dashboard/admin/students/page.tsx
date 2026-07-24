@@ -25,12 +25,14 @@ function sanitizeSearchQuery(raw: string): string {
 export default async function AdminStudentsPage({
   searchParams,
 }: {
-  searchParams: { page?: string; q?: string };
+  searchParams: Promise<{ page?: string; q?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+
   const supabase = createClient();
-  const page = parsePage(searchParams.page);
+  const page = parsePage(resolvedSearchParams.page);
   const { from, to } = pageRange(page, PAGE_SIZE);
-  const qRaw = searchParams.q?.trim() ?? "";
+  const qRaw = resolvedSearchParams.q?.trim() ?? "";
   const q = sanitizeSearchQuery(qRaw);
 
   let matchingIds: string[] | null = null;

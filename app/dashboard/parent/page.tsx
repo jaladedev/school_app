@@ -4,9 +4,15 @@ import { getLinkedChildren, resolveSelectedChild } from "@/lib/parent";
 import { ChildSwitcher } from "@/components/ChildSwitcher";
 import { formatKobo } from "@/types/database";
 
-export default async function ParentHome({ searchParams }: { searchParams: { child?: string } }) {
+export default async function ParentHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ child?: string }>;
+}) {
+  const resolvedSearchParams = await searchParams;
+
   const children = await getLinkedChildren();
-  const selected = await resolveSelectedChild(searchParams.child);
+  const selected = await resolveSelectedChild(resolvedSearchParams.child);
 
   if (!selected) {
     return (

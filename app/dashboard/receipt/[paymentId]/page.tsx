@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { ReceiptView } from "@/components/ReceiptView";
 
-export default async function ReceiptPage({ params }: { params: { paymentId: string } }) {
+export default async function ReceiptPage({ params }: { params: Promise<{ paymentId: string }> }) {
+  const resolvedParams = await params;
+
   const supabase = createClient();
 
   const { data: settings } = await supabase
@@ -15,7 +17,7 @@ export default async function ReceiptPage({ params }: { params: { paymentId: str
     .select(
       "*, invoices(term, academic_year, fee_structures(title)), student_profiles(admission_no, profiles(full_name)), profiles(full_name)"
     )
-    .eq("id", params.paymentId)
+    .eq("id", resolvedParams.paymentId)
     .single();
 
   if (!payment) {
