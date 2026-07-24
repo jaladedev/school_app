@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { TopicContent } from "@/components/TopicContent";
 import { formatLevel } from "@/types/database";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function TopicPage({ params }: { params: Promise<{ topicId: string }> }) {
   const resolvedParams = await params;
@@ -14,6 +15,23 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
     .select("*, subjects(name)")
     .eq("id", resolvedParams.topicId)
     .single();
+
+  // No row back means either the topic doesn't exist, or RLS correctly
+  // denied it (e.g. a topic from another class/level). Either way, show
+  // a clear message instead of silently rendering a blank page.
+  if (!topic) {
+    return (
+      <div className="max-w-2xl">
+        <Link
+          href="/dashboard/student"
+          className="mb-4 inline-block text-sm text-leaf hover:underline"
+        >
+          ← Back to my subjects
+        </Link>
+        <EmptyState message="This topic isn't available — it may not exist, or it may belong to a different class." />
+      </div>
+    );
+  }
 
   const { data: note } = await supabase
     .from("topic_notes")
@@ -44,16 +62,16 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
   return (
     <div className="max-w-2xl">
       <Link
-        href={`/dashboard/student/subjects/${topic?.subject_id}`}
+        href={`/dashboard/student/subjects/${topic.subject_id}`}
         className="mb-4 inline-block text-sm text-leaf hover:underline"
       >
-        ← Back to {topic?.subjects?.name ?? "subject"}
+        ← Back to {topic.subjects?.name ?? "subject"}
       </Link>
 
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">{topic?.title}</h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">{topic.title}</h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Term {topic?.term} · Week {topic?.week_number} ·{" "}
-        {topic && formatLevel(topic.education_level, topic.level_number)}
+        Term {topic.term} · Week {topic.week_number} ·{" "}
+        {formatLevel(topic.education_level, topic.level_number)}
       </p>
 
       {note ? (
