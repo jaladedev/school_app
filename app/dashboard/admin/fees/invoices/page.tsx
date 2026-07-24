@@ -12,15 +12,28 @@ const STATUS_STYLES: Record<InvoiceStatus, string> = {
   unpaid: "bg-clay/10 text-clay",
 };
 
+const VALID_STATUSES: InvoiceStatus[] = ["unpaid", "partial", "paid"];
+
 export default async function AdminInvoicesPage({
   searchParams,
 }: {
   searchParams: { status?: string; page?: string };
 }) {
   const supabase = createClient();
-  const statusFilter = searchParams.status;
+  const statusFilter = VALID_STATUSES.includes(searchParams.status as InvoiceStatus)
+    ? (searchParams.status as InvoiceStatus)
+    : undefined;
   const page = parsePage(searchParams.page);
   const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
+
+  const { data: settings } = await supabase
+    .from("school_settings")
+    .select("current_academic_year, current_term")
+    .eq("id", 1)
+    .single();
+
+  const academicYear = settings?.current_academic_year;
+  const term = settings?.current_term;
 
   let query = supabase
     .from("invoices")
@@ -29,24 +42,22 @@ export default async function AdminInvoicesPage({
     })
     .order("created_at", { ascending: false });
 
+  if (academicYear && term) {
+    query = query.eq("academic_year", academicYear).eq("term", term);
+  }
+
   if (statusFilter) {
-    query = query.eq("status", statusFilter as InvoiceStatus);
+    query = query.eq("status", statusFilter);
   }
 
   const { data: invoices, count } = await query.range(from, to);
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / DEFAULT_PAGE_SIZE));
 
-  const { data: allInvoices } = await supabase
-    .from("invoices")
-    .select("total_amount_kobo, discount_kobo, amount_paid_kobo, status");
-
-  const totalBilled = (allInvoices ?? []).reduce(
-    (sum, i) => sum + (i.total_amount_kobo - i.discount_kobo),
-    0
-  );
-  const totalCollected = (allInvoices ?? []).reduce((sum, i) => sum + i.amount_paid_kobo, 0);
-  const totalOutstanding = totalBilled - totalCollected;
-  const defaulterCount = (allInvoices ?? []).filter((i) => i.status === "unpaid").length;
+  const { data: totals } = await supabase.rpc("invoice_dashboard_totals").single();
+  const totalBilled = totals?.total_billed ?? 0;
+  const totalCollected = totals?.total_collected ?? 0;
+  const totalOutstanding = totals?.total_outstanding ?? 0;
+  const defaulterCount = totals?.unpaid_invoice_count ?? 0;
 
   return (
     <div>
@@ -62,10 +73,15 @@ export default async function AdminInvoicesPage({
           </Link>
         </div>
       </div>
-      <p className="mb-6 text-sm text-ink-soft">
+      <p className="mb-1 text-sm text-ink-soft">
         Record payments as they come in — cash, bank transfer, or other offline methods. Card
         payments made online through the student portal are recorded automatically once verified.
       </p>
+      {academicYear && term && (
+        <p className="mb-6 text-xs text-ink-soft">
+          Showing {academicYear}, term {term}
+        </p>
+      )}
 
       <div className="mb-6 grid grid-cols-4 gap-3">
         <div className="rounded-lg border border-rule bg-white p-4">
@@ -92,7 +108,7 @@ export default async function AdminInvoicesPage({
 
       <div className="mb-4 flex gap-2">
         {["all", "unpaid", "partial", "paid"].map((s) => (
-          <a
+          <Link
             key={s}
             href={
               s === "all"
@@ -106,7 +122,7 @@ export default async function AdminInvoicesPage({
             }`}
           >
             {s}
-          </a>
+          </Link>
         ))}
       </div>
 

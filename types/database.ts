@@ -796,6 +796,18 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      invoice_dashboard_totals: {
+        Args: {
+          p_academic_year?: string | null;
+          p_term?: number | null;
+        };
+        Returns: {
+          total_billed: number;
+          total_collected: number;
+          total_outstanding: number;
+          unpaid_invoice_count: number;
+        }[];
+      };
       record_invoice_payment: {
         Args: {
           p_amount_kobo: number;
