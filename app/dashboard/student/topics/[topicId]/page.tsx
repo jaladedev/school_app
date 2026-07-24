@@ -36,7 +36,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
       if (!resource.file_url || resource.file_url.startsWith("http")) return resource;
       const { data: signed } = await admin.storage
         .from("topic-resources")
-        .createSignedUrl(resource.file_url, 60 * 60);
+        .createSignedUrl(resource.file_url, 6 * 60 * 60);
       return { ...resource, file_url: signed?.signedUrl ?? null };
     })
   );
