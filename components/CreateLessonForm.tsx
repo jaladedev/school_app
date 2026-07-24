@@ -8,15 +8,17 @@ export function CreateLessonForm({
   timetableEntryId,
   classId,
   topics,
+  suggestedTopicId,
   onClose,
 }: {
   timetableEntryId: string;
   classId: string;
   topics: { id: string; title: string }[];
+  suggestedTopicId?: string | null;
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [topicId, setTopicId] = useState("");
+  const [topicId, setTopicId] = useState(suggestedTopicId ?? "");
   const [objectives, setObjectives] = useState("");
   const [homework, setHomework] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -58,9 +60,16 @@ export function CreateLessonForm({
         {topics.map((t) => (
           <option key={t.id} value={t.id}>
             {t.title}
+            {t.id === suggestedTopicId ? " (this week)" : ""}
           </option>
         ))}
       </select>
+      {suggestedTopicId && (
+        <p className="text-xs text-ink-soft">
+          Pre-selected based on this week&apos;s scheme of work — change it if you taught something
+          else.
+        </p>
+      )}
 
       <textarea
         placeholder="Lesson objectives (optional)"

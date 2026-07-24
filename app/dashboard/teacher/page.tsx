@@ -42,10 +42,23 @@ export default async function TeacherHome() {
 
   const lessonByEntry = new Map((lessons ?? []).map((l) => [l.timetable_entry_id, l.id]));
 
+  // Current scheme-of-work week, derived from school_settings.current_term_start_date.
+  // Falls back to null (no suggestion) if admin hasn't set a term start date yet.
+  const { data: settings } = await supabase
+    .from("school_settings")
+    .select("current_academic_year, current_term")
+    .eq("id", 1)
+    .single();
+
+  const { data: currentWeekResult } = await supabase.rpc("current_scheme_week");
+  const currentWeek = currentWeekResult ?? null;
+
   // Fetch curriculum topics for every (subject, education_level, level_number)
   // combination appearing in today's schedule, so each row's "Log lesson"
-  // form can offer the right topic list without a query per row.
+  // form can offer the right topic list without a query per row. Also work
+  // out which topic matches the current scheme-of-work week, to suggest it.
   const topicsByKey = new Map<string, { id: string; title: string }[]>();
+  const suggestedTopicByKey = new Map<string, string | null>();
   for (const entry of todaysEntries ?? []) {
     const subj = entry.subjects;
     const cls = entry.classes;
@@ -55,13 +68,24 @@ export default async function TeacherHome() {
 
     const { data: topics } = await supabase
       .from("curriculum_topics")
-      .select("id, title")
+      .select("id, title, week_number")
       .eq("subject_id", subj.id)
       .eq("education_level", cls.education_level)
       .eq("level_number", cls.level_number)
-      .order("sequence_order", { ascending: true });
+      .eq("term", settings?.current_term ?? 1)
+      .eq("academic_year", settings?.current_academic_year ?? "")
+      .order("week_number", { ascending: true });
 
-    topicsByKey.set(key, topics ?? []);
+    topicsByKey.set(
+      key,
+      (topics ?? []).map((t) => ({ id: t.id, title: t.title }))
+    );
+    suggestedTopicByKey.set(
+      key,
+      currentWeek != null
+        ? ((topics ?? []).find((t) => t.week_number === currentWeek)?.id ?? null)
+        : null
+    );
   }
 
   // Distinct classes taught, from timetable
@@ -110,6 +134,7 @@ export default async function TeacherHome() {
               room={entry.room}
               lessonId={lessonByEntry.get(entry.id) ?? null}
               topics={topicsByKey.get(key) ?? []}
+              suggestedTopicId={suggestedTopicByKey.get(key) ?? null}
             />
           );
         })}

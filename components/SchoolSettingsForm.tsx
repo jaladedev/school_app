@@ -12,6 +12,7 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
   const [logoUrl, setLogoUrl] = useState(settings.logo_url ?? "");
   const [academicYear, setAcademicYear] = useState(settings.current_academic_year);
   const [term, setTerm] = useState(settings.current_term);
+  const [termStartDate, setTermStartDate] = useState(settings.current_term_start_date ?? "");
   const [gradeScale, setGradeScale] = useState<GradeScaleEntry[]>(settings.grade_scale);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +36,7 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
           logoUrl,
           currentAcademicYear: academicYear,
           currentTerm: term,
+          currentTermStartDate: termStartDate || null,
           gradeScale,
         });
         emitToast("School settings saved.");
@@ -142,6 +144,21 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
               <option value={2}>Term 2</option>
               <option value={3}>Term 3</option>
             </select>
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-soft">
+              Term start date
+            </label>
+            <p className="mb-1 text-xs text-ink-soft">
+              Used to suggest each subject&apos;s scheme-of-work topic for the current week when
+              teachers log a lesson.
+            </p>
+            <input
+              type="date"
+              value={termStartDate}
+              onChange={(e) => setTermStartDate(e.target.value)}
+              className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+            />
           </div>
         </div>
       </div>

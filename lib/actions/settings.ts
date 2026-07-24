@@ -12,6 +12,7 @@ export async function saveSchoolSettings(input: {
   logoUrl?: string;
   currentAcademicYear: string;
   currentTerm: number;
+  currentTermStartDate?: string | null;
   gradeScale: GradeScaleEntry[];
 }) {
   await assertRole(["admin"], "Only an admin can update school settings.");
@@ -27,6 +28,7 @@ export async function saveSchoolSettings(input: {
       logo_url: input.logoUrl || null,
       current_academic_year: input.currentAcademicYear,
       current_term: input.currentTerm,
+      current_term_start_date: input.currentTermStartDate || null,
       grade_scale: input.gradeScale,
       updated_at: new Date().toISOString(),
     })

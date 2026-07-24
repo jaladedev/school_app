@@ -90,6 +90,7 @@
 - [x] Assessment type as a real enum — standard and custom assessments now store a constrained type separately from their display title.
 - [x] `weight_percent` — now used in report-card scoring (`lib/report-card.ts` reads `weight_percent` and applies the weighted-average path when available)
 - [x] Curriculum notes — teachers can upload private image, PDF, audio, and video resources; `pdf`/`audio` render in `TopicContent`; each save creates an immutable version shown in the editor history
+- [x] `curriculum_topics` formalized as each subject's scheme of work — added `academic_year` (schemes can be revised year to year) and `week_number` (1–14, unique per subject/level/term/year). Admin sets `school_settings.current_term_start_date`; a `current_scheme_week()` SQL function derives the current week from it. Teacher dashboard now pre-selects that week's topic in the "Log lesson" form (labeled "(this week)"), teacher can still override. Migration backfilled `week_number` from the old `sequence_order` — flagged for manual verification against the real scheme of work before trusting it in prod.
 
 ---
 

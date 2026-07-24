@@ -15,6 +15,7 @@ export function LessonEntryRow({
   room,
   lessonId,
   topics,
+  suggestedTopicId,
 }: {
   entryId: string;
   classId: string;
@@ -26,6 +27,7 @@ export function LessonEntryRow({
   room: string | null;
   lessonId: string | null;
   topics: { id: string; title: string }[];
+  suggestedTopicId?: string | null;
 }) {
   const [logging, setLogging] = useState(false);
 
@@ -64,6 +66,7 @@ export function LessonEntryRow({
           timetableEntryId={entryId}
           classId={classId}
           topics={topics}
+          suggestedTopicId={suggestedTopicId ?? null}
           onClose={() => setLogging(false)}
         />
       )}

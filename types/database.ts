@@ -100,9 +100,11 @@ export type CurriculumTopic = {
   education_level: EducationLevel;
   level_number: number;
   term: number;
+  academic_year: string;
   title: string;
   description: string | null;
   sequence_order: number;
+  week_number: number;
   created_by: string | null;
   created_at: string;
 };
@@ -247,6 +249,7 @@ export type SchoolSettings = {
   address: string | null;
   current_academic_year: string;
   current_term: number;
+  current_term_start_date: string | null;
   grade_scale: GradeScaleEntry[];
   updated_at: string;
 };
@@ -796,6 +799,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      current_scheme_week: {
+        Args: Record<string, never>;
+        Returns: number | null;
+      };
       invoice_dashboard_totals: {
         Args: {
           p_academic_year?: string | null;
