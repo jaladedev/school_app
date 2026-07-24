@@ -1,8 +1,18 @@
+const FORMULA_TRIGGER_CHARS = new Set(["=", "+", "-", "@", "\t", "\r"]);
+
 export function escapeCsvField(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
+  // Check the first non-whitespace character, not just value[0] — a
+  // leading space before a formula trigger (" =SUM(...)") would
+  // otherwise slip past the guard while some spreadsheet apps still
+  // evaluate it as a formula on paste/import.
+  const firstMeaningfulChar = value.trimStart()[0] ?? "";
+  const needsFormulaGuard = FORMULA_TRIGGER_CHARS.has(firstMeaningfulChar);
+  const safeValue = needsFormulaGuard ? `'${value}` : value;
+
+  if (safeValue.includes(",") || safeValue.includes('"') || safeValue.includes("\n")) {
+    return `"${safeValue.replace(/"/g, '""')}"`;
   }
-  return value;
+  return safeValue;
 }
 
 export function buildCsv(headers: string[], rows: (string | number)[][]): string {

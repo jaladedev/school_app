@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { assertRole } from "@/lib/actions/authGuards";
 import type {
   AssessmentType,
   AttendanceStatus,
@@ -20,10 +21,7 @@ export async function createLesson(input: {
   objectives?: string;
   homework?: string;
 }) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "teacher") {
-    throw new Error("Only teachers can log lessons.");
-  }
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can log lessons.");
 
   const supabase = createClient();
 
@@ -37,7 +35,7 @@ export async function createLesson(input: {
     throw new Error("Timetable entry not found.");
   }
 
-  if (entry.teacher_id !== profile.id) {
+  if (entry.teacher_id !== teacherId) {
     const className = entry.classes?.name ?? "this class";
     throw new Error(`You aren't assigned to this period for ${className}.`);
   }
@@ -51,7 +49,7 @@ export async function createLesson(input: {
     .insert({
       timetable_entry_id: input.timetableEntryId,
       class_id: input.classId,
-      teacher_id: profile.id,
+      teacher_id: teacherId,
       lesson_date: input.lessonDate,
       topic_id: input.topicId || null,
       objectives: input.objectives || null,
@@ -68,10 +66,10 @@ export async function createLesson(input: {
 }
 
 export async function updateHomeworkStatus(lessonId: string, status: HomeworkStatus) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "teacher") {
-    throw new Error("Only teachers can update homework status.");
-  }
+  const { id: teacherId } = await assertRole(
+    ["teacher"],
+    "Only teachers can update homework status."
+  );
 
   const supabase = createClient();
 
@@ -81,7 +79,7 @@ export async function updateHomeworkStatus(lessonId: string, status: HomeworkSta
     .eq("id", lessonId)
     .single();
 
-  if (!lesson || lesson.teacher_id !== profile.id) {
+  if (!lesson || lesson.teacher_id !== teacherId) {
     throw new Error("You aren't the teacher assigned to this lesson.");
   }
 
@@ -101,10 +99,7 @@ export async function markAttendance(
   lessonId: string,
   records: { studentId: string; status: AttendanceStatus }[]
 ) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "teacher") {
-    throw new Error("Only teachers can mark attendance.");
-  }
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can mark attendance.");
 
   const supabase = createClient();
 
@@ -118,7 +113,7 @@ export async function markAttendance(
     throw new Error("Lesson not found.");
   }
 
-  if (lesson.teacher_id !== profile.id) {
+  if (lesson.teacher_id !== teacherId) {
     const className = lesson.classes?.name ?? "this class";
     throw new Error(`You aren't the teacher assigned to this lesson for ${className}.`);
   }
@@ -127,7 +122,7 @@ export async function markAttendance(
     lesson_id: lessonId,
     student_id: r.studentId,
     status: r.status,
-    marked_by: profile.id,
+    marked_by: teacherId,
   }));
 
   const { error } = await supabase
@@ -151,10 +146,7 @@ export async function saveGrade(
   score: number,
   remark?: string
 ) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "teacher") {
-    throw new Error("Only teachers can enter grades.");
-  }
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can enter grades.");
 
   const supabase = createClient();
 
@@ -171,7 +163,7 @@ export async function saveGrade(
   const { data: assignment } = await supabase
     .from("timetable_entries")
     .select("id")
-    .eq("teacher_id", profile.id)
+    .eq("teacher_id", teacherId)
     .eq("subject_id", assessment.subject_id)
     .eq("class_id", assessment.class_id)
     .maybeSingle();
@@ -190,7 +182,7 @@ export async function saveGrade(
       student_id: studentId,
       score,
       remark: remark ?? null,
-      graded_by: profile.id,
+      graded_by: teacherId,
     },
     { onConflict: "assessment_id,student_id" }
   );
@@ -207,8 +199,7 @@ export async function importGrades(
   assessmentId: string,
   entries: { admissionNo: string; score: number; remark?: string }[]
 ) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "teacher") throw new Error("Only teachers can import grades.");
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can import grades.");
   if (!entries.length) throw new Error("Add at least one grade row to import.");
 
   const supabase = createClient();
@@ -223,7 +214,7 @@ export async function importGrades(
   const { data: assignment } = await supabase
     .from("timetable_entries")
     .select("id")
-    .eq("teacher_id", profile.id)
+    .eq("teacher_id", teacherId)
     .eq("subject_id", assessment.subject_id)
     .eq("class_id", assessment.class_id)
     .maybeSingle();
@@ -264,7 +255,7 @@ export async function importGrades(
       student_id: studentByAdmission.get(entry.admissionNo.trim())!,
       score: entry.score,
       remark: entry.remark?.trim() || null,
-      graded_by: profile.id,
+      graded_by: teacherId,
     })),
     { onConflict: "assessment_id,student_id" }
   );
@@ -302,13 +293,10 @@ export async function createStandardAssessmentSet(input: {
   term: number;
   academicYear: string;
 }) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "teacher") {
-    throw new Error("Only teachers can create assessments.");
-  }
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can create assessments.");
 
   const supabase = createClient();
-  await assertTeacherAssignedTo(supabase, profile.id, input.subjectId, input.classId);
+  await assertTeacherAssignedTo(supabase, teacherId, input.subjectId, input.classId);
 
   const STANDARD_ASSESSMENTS = [
     { title: "1st CA", max_score: 20, assessment_type: "first_ca" as const },
@@ -340,7 +328,7 @@ export async function createStandardAssessmentSet(input: {
       max_score: a.max_score,
       term: input.term,
       academic_year: input.academicYear,
-      created_by: profile.id,
+      created_by: teacherId,
     }))
   );
 
@@ -360,16 +348,13 @@ export async function createCustomAssessment(input: {
   title: string;
   maxScore: number;
 }) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "teacher") {
-    throw new Error("Only teachers can create assessments.");
-  }
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can create assessments.");
   if (!input.title.trim()) {
     throw new Error("Enter a title for this assessment.");
   }
 
   const supabase = createClient();
-  await assertTeacherAssignedTo(supabase, profile.id, input.subjectId, input.classId);
+  await assertTeacherAssignedTo(supabase, teacherId, input.subjectId, input.classId);
 
   const { error } = await supabase.from("assessments").insert({
     subject_id: input.subjectId,
@@ -379,7 +364,7 @@ export async function createCustomAssessment(input: {
     max_score: input.maxScore,
     term: input.term,
     academic_year: input.academicYear,
-    created_by: profile.id,
+    created_by: teacherId,
   });
 
   if (error) throw new Error(error.message);
@@ -395,10 +380,7 @@ export async function saveTopicNote(
   content: string,
   status: "draft" | "published"
 ) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "teacher") {
-    throw new Error("Only teachers can author notes.");
-  }
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can author notes.");
 
   const supabase = createClient();
 
@@ -415,7 +397,7 @@ export async function saveTopicNote(
   // topic history later and students continue seeing the latest publish.
   const { error } = await supabase.from("topic_notes").insert({
     topic_id: topicId,
-    author_id: profile.id,
+    author_id: teacherId,
     content,
     status,
     version: (latest?.version ?? 0) + 1,
@@ -441,9 +423,7 @@ const RESOURCE_TYPES = new Map<string, Extract<ResourceType, "image" | "pdf" | "
 ]);
 
 export async function uploadTopicResource(topicId: string, noteId: string, formData: FormData) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "teacher")
-    throw new Error("Only teachers can upload resources.");
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can upload resources.");
 
   const file = formData.get("file");
   const title = String(formData.get("title") ?? "").trim();
@@ -456,7 +436,7 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
   const supabase = createClient();
   const [{ data: topic }, { data: teacher }] = await Promise.all([
     supabase.from("curriculum_topics").select("subject_id").eq("id", topicId).single(),
-    supabase.from("teacher_profiles").select("subjects_taught").eq("id", profile.id).single(),
+    supabase.from("teacher_profiles").select("subjects_taught").eq("id", teacherId).single(),
   ]);
   if (!topic || !teacher?.subjects_taught?.includes(topic.subject_id)) {
     throw new Error("You can only add resources for subjects assigned to you.");
@@ -498,7 +478,7 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
     title: title || file.name,
     file_url: objectPath,
     sequence_order: (latestResource?.sequence_order ?? 0) + 1,
-    uploaded_by: profile.id,
+    uploaded_by: teacherId,
   });
   if (insertError) {
     await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([objectPath]);
