@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import type { EducationLevel, PaymentMethod } from "@/types/database";
+import { serverEnv } from "@/lib/env.server";
 
 function computeStatus(totalKobo: number, discountKobo: number, paidKobo: number) {
   const owed = totalKobo - discountKobo;
@@ -211,10 +212,7 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
     return { alreadyRecorded: true };
   }
 
-  const secretKey = process.env.PAYSTACK_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error("Paystack isn't configured on the server yet.");
-  }
+  const secretKey = serverEnv.PAYSTACK_SECRET_KEY; 
 
   const verifyResponse = await fetch(
     `https://api.paystack.co/transaction/verify/${encodeURIComponent(input.reference)}`,

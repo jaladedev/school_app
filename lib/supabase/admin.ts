@@ -1,4 +1,5 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { serverEnv } from "@/lib/env.server";
 import type { Database } from "@/types/database";
 
 // SERVER-ONLY. Never import this from a Client Component ("use client")
@@ -7,13 +8,8 @@ import type { Database } from "@/types/database";
 // Next.js never inlines it into client code.
 export function createAdminClient() {
   return createSupabaseClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
+    serverEnv.NEXT_PUBLIC_SUPABASE_URL,
+    serverEnv.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }

@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { serverEnv } from "@/lib/env.server";
 
 export const runtime = "nodejs";
 
@@ -31,11 +32,7 @@ function hasValidSignature(payload: string, signature: string | null, secret: st
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.PAYSTACK_SECRET_KEY;
-  if (!secret) {
-    return NextResponse.json({ error: "Webhook is not configured." }, { status: 503 });
-  }
-
+  const secret = serverEnv.PAYSTACK_SECRET_KEY; 
   const payload = await request.text();
   if (!hasValidSignature(payload, request.headers.get("x-paystack-signature"), secret)) {
     return NextResponse.json({ error: "Invalid signature." }, { status: 401 });

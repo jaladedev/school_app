@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { edgeEnv } from "@/lib/env.edge";
 
 // Decodes a JWT payload without verifying the signature. That's fine
 // here — this claim only gates a UI redirect (whether to show the
@@ -18,13 +19,11 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 }
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: { headers: request.headers },
-  });
+  let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    edgeEnv.NEXT_PUBLIC_SUPABASE_URL,
+    edgeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         get(name: string) {
@@ -66,12 +65,8 @@ export async function middleware(request: NextRequest) {
     const claims = session?.access_token ? decodeJwtPayload(session.access_token) : null;
 
     if (claims && "must_change_password" in claims) {
-      // Fast path: the custom access token hook is active, claim read
-      // straight from the JWT already in hand — no extra DB round trip.
       mustChangePassword = Boolean(claims.must_change_password);
     } else {
-      // Fallback: hook not enabled yet (or an old token issued before
-      // it was turned on). Same behavior as before, just not the fast path.
       const { data: profile } = await supabase
         .from("profiles")
         .select("must_change_password")
