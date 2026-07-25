@@ -8,7 +8,7 @@ export type AssessmentType =
   "first_ca" | "second_ca" | "exam" | "test" | "assignment" | "project" | "practical" | "other";
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
-export type StaffRole = "teacher" | "hod" | "bursar" | "librarian";
+export type StaffRole = "teacher" | "hod" | "bursar" | "librarian" | "house_parent";
 export type GradeModerationStatus = "pending" | "approved";
 export type ResourceType = "image" | "diagram_mermaid" | "video" | "pdf" | "link" | "audio";
 export type AssetCondition = "new" | "good" | "fair" | "poor" | "damaged";
@@ -357,6 +357,49 @@ export type Asset = {
   created_at: string;
   updated_at: string;
 };
+
+export type Hostel = {
+  id: string;
+  name: string;
+  gender: "male" | "female";
+  house_parent_id: string | null;
+  capacity: number | null;
+  created_at: string;
+};
+
+export type HostelRoom = {
+  id: string;
+  hostel_id: string;
+  room_number: string;
+  capacity: number;
+  created_at: string;
+};
+
+export type HostelAssignment = {
+  id: string;
+  student_id: string;
+  room_id: string;
+  academic_year: string;
+  assigned_at: string;
+  unassigned_at: string | null;
+  assigned_by: string | null;
+};
+
+export type HostelLeaveLog = {
+  id: string;
+  student_id: string;
+  reason: string | null;
+  out_at: string;
+  expected_return_at: string | null;
+  returned_at: string | null;
+  logged_by: string | null;
+  returned_logged_by: string | null;
+  created_at: string;
+};
+
+export function isOnLeave(log: HostelLeaveLog): boolean {
+  return log.returned_at === null;
+}
 
 export type Database = {
   public: {
@@ -932,6 +975,90 @@ export type Database = {
           },
         ];
       };
+      hostels: {
+        Row: Hostel;
+        Insert: Partial<Hostel>;
+        Update: Partial<Hostel>;
+        Relationships: [
+          {
+            foreignKeyName: "hostels_house_parent_id_fkey";
+            columns: ["house_parent_id"];
+            isOneToOne: false;
+            referencedRelation: "teacher_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      hostel_rooms: {
+        Row: HostelRoom;
+        Insert: Partial<HostelRoom>;
+        Update: Partial<HostelRoom>;
+        Relationships: [
+          {
+            foreignKeyName: "hostel_rooms_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      hostel_assignments: {
+        Row: HostelAssignment;
+        Insert: Partial<HostelAssignment>;
+        Update: Partial<HostelAssignment>;
+        Relationships: [
+          {
+            foreignKeyName: "hostel_assignments_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hostel_assignments_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "hostel_rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hostel_assignments_assigned_by_fkey";
+            columns: ["assigned_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      hostel_leave_logs: {
+        Row: HostelLeaveLog;
+        Insert: Partial<HostelLeaveLog>;
+        Update: Partial<HostelLeaveLog>;
+        Relationships: [
+          {
+            foreignKeyName: "hostel_leave_logs_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hostel_leave_logs_logged_by_fkey";
+            columns: ["logged_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hostel_leave_logs_returned_logged_by_fkey";
+            columns: ["returned_logged_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -964,6 +1091,10 @@ export type Database = {
           total_outstanding: number;
           unpaid_invoice_count: number;
         }[];
+      };
+      student_current_hostel: {
+        Args: { sid: string };
+        Returns: string | null;
       };
       record_invoice_payment: {
         Args: {

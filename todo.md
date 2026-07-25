@@ -202,7 +202,7 @@
 
 ---
 
-## Not Started (P6 — correctly deferred throughout)
+## Not Started (P6 )
 
 - [ ] CBT/quiz builder — teachers author objective-question tests (MCQ, true/false, maybe fill-in-blank) tied to a subject/class; students take them in a timed browser session, auto-graded on submit. New tables (`quiz_questions`, `quiz_options`, `quiz_attempts`, `quiz_answers`); feeds into `grades`/`assessments` as another assessment type so it inherits the existing moderation-approval flow rather than becoming a separate system.
 - [ ] Hostel module — for boarding students: room/bed assignment (`hostels`, `hostel_rooms`, `hostel_assignments` linking student_id to a room), house-master/matron oversight, maybe check-in/check-out logs for leave requests. Would need a new staff sub-role (same pattern as the HOD/bursar `staff_role` work) for house parents.
@@ -213,6 +213,24 @@
 - [ ] PWA/offline support — service worker + manifest so the app installs like a native app and core screens (today's attendance, a cached timetable) work with spotty connectivity — genuinely relevant given the target market. Needs a decision on which flows must work offline (attendance marking is the obvious one) and a write-queue for syncing once back online.
 
 ---
+
+**ID cards**
+- No QR/verification code on the card — left an explicit comment that faking a scannable pattern without a real QR-encoding library would be worse than nothing; a real library is a deliberate dependency to add later, not something to hand-roll
+- Staff and parent ID cards dropped entirely per your call — students only now
+
+**Inventory/asset tracking**
+- `assigned_to` is free text, not an FK to `profiles` — an asset is often assigned to a room/place, not a person, so a picker UI wasn't worth the complexity
+- No hard delete, archive only (matches `classes`/`library_books` convention)
+- No condition/location history *timeline* view beyond what `audit_log` already captures
+
+**Hostel module**
+- No gender-match validation between student and hostel — there's no gender field on `student_profiles`/`profiles` in the schema to check against; adding one felt out of scope for this pass
+- No capacity-based waitlisting — a full room just can't accept more (checked in `assignStudentToRoom`), no queue
+- No hostel-fee integration with `fee_structures`/`invoices` — boarding fee billing would need its own fee-structure entries, not wired up here
+- Room/hostel creation stays admin-only (house parents can assign students and log leave for their own hostel, but not add rooms or hostels)
+- `assignStudentToRoom` uses sequential Supabase calls (close old assignment, then insert new), not a single atomic RPC like `borrow_library_book` — fine at low concurrency, but a race between two simultaneous assignments to the same student is theoretically possible; an RPC-based version would close that gap if it ever matters
+
+Want me to tighten up any of these before moving to the next P6 item?
 
 ## Dev, Docs, Quality
 

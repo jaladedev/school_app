@@ -42,6 +42,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "ID Cards", href: "/dashboard/admin/id-cards" },
     { label: "Library", href: "/dashboard/library" },
     { label: "Inventory", href: "/dashboard/admin/inventory" },
+    { label: "Hostels", href: "/dashboard/admin/hostels" },
     { label: "Analytics", href: "/dashboard/admin/analytics" },
     { label: "Audit Log", href: "/dashboard/admin/audit-log" },
     { label: "Messages", href: "/dashboard/messages" },
@@ -92,7 +93,9 @@ export function Sidebar({
   const items =
     role === "teacher" && staffRole === "librarian"
       ? [...NAV_BY_ROLE.teacher, { label: "Library", href: "/dashboard/library" }]
-      : NAV_BY_ROLE[role];
+      : role === "teacher" && staffRole === "house_parent"
+        ? [...NAV_BY_ROLE.teacher, { label: "Hostel", href: "/dashboard/hostel" }]
+        : NAV_BY_ROLE[role];
   const pathname = usePathname();
   const activeHref = findActiveHref(pathname, items);
   const [mobileOpen, setMobileOpen] = useState(false);
