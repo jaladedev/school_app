@@ -215,15 +215,18 @@
 ---
 
 **ID cards**
+
 - No QR/verification code on the card — left an explicit comment that faking a scannable pattern without a real QR-encoding library would be worse than nothing; a real library is a deliberate dependency to add later, not something to hand-roll
 - Staff and parent ID cards dropped entirely per your call — students only now
 
 **Inventory/asset tracking**
+
 - `assigned_to` is free text, not an FK to `profiles` — an asset is often assigned to a room/place, not a person, so a picker UI wasn't worth the complexity
 - No hard delete, archive only (matches `classes`/`library_books` convention)
-- No condition/location history *timeline* view beyond what `audit_log` already captures
+- No condition/location history _timeline_ view beyond what `audit_log` already captures
 
 **Hostel module**
+
 - No gender-match validation between student and hostel — there's no gender field on `student_profiles`/`profiles` in the schema to check against; adding one felt out of scope for this pass
 - No capacity-based waitlisting — a full room just can't accept more (checked in `assignStudentToRoom`), no queue
 - No hostel-fee integration with `fee_structures`/`invoices` — boarding fee billing would need its own fee-structure entries, not wired up here

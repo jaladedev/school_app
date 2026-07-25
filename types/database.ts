@@ -401,6 +401,16 @@ export function isOnLeave(log: HostelLeaveLog): boolean {
   return log.returned_at === null;
 }
 
+export type Testimonial = {
+  id: string;
+  student_id: string;
+  conduct_remark: string;
+  admission_academic_year: string;
+  leaving_academic_year: string;
+  issued_by: string | null;
+  issued_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -1053,6 +1063,27 @@ export type Database = {
           {
             foreignKeyName: "hostel_leave_logs_returned_logged_by_fkey";
             columns: ["returned_logged_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      testimonials: {
+        Row: Testimonial;
+        Insert: Partial<Testimonial>;
+        Update: Partial<Testimonial>;
+        Relationships: [
+          {
+            foreignKeyName: "testimonials_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "testimonials_issued_by_fkey";
+            columns: ["issued_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
