@@ -159,6 +159,7 @@
 - [x] `DeleteEntryButton` now has a confirm/cancel flow with auto-cancel behavior, so the confirm step exists in code and is not purely implicit
 - [x] Consistent empty-state component with CTA (`components/EmptyState.tsx` exists and is reusable)
 - [x] New-admin onboarding checklist — the admin overview shows setup progress and links to remaining school-settings, subject, class, teacher, and student tasks
+- [x] Analytics dashboard — `/dashboard/admin/analytics`, added to admin nav. Five aggregate views: enrollment by term (`enrollments`), fee collection (billed/collected/outstanding per term, `invoices`), average grades by subject for the current term (approved grades only, joined via `assessments`), attendance rate over the trailing 8 weeks (`attendance` joined to `lessons.lesson_date`, bucketed by week), and teacher workload (scheduled periods/week from `timetable_entries` for the current term). All read-only aggregation in `lib/analytics.ts` — no new tables. No charting library was added to the project — rendered with a small dependency-free `BarList` component (proportional-width divs) instead, consistent with the bandwidth-conscious approach used elsewhere. Two scope notes: grades are broken down by subject only, not further by class (the original ask mentioned "by subject/class"); and the fee/enrollment trends group by every `(academic_year, term)` combination found in the data with no cap, which is fine at current data volumes but worth capping/paginating if terms accumulate for many years.
 
 ---
 
@@ -170,6 +171,7 @@
 - [x] **Critical fix**: `profiles` RLS originally only allowed `id = auth.uid()` — silently breaking every embedded `profiles(...)` join for non-admin users (teacher names on student timetables, etc., showing empty) since the very first migration. Broadened to authenticated-read.
 - [x] Parent access added additively across 7 tables via `is_parent_of()`, no existing policy touched
 - [x] Full manual RLS audit — closed direct profile-table privilege-escalation paths: only admins can create or mutate student/teacher/profile records, while narrowly scoped server actions handle password completion and subject assignments.
+- [x] Audit log completed — `audit_log` table, RLS (admin/bursar read), and trigger coverage (`enrollments`, `fee_structures`, `invoices`, `log_receipt_print()`) already existed; added the missing pieces: `lib/audit.ts` (`writeAuditLog()` helper), coverage for grade approval (bulk + single), user deactivation/reactivation, and staff role changes — each via app-code inserts rather than triggers, since those live in server actions rather than direct table writes. New `/dashboard/admin/audit-log` page (filterable by entity type, paginated) surfaces it; added to admin nav. `curriculum_topics.week_number`/scheme-of-work locking-down work earlier this session is not itself audit-logged — flagging in case that's wanted too.
 
 ---
 
@@ -185,7 +187,14 @@
 
 ## Not Started (P6 — correctly deferred throughout)
 
-CBT/quiz builder, library module, hostel module, transport module, inventory/asset tracking, ID card generator, admission letter/testimonial generator, analytics dashboard, audit log, PWA/offline support, WhatsApp notifications.
+- [ ] CBT/quiz builder — teachers author objective-question tests (MCQ, true/false, maybe fill-in-blank) tied to a subject/class; students take them in a timed browser session, auto-graded on submit. New tables (`quiz_questions`, `quiz_options`, `quiz_attempts`, `quiz_answers`); feeds into `grades`/`assessments` as another assessment type so it inherits the existing moderation-approval flow rather than becoming a separate system.
+- [ ] Library module — catalog of physical books (`library_books`: title, author, ISBN, copies), borrow/return workflow (`library_loans`: student_id, book_id, borrowed_at, due_at, returned_at), overdue tracking, possibly a fine tied into the fees module. Admin/librarian manages the catalog; students/parents see current borrows and due dates.
+- [ ] Hostel module — for boarding students: room/bed assignment (`hostels`, `hostel_rooms`, `hostel_assignments` linking student_id to a room), house-master/matron oversight, maybe check-in/check-out logs for leave requests. Would need a new staff sub-role (same pattern as the HOD/bursar `staff_role` work) for house parents.
+- [ ] Transport module — school bus routes/stops (`bus_routes`, `bus_stops`), student-to-route assignment, driver/vehicle records, possibly a live "bus left/arrived" status parents can see — that last part would reuse the Realtime wiring already built for messaging.
+- [ ] Inventory/asset tracking — non-book school assets (furniture, lab equipment, computers, sports gear): `assets` table (name, category, serial no., condition, location/assigned-to), audit trail of who has what and when it was last checked. Admin-only, record-keeping rather than student/parent-facing.
+- [ ] ID card generator — pulls existing `profiles` + uploaded photo into a print-ready card template (school logo, name, class/role, ID number, maybe a QR code to a verification page). Same print-to-PDF pattern already used for report cards and receipts.
+- [ ] Admission letter/testimonial generator — template-driven documents pulling from `student_profiles`/`enrollments`: an admission letter on student creation, a testimonial/leaving certificate on graduation (promotion workflow already tracks graduate status). Same print-to-PDF pattern; mostly a templating/mail-merge problem, no new data model needed.
+- [ ] PWA/offline support — service worker + manifest so the app installs like a native app and core screens (today's attendance, a cached timetable) work with spotty connectivity — genuinely relevant given the target market. Needs a decision on which flows must work offline (attendance marking is the obvious one) and a write-queue for syncing once back online.
 
 ---
 

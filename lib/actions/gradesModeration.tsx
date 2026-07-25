@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
+import { writeAuditLog } from "@/lib/audit";
 
 async function assertCanModerateAssessment(assessmentId: string) {
   const { id } = await assertRole(["admin", "teacher"], "Only an admin or HOD can approve grades.");
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
-  if (profile?.role === "admin") return;
+  if (profile?.role === "admin") return { actorId: id };
   const [{ data: teacher }, { data: assessment }] = await Promise.all([
     admin.from("teacher_profiles").select("staff_role, subjects_taught").eq("id", id).single(),
     admin.from("assessments").select("subject_id").eq("id", assessmentId).single(),
@@ -20,10 +21,11 @@ async function assertCanModerateAssessment(assessmentId: string) {
   ) {
     throw new Error("Only the HOD assigned to this subject can approve these grades.");
   }
+  return { actorId: id };
 }
 
 export async function approveAssessmentGrades(assessmentId: string) {
-  await assertCanModerateAssessment(assessmentId);
+  const { actorId } = await assertCanModerateAssessment(assessmentId);
   const supabase = createAdminClient();
 
   const { error, count } = await supabase
@@ -33,6 +35,14 @@ export async function approveAssessmentGrades(assessmentId: string) {
     .eq("moderation_status", "pending");
 
   if (error) throw new Error(error.message);
+
+  await writeAuditLog({
+    entityType: "assessment",
+    entityId: assessmentId,
+    action: "grades_bulk_approved",
+    actorId,
+    metadata: { approved_count: count ?? 0 },
+  });
 
   revalidatePath("/dashboard/admin/grades");
   revalidatePath(`/dashboard/teacher/grades/${assessmentId}`);
@@ -49,7 +59,7 @@ export async function approveSingleGrade(gradeId: string) {
     .single();
 
   if (!grade) throw new Error("Grade not found.");
-  await assertCanModerateAssessment(grade.assessment_id);
+  const { actorId } = await assertCanModerateAssessment(grade.assessment_id);
 
   const { error } = await admin
     .from("grades")
@@ -57,6 +67,14 @@ export async function approveSingleGrade(gradeId: string) {
     .eq("id", gradeId);
 
   if (error) throw new Error(error.message);
+
+  await writeAuditLog({
+    entityType: "grade",
+    entityId: gradeId,
+    action: "grade_approved",
+    actorId,
+    metadata: { assessment_id: grade.assessment_id, student_id: grade.student_id },
+  });
 
   revalidatePath("/dashboard/admin/grades");
   revalidatePath("/dashboard/student/grades");

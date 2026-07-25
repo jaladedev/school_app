@@ -299,6 +299,16 @@ export type Payment = {
   paid_at: string;
 };
 
+export type AuditLogEntry = {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  actor_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -790,6 +800,20 @@ export type Database = {
           {
             foreignKeyName: "payments_verified_by_fkey";
             columns: ["verified_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      audit_log: {
+        Row: AuditLogEntry;
+        Insert: Partial<AuditLogEntry>;
+        Update: Partial<AuditLogEntry>;
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_id_fkey";
+            columns: ["actor_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];

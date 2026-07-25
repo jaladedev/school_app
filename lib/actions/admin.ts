@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
+import { writeAuditLog } from "@/lib/audit";
 import type { StaffRole } from "@/types/database";
 
 const TEMP_PASSWORD_WORDS = [
@@ -634,13 +635,29 @@ export async function updateTeacherSubjects(teacherId: string, subjectIds: strin
 }
 
 export async function updateTeacherStaffRole(teacherId: string, staffRole: StaffRole) {
-  await assertRole(["admin"], "Only an admin can assign staff roles.");
+  const { id: actorId } = await assertRole(["admin"], "Only an admin can assign staff roles.");
   const admin = createAdminClient();
+
+  const { data: before } = await admin
+    .from("teacher_profiles")
+    .select("staff_role")
+    .eq("id", teacherId)
+    .single();
+
   const { error } = await admin
     .from("teacher_profiles")
     .update({ staff_role: staffRole })
     .eq("id", teacherId);
   if (error) throw new Error(error.message);
+
+  await writeAuditLog({
+    entityType: "teacher_profile",
+    entityId: teacherId,
+    action: "staff_role_changed",
+    actorId,
+    metadata: { old_staff_role: before?.staff_role ?? null, new_staff_role: staffRole },
+  });
+
   revalidatePath("/dashboard/admin/staff");
   revalidatePath(`/dashboard/admin/staff/${teacherId}`);
 }
@@ -779,7 +796,7 @@ export async function removeChildFromParent(guardianLinkId: string) {
 // ---------- Deactivation (any role) ----------
 
 export async function deactivateUser(userId: string, deactivate: boolean) {
-  await assertRole(["admin"], "Only an admin can perform this action.");
+  const { id: actorId } = await assertRole(["admin"], "Only an admin can perform this action.");
   const admin = createAdminClient();
 
   // ban_duration actually blocks sign-in at the auth level. "none" lifts
@@ -798,6 +815,13 @@ export async function deactivateUser(userId: string, deactivate: boolean) {
     .eq("id", userId);
 
   if (profileError) throw new Error(profileError.message);
+
+  await writeAuditLog({
+    entityType: "profile",
+    entityId: userId,
+    action: deactivate ? "user_deactivated" : "user_reactivated",
+    actorId,
+  });
 
   revalidatePath("/dashboard/admin/staff");
   revalidatePath("/dashboard/admin/students");
