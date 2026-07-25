@@ -426,6 +426,20 @@ const RESOURCE_TYPES = new Map<string, Extract<ResourceType, "image" | "pdf" | "
   ["video/webm", "video"],
 ]);
 
+async function assertTeacherOwnsTopic(
+  supabase: ReturnType<typeof createClient>,
+  teacherId: string,
+  topicId: string
+) {
+  const [{ data: topic }, { data: teacher }] = await Promise.all([
+    supabase.from("curriculum_topics").select("subject_id").eq("id", topicId).single(),
+    supabase.from("teacher_profiles").select("subjects_taught").eq("id", teacherId).single(),
+  ]);
+  if (!topic || !teacher?.subjects_taught?.includes(topic.subject_id)) {
+    throw new Error("You can only add resources for subjects assigned to you.");
+  }
+}
+
 export async function uploadTopicResource(topicId: string, noteId: string, formData: FormData) {
   const { id: teacherId } = await assertRole(["teacher"], "Only teachers can upload resources.");
 
@@ -438,13 +452,7 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
     throw new Error("Use an image, PDF, MP3/WAV/OGG audio, or MP4/WebM video file.");
 
   const supabase = createClient();
-  const [{ data: topic }, { data: teacher }] = await Promise.all([
-    supabase.from("curriculum_topics").select("subject_id").eq("id", topicId).single(),
-    supabase.from("teacher_profiles").select("subjects_taught").eq("id", teacherId).single(),
-  ]);
-  if (!topic || !teacher?.subjects_taught?.includes(topic.subject_id)) {
-    throw new Error("You can only add resources for subjects assigned to you.");
-  }
+  await assertTeacherOwnsTopic(supabase, teacherId, topicId);
 
   const admin = createAdminClient();
   const { error: bucketError } = await admin.storage.createBucket(TOPIC_RESOURCE_BUCKET, {
@@ -491,4 +499,89 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
 
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath(`/dashboard/student/topics/${topicId}`);
+}
+
+// A Mermaid diagram has no binary file to store — its "content" is the
+// diagram source itself — so unlike uploadTopicResource this writes
+// straight to topic_resources with file_url left null (matching the
+// assumption already baked into deleteTopicResource's cleanup logic).
+export async function createMermaidResource(
+  topicId: string,
+  noteId: string,
+  title: string,
+  mermaidCode: string
+) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can add diagrams.");
+
+  const trimmedCode = mermaidCode.trim();
+  if (!trimmedCode) {
+    throw new Error("The diagram is empty — write some Mermaid code first.");
+  }
+
+  const supabase = createClient();
+  await assertTeacherOwnsTopic(supabase, teacherId, topicId);
+
+  const { data: latestResource } = await supabase
+    .from("topic_resources")
+    .select("sequence_order")
+    .eq("topic_id", topicId)
+    .order("sequence_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: resource, error } = await supabase
+    .from("topic_resources")
+    .insert({
+      topic_id: topicId,
+      note_id: noteId,
+      resource_type: "diagram_mermaid",
+      title: title.trim() || "Diagram",
+      content: trimmedCode,
+      file_url: null,
+      sequence_order: (latestResource?.sequence_order ?? 0) + 1,
+      uploaded_by: teacherId,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/teacher/notes/${topicId}`);
+  revalidatePath(`/dashboard/student/topics/${topicId}`);
+
+  return resource;
+}
+
+export async function deleteTopicResource(resourceId: string) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can remove resources.");
+
+  const supabase = createClient();
+
+  const { data: resource } = await supabase
+    .from("topic_resources")
+    .select("id, file_url, topic_id")
+    .eq("id", resourceId)
+    .single();
+
+  if (!resource) {
+    throw new Error("Resource not found.");
+  }
+
+  await assertTeacherOwnsTopic(supabase, teacherId, resource.topic_id);
+
+  const admin = createAdminClient();
+
+  // diagram_mermaid resources store their content inline (file_url is
+  // null) — only image/pdf/audio/video have an actual storage object to
+  // clean up.
+  if (resource.file_url) {
+    await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([resource.file_url]);
+  }
+
+  const { error: deleteError } = await admin.from("topic_resources").delete().eq("id", resourceId);
+
+  if (deleteError) throw new Error(deleteError.message);
+
+  revalidatePath(`/dashboard/teacher/notes/${resource.topic_id}`);
+  revalidatePath(`/dashboard/student/topics/${resource.topic_id}`);
 }

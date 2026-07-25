@@ -41,6 +41,55 @@ function MediaError({ label }: { label: string }) {
   );
 }
 
+// Matches a marker like [[resource:3f9e1a2b-...]] placed on its own line
+// in a note's markdown. Lets a teacher choose exactly where a resource
+// appears in the flow of the text — e.g. right after the sentence that
+// references it — instead of every resource always landing at the end
+// of the note regardless of what the prose actually says about it.
+const RESOURCE_MARKER = /\[\[resource:([0-9a-fA-F-]{36})\]\]/g;
+
+type ContentPart = { type: "text"; value: string } | { type: "resource"; resource: TopicResource };
+
+function splitContentByMarkers(
+  content: string,
+  resources: TopicResource[]
+): { parts: ContentPart[]; leftover: TopicResource[] } {
+  const byId = new Map(resources.map((r) => [r.id, r]));
+  const usedIds = new Set<string>();
+  const parts: ContentPart[] = [];
+
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  RESOURCE_MARKER.lastIndex = 0;
+
+  while ((match = RESOURCE_MARKER.exec(content))) {
+    const textChunk = content.slice(lastIndex, match.index);
+    if (textChunk.trim()) parts.push({ type: "text", value: textChunk });
+
+    const resource = byId.get(match[1]);
+    if (resource) {
+      parts.push({ type: "resource", resource });
+      usedIds.add(resource.id);
+    }
+    // An unmatched marker (resource deleted, or id typo) is silently
+    // dropped from the rendered output rather than left as literal
+    // "[[resource:...]]" text on the page.
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  const remainder = content.slice(lastIndex);
+  if (remainder.trim()) parts.push({ type: "text", value: remainder });
+
+  // Any resource never referenced by a marker still needs to show up
+  // somewhere — same as the old behavior, appended after everything else,
+  // so nothing silently disappears just because a note wasn't written
+  // with markers.
+  const leftover = resources.filter((r) => !usedIds.has(r.id));
+
+  return { parts, leftover };
+}
+
 export function TopicContent({
   content,
   resources,
@@ -48,13 +97,21 @@ export function TopicContent({
   content: string;
   resources: TopicResource[];
 }) {
+  const { parts, leftover } = splitContentByMarkers(content, resources);
+
   return (
     <div>
-      <div className="topic-prose">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-      </div>
+      {parts.map((part, i) =>
+        part.type === "text" ? (
+          <div className="topic-prose" key={i}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.value}</ReactMarkdown>
+          </div>
+        ) : (
+          <TopicResourceItem key={part.resource.id} resource={part.resource} />
+        )
+      )}
 
-      {resources.map((resource) => (
+      {leftover.map((resource) => (
         <TopicResourceItem key={resource.id} resource={resource} />
       ))}
     </div>

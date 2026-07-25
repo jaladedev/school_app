@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { NoteEditor } from "@/components/NoteEditor";
 import { TopicResourceUpload } from "@/components/TopicResourceUpload";
+import { TopicResourceList } from "@/components/TopicResourceList";
 import { formatLevel } from "@/types/database";
 
 export default async function TeacherNoteEditPage({
@@ -34,6 +35,19 @@ export default async function TeacherNoteEditPage({
     .eq("topic_id", resolvedParams.topicId)
     .order("version", { ascending: false });
 
+  // Scoped to this specific note version, not the whole topic — same fix
+  // as the student-facing topic page. Without this, a teacher editing a
+  // fresh draft would see resources left over from an earlier, superseded
+  // note version mixed in with what actually belongs to the draft they're
+  // working on.
+  const { data: resources } = note
+    ? await supabase
+        .from("topic_resources")
+        .select("*")
+        .eq("note_id", note.id)
+        .order("sequence_order", { ascending: true })
+    : { data: [] };
+
   return (
     <div>
       <Link
@@ -50,11 +64,16 @@ export default async function TeacherNoteEditPage({
 
       <NoteEditor
         topicId={resolvedParams.topicId}
+        noteId={note?.id}
         initialContent={note?.content ?? `## Introduction\n\nWrite about "${topic?.title}" here.\n`}
         initialStatus={note?.status ?? "unwritten"}
+        resources={resources ?? []}
       />
       {note ? (
-        <TopicResourceUpload topicId={resolvedParams.topicId} noteId={note.id} />
+        <section className="mt-4">
+          <TopicResourceUpload topicId={resolvedParams.topicId} noteId={note.id} />
+          <TopicResourceList resources={resources ?? []} />
+        </section>
       ) : (
         <p className="mt-4 text-sm text-ink-soft">Save the note once before attaching resources.</p>
       )}

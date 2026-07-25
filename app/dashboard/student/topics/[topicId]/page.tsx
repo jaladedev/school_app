@@ -42,11 +42,20 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
     .limit(1)
     .maybeSingle();
 
-  const { data: resources } = await supabase
-    .from("topic_resources")
-    .select("*")
-    .eq("topic_id", resolvedParams.topicId)
-    .order("sequence_order", { ascending: true });
+  // Scoped to the specific note version being displayed, not the whole
+  // topic — topic_resources.note_id ties a resource to one note row, and
+  // a topic can have several note versions over its history (drafts,
+  // superseded published versions). Filtering by topic_id alone would
+  // pull in resources attached to old, no-longer-displayed versions
+  // alongside the current one — e.g. two "states of matter" diagrams
+  // shown together after a note got revised and republished.
+  const { data: resources } = note
+    ? await supabase
+        .from("topic_resources")
+        .select("*")
+        .eq("note_id", note.id)
+        .order("sequence_order", { ascending: true })
+    : { data: [] };
 
   const admin = createAdminClient();
   const displayResources = await Promise.all(
