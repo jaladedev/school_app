@@ -11,6 +11,9 @@ export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
 export type StaffRole = "teacher" | "hod" | "bursar" | "librarian";
 export type GradeModerationStatus = "pending" | "approved";
 export type ResourceType = "image" | "diagram_mermaid" | "video" | "pdf" | "link" | "audio";
+export type AssetCondition = "new" | "good" | "fair" | "poor" | "damaged";
+
+export const ASSET_CONDITIONS: AssetCondition[] = ["new", "good", "fair", "poor", "damaged"];
 
 export type EducationLevel = "primary" | "jss" | "sss";
 
@@ -340,6 +343,21 @@ export function isLoanOverdue(loan: Pick<LibraryLoan, "due_at" | "returned_at">)
   return new Date(loan.due_at) < new Date(new Date().toDateString());
 }
 
+export type Asset = {
+  id: string;
+  name: string;
+  category: string | null;
+  serial_no: string | null;
+  condition: AssetCondition;
+  location: string | null;
+  assigned_to: string | null;
+  notes: string | null;
+  is_archived: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -603,6 +621,20 @@ export type Database = {
             columns: ["marked_by"];
             isOneToOne: false;
             referencedRelation: "teacher_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      assets: {
+        Row: Asset;
+        Insert: Partial<Asset>;
+        Update: Partial<Asset>;
+        Relationships: [
+          {
+            foreignKeyName: "assets_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];

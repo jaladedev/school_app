@@ -41,6 +41,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Fees", href: "/dashboard/admin/fees" },
     { label: "ID Cards", href: "/dashboard/admin/id-cards" },
     { label: "Library", href: "/dashboard/library" },
+    { label: "Inventory", href: "/dashboard/admin/inventory" },
     { label: "Analytics", href: "/dashboard/admin/analytics" },
     { label: "Audit Log", href: "/dashboard/admin/audit-log" },
     { label: "Messages", href: "/dashboard/messages" },
