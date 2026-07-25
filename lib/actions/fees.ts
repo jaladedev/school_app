@@ -6,13 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import type { EducationLevel, PaymentMethod } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
-
-function computeStatus(totalKobo: number, discountKobo: number, paidKobo: number) {
-  const owed = totalKobo - discountKobo;
-  if (paidKobo <= 0) return "unpaid" as const;
-  if (paidKobo >= owed) return "paid" as const;
-  return "partial" as const;
-}
+import { computeInvoiceStatus } from "@/lib/invoiceStatus";
 
 export async function createFeeStructure(input: {
   educationLevel: EducationLevel;
@@ -131,7 +125,7 @@ export async function applyDiscount(invoiceId: string, discountKobo: number) {
 
   if (!invoice) throw new Error("Invoice not found.");
 
-  const newStatus = computeStatus(
+  const newStatus = computeInvoiceStatus(
     invoice.total_amount_kobo,
     discountKobo,
     invoice.amount_paid_kobo

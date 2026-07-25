@@ -25,8 +25,14 @@ async function signStudentPhotos(paths: (string | null)[]): Promise<Map<string, 
 export default async function IdCardsPrintPage({
   searchParams,
 }: {
-  searchParams: { type?: string; classId?: string; studentId?: string; teacherId?: string };
+  searchParams: Promise<{
+    type?: string;
+    classId?: string;
+    studentId?: string;
+    teacherId?: string;
+  }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const supabase = createClient();
 
   const { data: settings } = await supabase
@@ -37,7 +43,7 @@ export default async function IdCardsPrintPage({
 
   let cards: IdCardData[] = [];
 
-  if (searchParams.type === "students" && searchParams.studentId) {
+  if (resolvedSearchParams.type === "students" && resolvedSearchParams.studentId) {
     // Single-card mode, e.g. from a student's own detail page — same
     // shape as the class query below, just filtered to one id instead
     // of a whole class.
@@ -46,7 +52,7 @@ export default async function IdCardsPrintPage({
       .select(
         "id, admission_no, profiles(full_name, avatar_url), classes(name, arm, education_level, level_number)"
       )
-      .eq("id", searchParams.studentId);
+      .eq("id", resolvedSearchParams.studentId);
 
     const photoUrlByPath = await signStudentPhotos(
       (students ?? []).map((s) => s.profiles?.avatar_url ?? null)
@@ -62,13 +68,13 @@ export default async function IdCardsPrintPage({
         : null,
       photoUrl: s.profiles?.avatar_url ? (photoUrlByPath.get(s.profiles.avatar_url) ?? null) : null,
     }));
-  } else if (searchParams.type === "students" && searchParams.classId) {
+  } else if (resolvedSearchParams.type === "students" && resolvedSearchParams.classId) {
     const { data: students } = await supabase
       .from("student_profiles")
       .select(
         "id, admission_no, profiles(full_name, avatar_url), classes(name, arm, education_level, level_number)"
       )
-      .eq("class_id", searchParams.classId)
+      .eq("class_id", resolvedSearchParams.classId)
       .order("admission_no", { ascending: true });
 
     const photoUrlByPath = await signStudentPhotos(
@@ -85,11 +91,11 @@ export default async function IdCardsPrintPage({
         : null,
       photoUrl: s.profiles?.avatar_url ? (photoUrlByPath.get(s.profiles.avatar_url) ?? null) : null,
     }));
-  } else if (searchParams.type === "staff" && searchParams.teacherId) {
+  } else if (resolvedSearchParams.type === "staff" && resolvedSearchParams.teacherId) {
     const { data: teachers } = await supabase
       .from("teacher_profiles")
       .select("id, staff_id, staff_role, profiles!inner(full_name, is_active)")
-      .eq("id", searchParams.teacherId);
+      .eq("id", resolvedSearchParams.teacherId);
 
     cards = (teachers ?? []).map((t) => ({
       id: t.id,
@@ -99,7 +105,7 @@ export default async function IdCardsPrintPage({
       subLabel: t.staff_role && t.staff_role !== "teacher" ? t.staff_role.toUpperCase() : null,
       photoUrl: null,
     }));
-  } else if (searchParams.type === "staff") {
+  } else if (resolvedSearchParams.type === "staff") {
     const { data: teachers } = await supabase
       .from("teacher_profiles")
       .select("id, staff_id, staff_role, profiles!inner(full_name, is_active)")

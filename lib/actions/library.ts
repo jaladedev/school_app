@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
+import { computeInvoiceStatus } from "@/lib/invoiceStatus";
 
 async function assertCanManageLibrary(): Promise<{ actorId: string }> {
   const { id } = await assertRole(
@@ -187,4 +188,64 @@ export async function returnLibraryLoan(loanId: string) {
   revalidatePath("/dashboard/parent/fees");
 
   return { overdueDays: loan.overdue_days, fineKobo: loan.fine_kobo };
+}
+
+export async function waiveLibraryFine(invoiceId: string, reason?: string) {
+  const { actorId } = await assertCanManageLibrary();
+  const admin = createAdminClient();
+
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("*, fee_structures(title)")
+    .eq("id", invoiceId)
+    .single();
+
+  if (!invoice) throw new Error("Invoice not found.");
+
+  // Scope check: this action only waives library fines, not arbitrary
+  // invoices — an admin/librarian could otherwise use it as a backdoor
+  // discount tool for regular fees.
+  if (invoice.fee_structures?.title !== "Library Fine") {
+    throw new Error("This isn't a library fine invoice.");
+  }
+
+  if (invoice.amount_paid_kobo > 0) {
+    throw new Error(
+      "This fine has already been paid — waiving isn't available here. Use the fees module to refund it if needed."
+    );
+  }
+
+  const alreadyWaived = invoice.discount_kobo >= invoice.total_amount_kobo;
+  if (alreadyWaived) {
+    throw new Error("This fine has already been waived.");
+  }
+
+  const { error } = await admin
+    .from("invoices")
+    .update({
+      discount_kobo: invoice.total_amount_kobo,
+      status: computeInvoiceStatus(invoice.total_amount_kobo, invoice.total_amount_kobo, 0),
+    })
+    .eq("id", invoiceId);
+
+  if (error) throw new Error(error.message);
+
+  await writeAuditLog({
+    entityType: "invoice",
+    entityId: invoiceId,
+    action: "library_fine_waived",
+    actorId,
+    metadata: {
+      student_id: invoice.student_id,
+      amount_kobo: invoice.total_amount_kobo,
+      reason: reason || null,
+    },
+  });
+
+  revalidatePath("/dashboard/library");
+  revalidatePath("/dashboard/library/loans");
+  revalidatePath("/dashboard/admin/fees");
+  revalidatePath("/dashboard/admin/fees/invoices");
+  revalidatePath("/dashboard/student/fees");
+  revalidatePath("/dashboard/parent/fees");
 }
