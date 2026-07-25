@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { UserRole } from "@/types/database";
+import type { UserRole, StaffRole } from "@/types/database";
 import { SignOutButton } from "@/components/SignOutButton";
 
 const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
@@ -15,6 +15,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Report Card", href: "/dashboard/student/report-card" },
     { label: "Fees", href: "/dashboard/student/fees" },
     { label: "My Notes", href: "/dashboard/student/notes" },
+    { label: "Library", href: "/dashboard/student/library" },
     { label: "Messages", href: "/dashboard/messages" },
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
@@ -38,6 +39,8 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Staff", href: "/dashboard/admin/staff" },
     { label: "Grade Moderation", href: "/dashboard/admin/grades" },
     { label: "Fees", href: "/dashboard/admin/fees" },
+    { label: "ID Cards", href: "/dashboard/admin/id-cards" },
+    { label: "Library", href: "/dashboard/library" },
     { label: "Analytics", href: "/dashboard/admin/analytics" },
     { label: "Audit Log", href: "/dashboard/admin/audit-log" },
     { label: "Messages", href: "/dashboard/messages" },
@@ -52,6 +55,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Fees", href: "/dashboard/parent/fees" },
     { label: "Timetable", href: "/dashboard/parent/timetable" },
     { label: "Homework", href: "/dashboard/parent/homework" },
+    { label: "Library", href: "/dashboard/parent/library" },
     { label: "Messages", href: "/dashboard/messages" },
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
@@ -75,8 +79,19 @@ function findActiveHref(pathname: string, items: { href: string }[]): string | n
   return best;
 }
 
-export function Sidebar({ role, fullName }: { role: UserRole; fullName: string }) {
-  const items = NAV_BY_ROLE[role];
+export function Sidebar({
+  role,
+  fullName,
+  staffRole,
+}: {
+  role: UserRole;
+  fullName: string;
+  staffRole?: StaffRole | null;
+}) {
+  const items =
+    role === "teacher" && staffRole === "librarian"
+      ? [...NAV_BY_ROLE.teacher, { label: "Library", href: "/dashboard/library" }]
+      : NAV_BY_ROLE[role];
   const pathname = usePathname();
   const activeHref = findActiveHref(pathname, items);
   const [mobileOpen, setMobileOpen] = useState(false);

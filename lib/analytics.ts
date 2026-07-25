@@ -198,3 +198,61 @@ export async function getTeacherWorkload(
     .map((e) => ({ teacherName: e.name, periodsPerWeek: e.count }))
     .sort((a, b) => b.periodsPerWeek - a.periodsPerWeek);
 }
+
+// ---------- Library overdue rate ----------
+
+export type OverdueRatePoint = {
+  label: string;
+  ratePercent: number;
+  overdueCount: number;
+  activeCount: number;
+};
+
+/**
+ * Capped so this stays a bounded per-day computation regardless of how
+ * long the school has been using the library module — otherwise the
+ * window (and the per-day loop cost) would grow forever.
+ */
+const OVERDUE_TREND_CAP_DAYS = 30;
+
+export async function getLibraryOverdueTrend(
+  supabase: SupabaseServerClient
+): Promise<OverdueRatePoint[]> {
+  const { data: loans } = await supabase
+    .from("library_loans")
+    .select("borrowed_at, due_at, returned_at");
+
+  const points: OverdueRatePoint[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = OVERDUE_TREND_CAP_DAYS - 1; i >= 0; i--) {
+    const day = new Date(today);
+    day.setDate(day.getDate() - i);
+
+    let activeCount = 0;
+    let overdueCount = 0;
+    for (const loan of loans ?? []) {
+      const borrowedAt = new Date(loan.borrowed_at);
+      const returnedAt = loan.returned_at ? new Date(loan.returned_at) : null;
+      const dueAt = new Date(loan.due_at);
+
+      // Was this loan "on loan" as of this day? (Borrowed by end of day,
+      // and not yet returned, or returned after this day.)
+      const wasActive = borrowedAt <= day && (!returnedAt || returnedAt > day);
+      if (!wasActive) continue;
+
+      activeCount += 1;
+      if (dueAt < day) overdueCount += 1;
+    }
+
+    points.push({
+      label: day.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+      ratePercent: activeCount ? Math.round((overdueCount / activeCount) * 100) : 0,
+      overdueCount,
+      activeCount,
+    });
+  }
+
+  return points;
+}

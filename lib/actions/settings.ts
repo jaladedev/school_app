@@ -13,6 +13,7 @@ export async function saveSchoolSettings(input: {
   currentAcademicYear: string;
   currentTerm: number;
   currentTermStartDate?: string | null;
+  libraryFineKoboPerDay?: number;
   gradeScale: GradeScaleEntry[];
 }) {
   await assertRole(["admin"], "Only an admin can update school settings.");
@@ -29,6 +30,7 @@ export async function saveSchoolSettings(input: {
       current_academic_year: input.currentAcademicYear,
       current_term: input.currentTerm,
       current_term_start_date: input.currentTermStartDate || null,
+      library_fine_kobo_per_day: input.libraryFineKoboPerDay ?? 0,
       grade_scale: input.gradeScale,
       updated_at: new Date().toISOString(),
     })

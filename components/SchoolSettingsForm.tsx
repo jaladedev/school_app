@@ -13,6 +13,9 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
   const [academicYear, setAcademicYear] = useState(settings.current_academic_year);
   const [term, setTerm] = useState(settings.current_term);
   const [termStartDate, setTermStartDate] = useState(settings.current_term_start_date ?? "");
+  const [fineNaira, setFineNaira] = useState(
+    settings.library_fine_kobo_per_day ? String(settings.library_fine_kobo_per_day / 100) : ""
+  );
   const [gradeScale, setGradeScale] = useState<GradeScaleEntry[]>(settings.grade_scale);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +30,13 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
 
   function handleSave() {
     setError(null);
+
+    const fine = parseFloat(fineNaira);
+    if (fineNaira && (isNaN(fine) || fine < 0)) {
+      setError("Library fine per day must be a valid non-negative amount.");
+      return;
+    }
+
     startTransition(async () => {
       try {
         await saveSchoolSettings({
@@ -37,6 +47,7 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
           currentAcademicYear: academicYear,
           currentTerm: term,
           currentTermStartDate: termStartDate || null,
+          libraryFineKoboPerDay: fineNaira ? Math.round(fine * 100) : 0,
           gradeScale,
         });
         emitToast("School settings saved.");
@@ -157,6 +168,24 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
               type="date"
               value={termStartDate}
               onChange={(e) => setTermStartDate(e.target.value)}
+              className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-soft">
+              Library fine (per day overdue)
+            </label>
+            <p className="mb-1 text-xs text-ink-soft">
+              Charged automatically to a student&apos;s invoices when a book is returned late — no
+              approval step. Leave blank or 0 to disable fines.
+            </p>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={fineNaira}
+              onChange={(e) => setFineNaira(e.target.value)}
+              placeholder="0.00"
               className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
             />
           </div>

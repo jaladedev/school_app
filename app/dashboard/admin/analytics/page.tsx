@@ -8,6 +8,7 @@ import {
   getAverageGradesBySubject,
   getAttendanceTrend,
   getTeacherWorkload,
+  getLibraryOverdueTrend,
 } from "@/lib/analytics";
 
 function Card({
@@ -41,14 +42,21 @@ export default async function AdminAnalyticsPage() {
   const academicYear = settings?.current_academic_year ?? "";
   const term = settings?.current_term ?? 1;
 
-  const [enrollmentTrend, feeCollectionTrend, subjectGrades, attendanceTrend, teacherWorkload] =
-    await Promise.all([
-      getEnrollmentTrend(supabase),
-      getFeeCollectionTrend(supabase),
-      getAverageGradesBySubject(supabase, academicYear, term),
-      getAttendanceTrend(supabase, settings?.current_term_start_date ?? null),
-      getTeacherWorkload(supabase, academicYear, term),
-    ]);
+  const [
+    enrollmentTrend,
+    feeCollectionTrend,
+    subjectGrades,
+    attendanceTrend,
+    teacherWorkload,
+    libraryOverdueTrend,
+  ] = await Promise.all([
+    getEnrollmentTrend(supabase),
+    getFeeCollectionTrend(supabase),
+    getAverageGradesBySubject(supabase, academicYear, term),
+    getAttendanceTrend(supabase, settings?.current_term_start_date ?? null),
+    getTeacherWorkload(supabase, academicYear, term),
+    getLibraryOverdueTrend(supabase),
+  ]);
 
   const currentFeePoint = feeCollectionTrend.find(
     (p) => p.label === `${academicYear} · Term ${term}`
@@ -151,6 +159,28 @@ export default async function AdminAnalyticsPage() {
             />
           ) : (
             <EmptyState message="No timetable entries for the current term yet." />
+          )}
+        </Card>
+
+        <Card
+          title="Library overdue rate"
+          subtitle={
+            libraryOverdueTrend.length
+              ? `Today: ${libraryOverdueTrend[libraryOverdueTrend.length - 1].overdueCount} of ${libraryOverdueTrend[libraryOverdueTrend.length - 1].activeCount} active loans overdue — daily, last ${libraryOverdueTrend.length} days`
+              : "Daily overdue rate, last 30 days"
+          }
+        >
+          {libraryOverdueTrend.some((p) => p.activeCount > 0) ? (
+            <BarList
+              colorClassName="bg-clay"
+              items={libraryOverdueTrend.map((p) => ({
+                label: p.label,
+                value: p.ratePercent,
+                displayValue: `${p.ratePercent}% (${p.overdueCount}/${p.activeCount})`,
+              }))}
+            />
+          ) : (
+            <EmptyState message="No library loans in the last 30 days." />
           )}
         </Card>
       </div>

@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { updateTeacherStaffRole } from "@/lib/actions/admin";
 import type { StaffRole } from "@/types/database";
 
-const LABELS: Record<StaffRole, string> = { teacher: "Teacher", hod: "HOD", bursar: "Bursar" };
+const LABELS: Record<StaffRole, string> = {
+  teacher: "Teacher",
+  hod: "HOD",
+  bursar: "Bursar",
+  librarian: "Librarian",
+};
 
 export function EditTeacherRoleSelect({
   teacherId,

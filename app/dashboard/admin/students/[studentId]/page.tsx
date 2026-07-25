@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { EditStudentForm } from "@/components/EditStudentForm";
 import { StudentPhotoUpload } from "@/components/StudentPhotoUpload";
@@ -39,9 +40,19 @@ export default async function StudentInfoPage({
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
-        {profile?.full_name ?? "Student"}
-      </h1>
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <h1 className="font-display text-2xl font-semibold text-ink">
+          {profile?.full_name ?? "Student"}
+        </h1>
+        {student && (
+          <Link
+            href={`/dashboard/admin/id-cards/print?type=students&studentId=${resolvedParams.studentId}`}
+            className="whitespace-nowrap rounded-lg border border-rule px-3 py-1.5 text-sm font-medium text-ink hover:bg-leaf-soft"
+          >
+            Print ID Card
+          </Link>
+        )}
+      </div>
       <p className="mb-6 text-sm text-ink-soft">
         {profile?.email}
         {cls

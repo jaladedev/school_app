@@ -8,7 +8,7 @@ export type AssessmentType =
   "first_ca" | "second_ca" | "exam" | "test" | "assignment" | "project" | "practical" | "other";
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
-export type StaffRole = "teacher" | "hod" | "bursar";
+export type StaffRole = "teacher" | "hod" | "bursar" | "librarian";
 export type GradeModerationStatus = "pending" | "approved";
 export type ResourceType = "image" | "diagram_mermaid" | "video" | "pdf" | "link" | "audio";
 
@@ -250,6 +250,7 @@ export type SchoolSettings = {
   current_academic_year: string;
   current_term: number;
   current_term_start_date: string | null;
+  library_fine_kobo_per_day: number;
   grade_scale: GradeScaleEntry[];
   updated_at: string;
 };
@@ -308,6 +309,36 @@ export type AuditLogEntry = {
   metadata: Record<string, unknown>;
   created_at: string;
 };
+
+export type LibraryBook = {
+  id: string;
+  title: string;
+  author: string | null;
+  isbn: string | null;
+  category: string | null;
+  total_copies: number;
+  available_copies: number;
+  is_archived: boolean;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type LibraryLoan = {
+  id: string;
+  book_id: string;
+  student_id: string;
+  borrowed_at: string;
+  due_at: string;
+  returned_at: string | null;
+  issued_by: string | null;
+  returned_to: string | null;
+  created_at: string;
+};
+
+export function isLoanOverdue(loan: Pick<LibraryLoan, "due_at" | "returned_at">): boolean {
+  if (loan.returned_at) return false;
+  return new Date(loan.due_at) < new Date(new Date().toDateString());
+}
 
 export type Database = {
   public: {
@@ -820,9 +851,72 @@ export type Database = {
           },
         ];
       };
+      library_books: {
+        Row: LibraryBook;
+        Insert: Partial<LibraryBook>;
+        Update: Partial<LibraryBook>;
+        Relationships: [
+          {
+            foreignKeyName: "library_books_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      library_loans: {
+        Row: LibraryLoan;
+        Insert: Partial<LibraryLoan>;
+        Update: Partial<LibraryLoan>;
+        Relationships: [
+          {
+            foreignKeyName: "library_loans_book_id_fkey";
+            columns: ["book_id"];
+            isOneToOne: false;
+            referencedRelation: "library_books";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "library_loans_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "library_loans_issued_by_fkey";
+            columns: ["issued_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "library_loans_returned_to_fkey";
+            columns: ["returned_to"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
+      borrow_library_book: {
+        Args: {
+          p_book_id: string;
+          p_student_id: string;
+          p_due_at: string;
+        };
+        Returns: LibraryLoan;
+      };
+      return_library_book: {
+        Args: {
+          p_loan_id: string;
+        };
+        Returns: (LibraryLoan & { overdue_days: number; fine_kobo: number })[];
+      };
       current_scheme_week: {
         Args: Record<string, never>;
         Returns: number | null;
