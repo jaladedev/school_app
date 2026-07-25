@@ -48,9 +48,10 @@ function MediaError({ label }: { label: string }) {
 // of the note regardless of what the prose actually says about it.
 const RESOURCE_MARKER = /\[\[resource:([0-9a-fA-F-]{36})\]\]/g;
 
-type ContentPart = { type: "text"; value: string } | { type: "resource"; resource: TopicResource };
+export type ContentPart =
+  { type: "text"; value: string } | { type: "resource"; resource: TopicResource };
 
-function splitContentByMarkers(
+export function splitContentByMarkers(
   content: string,
   resources: TopicResource[]
 ): { parts: ContentPart[]; leftover: TopicResource[] } {
@@ -118,7 +119,7 @@ export function TopicContent({
   );
 }
 
-function TopicResourceItem({ resource }: { resource: TopicResource }) {
+export function TopicResourceItem({ resource }: { resource: TopicResource }) {
   const { ref, inView } = useInView<HTMLDivElement>();
   const [failed, setFailed] = useState(false);
 

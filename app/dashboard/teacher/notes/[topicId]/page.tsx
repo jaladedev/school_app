@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
-import { NoteEditor } from "@/components/NoteEditor";
+import { NoteWorkspace } from "@/components/NoteWorkspace";
 import { TopicResourceUpload } from "@/components/TopicResourceUpload";
 import { TopicResourceList } from "@/components/TopicResourceList";
 import { formatLevel } from "@/types/database";
@@ -62,7 +62,7 @@ export default async function TeacherNoteEditPage({
       </p>
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">{topic?.title}</h1>
 
-      <NoteEditor
+      <NoteWorkspace
         topicId={resolvedParams.topicId}
         noteId={note?.id}
         initialContent={note?.content ?? `## Introduction\n\nWrite about "${topic?.title}" here.\n`}
