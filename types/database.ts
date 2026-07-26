@@ -471,6 +471,70 @@ export const TRIP_STATUS_LABELS: Record<TripStatusValue, string> = {
   arrived: "Arrived",
 };
 
+// --- Quiz / assessment types ---
+
+export type QuestionType = "mcq" | "true_false";
+
+export type Quiz = {
+  id: string;
+  assessment_id: string;
+  duration_minutes: number;
+  opens_at: string | null;
+  closes_at: string | null;
+  is_published: boolean;
+  created_at: string;
+};
+
+export type QuizQuestion = {
+  id: string;
+  quiz_id: string;
+  question_text: string;
+  question_type: QuestionType;
+  points: number;
+  sequence_order: number;
+  created_at: string;
+};
+
+export type QuizOption = {
+  id: string;
+  question_id: string;
+  option_text: string;
+  is_correct: boolean;
+  sequence_order: number;
+};
+
+export type QuizAttempt = {
+  id: string;
+  quiz_id: string;
+  student_id: string;
+  started_at: string;
+  submitted_at: string | null;
+  score: number | null;
+  total_points: number | null;
+  grade_id: string | null;
+};
+
+export type QuizAnswer = {
+  id: string;
+  attempt_id: string;
+  question_id: string;
+  selected_option_id: string | null;
+  answered_at: string;
+};
+
+// Shape returned by the get_quiz_attempt_questions() RPC — deliberately
+// has no is_correct field, see the anti-cheat note in the migration.
+export type QuizAttemptQuestionRow = {
+  question_id: string;
+  question_text: string;
+  points: number;
+  question_sequence: number;
+  option_id: string;
+  option_text: string;
+  option_sequence: number;
+  selected_option_id: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -1226,6 +1290,97 @@ export type Database = {
           },
         ];
       };
+      quizzes: {
+        Row: Quiz;
+        Insert: Partial<Quiz>;
+        Update: Partial<Quiz>;
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_assessment_id_fkey";
+            columns: ["assessment_id"];
+            isOneToOne: true;
+            referencedRelation: "assessments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quiz_questions: {
+        Row: QuizQuestion;
+        Insert: Partial<QuizQuestion>;
+        Update: Partial<QuizQuestion>;
+        Relationships: [
+          {
+            foreignKeyName: "quiz_questions_quiz_id_fkey";
+            columns: ["quiz_id"];
+            isOneToOne: false;
+            referencedRelation: "quizzes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quiz_options: {
+        Row: QuizOption;
+        Insert: Partial<QuizOption>;
+        Update: Partial<QuizOption>;
+        Relationships: [
+          {
+            foreignKeyName: "quiz_options_question_id_fkey";
+            columns: ["question_id"];
+            isOneToOne: false;
+            referencedRelation: "quiz_questions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quiz_attempts: {
+        Row: QuizAttempt;
+        Insert: Partial<QuizAttempt>;
+        Update: Partial<QuizAttempt>;
+        Relationships: [
+          {
+            foreignKeyName: "quiz_attempts_quiz_id_fkey";
+            columns: ["quiz_id"];
+            isOneToOne: false;
+            referencedRelation: "quizzes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quiz_attempts_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quiz_attempts_grade_id_fkey";
+            columns: ["grade_id"];
+            isOneToOne: false;
+            referencedRelation: "grades";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quiz_answers: {
+        Row: QuizAnswer;
+        Insert: Partial<QuizAnswer>;
+        Update: Partial<QuizAnswer>;
+        Relationships: [
+          {
+            foreignKeyName: "quiz_answers_attempt_id_fkey";
+            columns: ["attempt_id"];
+            isOneToOne: false;
+            referencedRelation: "quiz_attempts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quiz_answers_question_id_fkey";
+            columns: ["question_id"];
+            isOneToOne: false;
+            referencedRelation: "quiz_questions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -1279,6 +1434,22 @@ export type Database = {
           status: InvoiceStatus;
           student_id: string;
         }[];
+      };
+      start_quiz_attempt: {
+        Args: { p_quiz_id: string };
+        Returns: QuizAttempt;
+      };
+      get_quiz_attempt_questions: {
+        Args: { p_attempt_id: string };
+        Returns: QuizAttemptQuestionRow[];
+      };
+      answer_quiz_question: {
+        Args: { p_attempt_id: string; p_question_id: string; p_selected_option_id: string };
+        Returns: void;
+      };
+      submit_quiz_attempt: {
+        Args: { p_attempt_id: string };
+        Returns: { score: number; total_points: number }[];
       };
     };
   };
