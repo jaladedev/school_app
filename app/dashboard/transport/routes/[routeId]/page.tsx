@@ -8,6 +8,7 @@ import { RouteOccupants } from "@/components/RouteOccupants";
 import { TripStatusControls } from "@/components/TripStatusControls";
 import { ReassignVehicleForm } from "@/components/ReassignVehicleForm";
 import { VehicleHistoryList } from "@/components/VehicleHistoryList";
+import { TransportFeeSection } from "@/components/TransportFeeSection";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -56,6 +57,18 @@ export default async function TransportRoutePage({
     .eq("route_id", routeId)
     .order("assigned_at", { ascending: false });
 
+  const { data: feeStructures } = await supabase
+    .from("transport_fee_structures")
+    .select("id, title, amount_kobo, term, academic_year, voided_at")
+    .eq("route_id", routeId)
+    .order("created_at", { ascending: false });
+
+  const { data: settings } = await supabase
+    .from("school_settings")
+    .select("current_term, current_academic_year")
+    .eq("id", 1)
+    .single();
+
   const { data: stops } = await supabase
     .from("transport_stops")
     .select("id, name, sequence_order, approx_time")
@@ -102,10 +115,7 @@ export default async function TransportRoutePage({
 
   return (
     <div className="max-w-2xl">
-      <Link
-        href={backHref}
-        className="mb-4 inline-block text-sm text-leaf hover:underline"
-      >
+      <Link href={backHref} className="mb-4 inline-block text-sm text-leaf hover:underline">
         ← Back to transport
       </Link>
 
@@ -136,8 +146,17 @@ export default async function TransportRoutePage({
         </details>
       </div>
 
+      <div className="mb-6">
+        <TransportFeeSection
+          routeId={routeId}
+          feeStructures={feeStructures ?? []}
+          defaultTerm={settings?.current_term ?? 1}
+          defaultAcademicYear={settings?.current_academic_year ?? ""}
+        />
+      </div>
+
       <div className="mb-6 space-y-2 rounded-xl border border-rule bg-white p-4">
-        <p className="text-sm font-medium text-ink">Today's status</p>
+        <p className="text-sm font-medium text-ink">Today&apos;s status</p>
         <TripStatusControls
           routeId={routeId}
           tripDate={tripDate}

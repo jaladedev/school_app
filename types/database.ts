@@ -283,7 +283,8 @@ export type FeeStructure = {
 export type Invoice = {
   id: string;
   student_id: string;
-  fee_structure_id: string;
+  fee_structure_id: string | null;
+  transport_fee_structure_id: string | null;
   term: number;
   academic_year: string;
   total_amount_kobo: number;
@@ -542,6 +543,20 @@ export type QuizAttemptQuestionRow = {
   option_text: string;
   option_sequence: number;
   selected_option_id: string | null;
+};
+
+export type TransportFeeStructure = {
+  id: string;
+  route_id: string;
+  term: number;
+  academic_year: string;
+  title: string;
+  amount_kobo: number;
+  due_date: string | null;
+  created_by: string | null;
+  created_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
 };
 
 export type Database = {
@@ -1006,6 +1021,20 @@ export type Database = {
           },
         ];
       };
+      transport_fee_structures: {
+        Row: TransportFeeStructure;
+        Insert: Partial<TransportFeeStructure>;
+        Update: Partial<TransportFeeStructure>;
+        Relationships: [
+          {
+            foreignKeyName: "transport_fee_structures_route_id_fkey";
+            columns: ["route_id"];
+            isOneToOne: false;
+            referencedRelation: "transport_routes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       invoices: {
         Row: Invoice;
         Insert: Partial<Invoice>;
@@ -1023,6 +1052,13 @@ export type Database = {
             columns: ["fee_structure_id"];
             isOneToOne: false;
             referencedRelation: "fee_structures";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_transport_fee_structure_id_fkey";
+            columns: ["transport_fee_structure_id"];
+            isOneToOne: false;
+            referencedRelation: "transport_fee_structures";
             referencedColumns: ["id"];
           },
         ];

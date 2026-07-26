@@ -50,7 +50,10 @@ export function StopList({ stops }: { stops: Stop[] }) {
     <div className="space-y-1">
       {sorted.map((s, i) =>
         editingId === s.id ? (
-          <div key={s.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-rule bg-paper p-2">
+          <div
+            key={s.id}
+            className="flex flex-wrap items-center gap-2 rounded-lg border border-rule bg-paper p-2"
+          >
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -77,10 +80,15 @@ export function StopList({ stops }: { stops: Stop[] }) {
             </button>
           </div>
         ) : (
-          <div key={s.id} className="flex items-center justify-between rounded-lg border border-rule bg-white px-3 py-2">
+          <div
+            key={s.id}
+            className="flex items-center justify-between rounded-lg border border-rule bg-white px-3 py-2"
+          >
             <p className="text-sm text-ink">
               {s.sequence_order}. {s.name}
-              {s.approx_time && <span className="text-ink-soft"> · {s.approx_time.slice(0, 5)}</span>}
+              {s.approx_time && (
+                <span className="text-ink-soft"> · {s.approx_time.slice(0, 5)}</span>
+              )}
             </p>
             <div className="flex items-center gap-1">
               <button

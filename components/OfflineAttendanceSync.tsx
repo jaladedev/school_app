@@ -84,7 +84,7 @@ export function OfflineAttendanceSync() {
           : `${pending.length} attendance record${pending.length === 1 ? "" : "s"} saved offline`}
       </p>
       {!syncing && (
-        <p className="text-ink-soft">Will sync automatically once you're back online.</p>
+        <p className="text-ink-soft">Will sync automatically once you&apos;re back online.</p>
       )}
     </div>
   );

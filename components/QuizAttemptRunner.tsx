@@ -139,7 +139,7 @@ export function QuizAttemptRunner({
       <div className="max-w-lg rounded-xl border border-rule bg-white p-6 text-center">
         <p className="mb-1 font-display text-xl font-semibold text-ink">Submitted</p>
         <p className="mb-4 text-sm text-ink-soft">
-          {result.score}/{result.total_points} — your score is pending your teacher's approval.
+          {result.score}/{result.total_points} — your score is pending your teacher&apos;s approval.
         </p>
         <button
           onClick={() => router.push("/dashboard/student/quizzes")}

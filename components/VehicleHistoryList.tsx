@@ -15,10 +15,18 @@ export function VehicleHistoryList({ entries }: { entries: HistoryEntry[] }) {
       {entries.map((e) => (
         <li key={e.id}>
           {e.vehiclePlateNumber} —{" "}
-          {new Date(e.assignedAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+          {new Date(e.assignedAt).toLocaleDateString("en-NG", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
           {" → "}
           {e.unassignedAt
-            ? new Date(e.unassignedAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })
+            ? new Date(e.unassignedAt).toLocaleDateString("en-NG", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })
             : "current"}
         </li>
       ))}

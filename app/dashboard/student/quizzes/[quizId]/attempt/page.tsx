@@ -15,7 +15,7 @@ export default async function QuizAttemptPage({ params }: { params: Promise<{ qu
     return (
       <div className="max-w-lg">
         <p className="text-sm text-clay">
-          This quiz isn't available — it may not be published yet, or may not be open to your class.
+          This quiz isn&apos;t available — it may not be published yet, or may not be open to your class.
         </p>
       </div>
     );
