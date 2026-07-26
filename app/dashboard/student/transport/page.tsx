@@ -24,7 +24,7 @@ export default async function StudentTransportPage() {
     return (
       <div className="max-w-lg">
         <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Transport</h1>
-        <p className="text-sm text-ink-soft">You aren't currently assigned to a bus route.</p>
+        <p className="text-sm text-ink-soft">You aren&apos;t currently assigned to a bus route.</p>
       </div>
     );
   }
