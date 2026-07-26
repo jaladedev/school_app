@@ -50,7 +50,7 @@ export default async function TransportOfficerPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Transport</h1>
-      <p className="mb-6 text-sm text-ink-soft">Today's routes and live status.</p>
+      <p className="mb-6 text-sm text-ink-soft">Today&apos;s routes and live status.</p>
 
       <div className="space-y-2">
         {(routes ?? []).map((r) => {
