@@ -471,6 +471,15 @@ export const TRIP_STATUS_LABELS: Record<TripStatusValue, string> = {
   arrived: "Arrived",
 };
 
+export type RouteVehicleHistory = {
+  id: string;
+  route_id: string;
+  vehicle_id: string;
+  assigned_at: string;
+  unassigned_at: string | null;
+  assigned_by: string | null;
+};
+
 // --- Quiz / assessment types ---
 
 export type QuestionType = "mcq" | "true_false";
@@ -1286,6 +1295,27 @@ export type Database = {
             columns: ["route_id"];
             isOneToOne: false;
             referencedRelation: "transport_routes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      route_vehicle_history: {
+        Row: RouteVehicleHistory;
+        Insert: Partial<RouteVehicleHistory>;
+        Update: Partial<RouteVehicleHistory>;
+        Relationships: [
+          {
+            foreignKeyName: "route_vehicle_history_route_id_fkey";
+            columns: ["route_id"];
+            isOneToOne: false;
+            referencedRelation: "transport_routes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "route_vehicle_history_vehicle_id_fkey";
+            columns: ["vehicle_id"];
+            isOneToOne: false;
+            referencedRelation: "vehicles";
             referencedColumns: ["id"];
           },
         ];

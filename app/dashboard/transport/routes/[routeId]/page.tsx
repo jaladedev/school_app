@@ -2,9 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { CreateStopForm } from "@/components/CreateStopForm";
+import { StopList } from "@/components/StopList";
 import { AssignStudentToRouteForm } from "@/components/AssignStudentToRouteForm";
 import { RouteOccupants } from "@/components/RouteOccupants";
 import { TripStatusControls } from "@/components/TripStatusControls";
+import { ReassignVehicleForm } from "@/components/ReassignVehicleForm";
+import { VehicleHistoryList } from "@/components/VehicleHistoryList";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -37,9 +40,21 @@ export default async function TransportRoutePage({
 
   const { data: route } = await supabase
     .from("transport_routes")
-    .select("id, name, description, vehicles(plate_number, driver_name)")
+    .select("id, name, description, vehicle_id, vehicles(plate_number, driver_name)")
     .eq("id", routeId)
     .single();
+
+  const { data: vehicles } = await supabase
+    .from("vehicles")
+    .select("id, plate_number, capacity")
+    .eq("is_archived", false)
+    .order("plate_number", { ascending: true });
+
+  const { data: vehicleHistory } = await supabase
+    .from("route_vehicle_history")
+    .select("id, assigned_at, unassigned_at, vehicles(plate_number)")
+    .eq("route_id", routeId)
+    .order("assigned_at", { ascending: false });
 
   const { data: stops } = await supabase
     .from("transport_stops")
@@ -87,19 +102,42 @@ export default async function TransportRoutePage({
 
   return (
     <div className="max-w-2xl">
-      <Link href={backHref} className="mb-4 inline-block text-sm text-leaf hover:underline">
+      <Link
+        href={backHref}
+        className="mb-4 inline-block text-sm text-leaf hover:underline"
+      >
         ← Back to transport
       </Link>
 
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">{route.name}</h1>
-      <p className="mb-6 text-sm text-ink-soft">
-        {route.vehicles?.plate_number
-          ? `${route.vehicles.plate_number}${route.vehicles.driver_name ? ` · ${route.vehicles.driver_name}` : ""}`
-          : "No vehicle assigned"}
-      </p>
 
       <div className="mb-6 space-y-2 rounded-xl border border-rule bg-white p-4">
-        <p className="text-sm font-medium text-ink">Today&apos;s status</p>
+        <p className="text-sm font-medium text-ink">Vehicle</p>
+        <ReassignVehicleForm
+          routeId={routeId}
+          currentVehicleId={route.vehicle_id}
+          vehicles={(vehicles ?? []).map((v) => ({
+            id: v.id,
+            label: `${v.plate_number} (${v.capacity} seats)`,
+          }))}
+        />
+        <details className="text-xs">
+          <summary className="cursor-pointer text-ink-soft">History</summary>
+          <div className="mt-2">
+            <VehicleHistoryList
+              entries={(vehicleHistory ?? []).map((h) => ({
+                id: h.id,
+                vehiclePlateNumber: h.vehicles?.plate_number ?? "Unknown",
+                assignedAt: h.assigned_at,
+                unassignedAt: h.unassigned_at,
+              }))}
+            />
+          </div>
+        </details>
+      </div>
+
+      <div className="mb-6 space-y-2 rounded-xl border border-rule bg-white p-4">
+        <p className="text-sm font-medium text-ink">Today's status</p>
         <TripStatusControls
           routeId={routeId}
           tripDate={tripDate}
@@ -116,16 +154,8 @@ export default async function TransportRoutePage({
 
       <div className="mb-6">
         <h2 className="mb-2 font-display text-lg font-semibold text-ink">Stops</h2>
-        <div className="mb-3 space-y-1">
-          {(stops ?? []).map((s) => (
-            <p key={s.id} className="text-sm text-ink">
-              {s.sequence_order}. {s.name}
-              {s.approx_time && (
-                <span className="text-ink-soft"> · {s.approx_time.slice(0, 5)}</span>
-              )}
-            </p>
-          ))}
-          {!stops?.length && <p className="text-sm text-ink-soft">No stops added yet.</p>}
+        <div className="mb-3">
+          <StopList stops={stops ?? []} />
         </div>
         <CreateStopForm routeId={routeId} nextSequence={(stops?.length ?? 0) + 1} />
       </div>

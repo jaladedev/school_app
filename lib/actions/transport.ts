@@ -96,6 +96,111 @@ export async function createStop(input: {
   revalidatePath("/dashboard/admin/transport");
 }
 
+export async function updateStop(input: { stopId: string; name: string; approxTime?: string }) {
+  await assertCanManageTransport();
+  if (!input.name.trim()) throw new Error("Stop name is required.");
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("transport_stops")
+    .update({ name: input.name.trim(), approx_time: input.approxTime || null })
+    .eq("id", input.stopId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/transport");
+  revalidatePath("/dashboard/transport");
+}
+
+/**
+ * Swaps sequence_order with the adjacent stop rather than a full
+ * drag-and-drop reorder — a route's stop list is short enough (a handful
+ * of pickup points) that up/down arrows cover the actual need without
+ * the extra client-side complexity a drag interface would add.
+ */
+export async function moveStop(stopId: string, direction: "up" | "down") {
+  await assertCanManageTransport();
+  const admin = createAdminClient();
+
+  const { data: stop } = await admin
+    .from("transport_stops")
+    .select("route_id, sequence_order")
+    .eq("id", stopId)
+    .single();
+  if (!stop) throw new Error("Stop not found.");
+
+  const { data: neighbor } = await admin
+    .from("transport_stops")
+    .select("id, sequence_order")
+    .eq("route_id", stop.route_id)
+    .eq("sequence_order", direction === "up" ? stop.sequence_order - 1 : stop.sequence_order + 1)
+    .maybeSingle();
+  if (!neighbor) return; // already at the top/bottom — nothing to do
+
+  // Two updates, not one transaction — swapping sequence_order under a
+  // unique(route_id, sequence_order) constraint needs a temporary
+  // out-of-range value in between, or the second update collides with
+  // whichever row hasn't moved yet.
+  const TEMP_ORDER = -1;
+  await admin.from("transport_stops").update({ sequence_order: TEMP_ORDER }).eq("id", stopId);
+  await admin
+    .from("transport_stops")
+    .update({ sequence_order: stop.sequence_order })
+    .eq("id", neighbor.id);
+  const { error } = await admin
+    .from("transport_stops")
+    .update({ sequence_order: neighbor.sequence_order })
+    .eq("id", stopId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/transport");
+  revalidatePath("/dashboard/transport");
+}
+
+export async function reassignRouteVehicle(routeId: string, vehicleId: string | null) {
+  const { id: actorId } = await assertRole(
+    ["admin", "teacher"],
+    "Only an admin or the transport officer can do this."
+  );
+  const admin = createAdminClient();
+  const { data: profile } = await admin.from("profiles").select("role").eq("id", actorId).single();
+  if (profile?.role !== "admin") {
+    const { data: teacherProfile } = await admin
+      .from("teacher_profiles")
+      .select("staff_role")
+      .eq("id", actorId)
+      .single();
+    if (teacherProfile?.staff_role !== "transport_officer") {
+      throw new Error("Only an admin or the transport officer can do this.");
+    }
+  }
+
+  // Close out the current history row for this route, if any.
+  const { error: closeError } = await admin
+    .from("route_vehicle_history")
+    .update({ unassigned_at: new Date().toISOString() })
+    .eq("route_id", routeId)
+    .is("unassigned_at", null);
+  if (closeError) throw new Error(closeError.message);
+
+  if (vehicleId) {
+    const { error: insertError } = await admin.from("route_vehicle_history").insert({
+      route_id: routeId,
+      vehicle_id: vehicleId,
+      assigned_by: actorId,
+    });
+    if (insertError) throw new Error(insertError.message);
+  }
+
+  const { error: updateError } = await admin
+    .from("transport_routes")
+    .update({ vehicle_id: vehicleId })
+    .eq("id", routeId);
+  if (updateError) throw new Error(updateError.message);
+
+  revalidatePath("/dashboard/admin/transport");
+  revalidatePath("/dashboard/transport");
+}
+
 // ---------- Admin or transport officer: assignments ----------
 
 export async function assignStudentToRoute(input: {
@@ -106,6 +211,27 @@ export async function assignStudentToRoute(input: {
 }) {
   const { actorId } = await assertCanManageTransport();
   const admin = createAdminClient();
+
+  const { data: route } = await admin
+    .from("transport_routes")
+    .select("vehicle_id, vehicles(capacity)")
+    .eq("id", input.routeId)
+    .single();
+
+  // Only enforced once a vehicle is actually assigned to the route — a
+  // route with no vehicle yet has no known capacity to check against,
+  // so assignment isn't blocked on that basis (just on the route
+  // existing at all).
+  if (route?.vehicle_id && route.vehicles?.capacity != null) {
+    const { count: currentRiders } = await admin
+      .from("transport_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("route_id", input.routeId)
+      .is("unassigned_at", null);
+    if ((currentRiders ?? 0) >= route.vehicles.capacity) {
+      throw new Error("This route's vehicle is already at seating capacity.");
+    }
+  }
 
   const { error: closeError } = await admin
     .from("transport_assignments")
