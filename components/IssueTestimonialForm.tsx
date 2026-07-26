@@ -47,9 +47,9 @@ export function IssueTestimonialForm({
       className="max-w-lg space-y-3 rounded-xl border border-rule bg-white p-4"
     >
       <p className="text-sm text-ink-soft">
-        This is a one-time issuance — once submitted, the testimonial&apos;s wording is locked in and can
-        only be reprinted, not edited, so it stays consistent with whatever copy has already been
-        handed out.
+        This is a one-time issuance — once submitted, the testimonial&apos;s wording is locked in
+        and can only be reprinted, not edited, so it stays consistent with whatever copy has already
+        been handed out.
       </p>
 
       <label className="block text-sm">

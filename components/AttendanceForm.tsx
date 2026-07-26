@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { markAttendance } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import { ExportAttendanceRegisterButton } from "@/components/ExportAttendanceRegisterButton";
+import { queueAttendance, looksLikeNetworkFailure } from "@/lib/offlineAttendanceQueue";
 import type { AttendanceStatus } from "@/types/database";
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string }[] = [
@@ -58,13 +59,22 @@ export function AttendanceForm({
   function handleSave() {
     setError(null);
     startTransition(async () => {
+      const records = students.map((s) => ({ studentId: s.id, status: statuses[s.id] }));
       try {
-        await markAttendance(
-          lessonId,
-          students.map((s) => ({ studentId: s.id, status: statuses[s.id] }))
-        );
+        await markAttendance(lessonId, records);
         emitToast("Attendance saved.");
       } catch (err: unknown) {
+        if (looksLikeNetworkFailure(err)) {
+          await queueAttendance({
+            lessonId,
+            lessonLabel: `${className} · ${lessonDate}`,
+            records,
+          });
+          emitToast(
+            "You're offline — attendance saved on this device and will sync automatically."
+          );
+          return;
+        }
         const message = err instanceof Error ? err.message : "Unable to save attendance.";
         setError(message);
         emitToast(message, "error");

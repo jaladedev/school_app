@@ -2,11 +2,18 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { ToastProvider } from "@/components/ToastProvider";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { OfflineAttendanceSync } from "@/components/OfflineAttendanceSync";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "School Management",
   description: "Timetables, lessons, notes and records for students, teachers and administration.",
+  manifest: "/manifest.webmanifest",
+};
+
+export const viewport = {
+  themeColor: "#faf7f0",
 };
 
 export default function RootLayout({
@@ -21,6 +28,8 @@ export default function RootLayout({
           <NavigationProgress />
         </Suspense>
         <ToastProvider />
+        <ServiceWorkerRegister />
+        <OfflineAttendanceSync />
         {children}
       </body>
     </html>
