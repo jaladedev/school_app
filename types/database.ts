@@ -8,7 +8,8 @@ export type AssessmentType =
   "first_ca" | "second_ca" | "exam" | "test" | "assignment" | "project" | "practical" | "other";
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
-export type StaffRole = "teacher" | "hod" | "bursar" | "librarian" | "house_parent";
+export type StaffRole =
+  "teacher" | "hod" | "bursar" | "librarian" | "house_parent" | "transport_officer";
 export type GradeModerationStatus = "pending" | "approved";
 export type ResourceType = "image" | "diagram_mermaid" | "video" | "pdf" | "link" | "audio";
 export type AssetCondition = "new" | "good" | "fair" | "poor" | "damaged";
@@ -409,6 +410,65 @@ export type Testimonial = {
   leaving_academic_year: string;
   issued_by: string | null;
   issued_at: string;
+};
+
+export type Vehicle = {
+  id: string;
+  plate_number: string;
+  model: string | null;
+  capacity: number;
+  driver_name: string | null;
+  driver_phone: string | null;
+  is_archived: boolean;
+  created_at: string;
+};
+
+export type TransportRoute = {
+  id: string;
+  name: string;
+  description: string | null;
+  vehicle_id: string | null;
+  is_archived: boolean;
+  created_at: string;
+};
+
+export type TransportStop = {
+  id: string;
+  route_id: string;
+  name: string;
+  sequence_order: number;
+  approx_time: string | null;
+  created_at: string;
+};
+
+export type TransportAssignment = {
+  id: string;
+  student_id: string;
+  route_id: string;
+  stop_id: string;
+  academic_year: string;
+  assigned_at: string;
+  unassigned_at: string | null;
+  assigned_by: string | null;
+};
+
+export type TripDirection = "morning" | "afternoon";
+export type TripStatusValue = "not_started" | "en_route" | "arrived";
+
+export type TransportTripStatus = {
+  id: string;
+  route_id: string;
+  trip_date: string;
+  direction: TripDirection;
+  status: TripStatusValue;
+  updated_by: string | null;
+  updated_at: string;
+};
+
+export const TRIP_STATUS_LABELS: Record<TripStatusValue, string> = {
+  not_started: "Not started",
+  en_route: "En route",
+  arrived: "Arrived",
 };
 
 export type Database = {
@@ -1086,6 +1146,82 @@ export type Database = {
             columns: ["issued_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      vehicles: {
+        Row: Vehicle;
+        Insert: Partial<Vehicle>;
+        Update: Partial<Vehicle>;
+        Relationships: [];
+      };
+      transport_routes: {
+        Row: TransportRoute;
+        Insert: Partial<TransportRoute>;
+        Update: Partial<TransportRoute>;
+        Relationships: [
+          {
+            foreignKeyName: "transport_routes_vehicle_id_fkey";
+            columns: ["vehicle_id"];
+            isOneToOne: false;
+            referencedRelation: "vehicles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      transport_stops: {
+        Row: TransportStop;
+        Insert: Partial<TransportStop>;
+        Update: Partial<TransportStop>;
+        Relationships: [
+          {
+            foreignKeyName: "transport_stops_route_id_fkey";
+            columns: ["route_id"];
+            isOneToOne: false;
+            referencedRelation: "transport_routes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      transport_assignments: {
+        Row: TransportAssignment;
+        Insert: Partial<TransportAssignment>;
+        Update: Partial<TransportAssignment>;
+        Relationships: [
+          {
+            foreignKeyName: "transport_assignments_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "transport_assignments_route_id_fkey";
+            columns: ["route_id"];
+            isOneToOne: false;
+            referencedRelation: "transport_routes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "transport_assignments_stop_id_fkey";
+            columns: ["stop_id"];
+            isOneToOne: false;
+            referencedRelation: "transport_stops";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      transport_trip_status: {
+        Row: TransportTripStatus;
+        Insert: Partial<TransportTripStatus>;
+        Update: Partial<TransportTripStatus>;
+        Relationships: [
+          {
+            foreignKeyName: "transport_trip_status_route_id_fkey";
+            columns: ["route_id"];
+            isOneToOne: false;
+            referencedRelation: "transport_routes";
             referencedColumns: ["id"];
           },
         ];

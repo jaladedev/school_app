@@ -16,6 +16,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Fees", href: "/dashboard/student/fees" },
     { label: "My Notes", href: "/dashboard/student/notes" },
     { label: "Library", href: "/dashboard/student/library" },
+    { label: "Transport", href: "/dashboard/student/transport" },
     { label: "Messages", href: "/dashboard/messages" },
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
@@ -43,6 +44,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Library", href: "/dashboard/library" },
     { label: "Inventory", href: "/dashboard/admin/inventory" },
     { label: "Hostels", href: "/dashboard/admin/hostels" },
+    { label: "Transport", href: "/dashboard/admin/transport" },
     { label: "Analytics", href: "/dashboard/admin/analytics" },
     { label: "Audit Log", href: "/dashboard/admin/audit-log" },
     { label: "Messages", href: "/dashboard/messages" },
@@ -58,6 +60,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Timetable", href: "/dashboard/parent/timetable" },
     { label: "Homework", href: "/dashboard/parent/homework" },
     { label: "Library", href: "/dashboard/parent/library" },
+    { label: "Transport", href: "/dashboard/parent/transport" },
     { label: "Messages", href: "/dashboard/messages" },
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
@@ -95,7 +98,9 @@ export function Sidebar({
       ? [...NAV_BY_ROLE.teacher, { label: "Library", href: "/dashboard/library" }]
       : role === "teacher" && staffRole === "house_parent"
         ? [...NAV_BY_ROLE.teacher, { label: "Hostel", href: "/dashboard/hostel" }]
-        : NAV_BY_ROLE[role];
+        : role === "teacher" && staffRole === "transport_officer"
+          ? [...NAV_BY_ROLE.teacher, { label: "Transport", href: "/dashboard/transport" }]
+          : NAV_BY_ROLE[role];
   const pathname = usePathname();
   const activeHref = findActiveHref(pathname, items);
   const [mobileOpen, setMobileOpen] = useState(false);

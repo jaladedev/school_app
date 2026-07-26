@@ -233,7 +233,15 @@
 - Room/hostel creation stays admin-only (house parents can assign students and log leave for their own hostel, but not add rooms or hostels)
 - `assignStudentToRoom` uses sequential Supabase calls (close old assignment, then insert new), not a single atomic RPC like `borrow_library_book` — fine at low concurrency, but a race between two simultaneous assignments to the same student is theoretically possible; an RPC-based version would close that gap if it ever matters
 
-Want me to tighten up any of these before moving to the next P6 item?
+**Transport module**
+No GPS tracking — status is hand-set (Not started / En route / Arrived) by the transport officer or admin, same "manually marked" spirit as attendance, not live location
+No route-capacity enforcement — a route/vehicle can be assigned more riders than its seating capacity; nothing blocks it (unlike hostel rooms, which do check capacity before assigning)
+No transport fee integration — no wiring into fee_structures/invoices for a transport levy; that would need its own fee-structure entries, not built here
+No stop reordering/editing UI — stops are append-only via sequence_order; no drag-to-reorder or edit-in-place once added
+No vehicle-to-route history — reassigning a route's vehicle just overwrites vehicle_id; unlike student assignments, there's no historical record of which vehicle served a route over time
+No driver accounts/login — drivers are just a name + phone on the vehicle record, not a system user; only the transport officer (a teacher sub-role) or admin can update live status, not the driver directly
+
+solving maths problems( calculations)
 
 ## Dev, Docs, Quality
 
