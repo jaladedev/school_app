@@ -99,8 +99,8 @@ export function CreateHostelForm({
       </div>
 
       <p className="text-xs text-ink-soft">
-        Only teachers with the "House parent" staff role appear above — assign that role from Staff
-        management first if the person you need isn't listed.
+        Only teachers with the &quot;House parent&quot; staff role appear above — assign that role from Staff
+        management first if the person you need isn&apos;t listed.
       </p>
 
       <div className="flex gap-2">
