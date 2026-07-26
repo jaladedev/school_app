@@ -99,7 +99,7 @@ export default async function TransportRoutePage({
       </p>
 
       <div className="mb-6 space-y-2 rounded-xl border border-rule bg-white p-4">
-        <p className="text-sm font-medium text-ink">Today's status</p>
+        <p className="text-sm font-medium text-ink">Today&apos;s status</p>
         <TripStatusControls
           routeId={routeId}
           tripDate={tripDate}
