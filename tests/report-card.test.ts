@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeSubjectPercent, ordinal, rankDescending } from "@/lib/report-card";
+import { computeSubjectPercent, ordinal, rankDescending } from "@/lib/report-card-scoring";
 
 describe("report-card scoring and ranking", () => {
   it("calculates unweighted scores from earned points and available points", () => {

@@ -1,45 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { scoreToLetterGrade, type GradeScaleEntry, type AttendanceStatus } from "@/types/database";
+import {
+  ordinal,
+  rankDescending,
+  computeSubjectPercent,
+  type SubjectResult,
+  type ReportCardData,
+} from "@/lib/report-card-scoring";
 
-export function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
-}
-
-export function rankDescending(values: number[]): number[] {
-  const sorted = [...values].sort((a, b) => b - a);
-  return values.map((v) => sorted.indexOf(v) + 1);
-}
-
-export type SubjectResult = {
-  subjectId: string;
-  subjectName: string;
-  scorePercent: number | null;
-  letterGrade: string | null;
-  position: string | null;
-  classSize: number;
-};
-
-export type ReportCardData = {
-  student: { id: string; fullName: string; admissionNo: string | null };
-  className: string;
-  term: number;
-  academicYear: string;
-  schoolName: string;
-  schoolMotto: string | null;
-  schoolLogoUrl: string | null;
-  subjects: SubjectResult[];
-  overall: {
-    averagePercent: number | null;
-    letterGrade: string | null;
-    position: string | null;
-    classSize: number;
-  };
-  attendance: { present: number; absent: number; late: number; excused: number; total: number };
-  remark: { classTeacherRemark: string | null; adminRemark: string | null } | null;
-};
+// Re-exported so nothing importing from "@/lib/report-card" needs to
+// change — the pure logic now lives in lib/report-card-scoring.ts (no
+// Supabase imports there, so it can be unit-tested / imported without
+// server env vars being configured). This file keeps only the
+// data-fetching orchestration.
+export { ordinal, rankDescending, computeSubjectPercent };
+export type { SubjectResult, ReportCardData };
 
 type StudentProfileWithProfile = {
   id: string;
@@ -61,40 +37,6 @@ type LessonWithTimetableEntry = {
   timetable_entry_id: string;
   timetable_entries: { term: number; academic_year: string } | null;
 };
-
-export function computeSubjectPercent(
-  studentId: string,
-  assessmentIds: string[],
-  maxScores: Map<string, number>,
-  weights: Map<string, number | null>,
-  grades: { assessment_id: string; student_id: string; score: number }[]
-): number | null {
-  const relevantGrades = assessmentIds
-    .map((aid) => grades.find((g) => g.assessment_id === aid && g.student_id === studentId))
-    .filter((g): g is NonNullable<typeof g> => !!g);
-
-  if (!relevantGrades.length) return null;
-
-  const allWeighted = assessmentIds.every((aid) => weights.get(aid) != null);
-
-  if (allWeighted) {
-    let total = 0;
-    for (const g of relevantGrades) {
-      const max = maxScores.get(g.assessment_id) ?? 0;
-      const weight = weights.get(g.assessment_id) ?? 0;
-      if (max > 0) total += (g.score / max) * weight;
-    }
-    return total;
-  }
-
-  let scoreSum = 0;
-  let maxSum = 0;
-  for (const g of relevantGrades) {
-    scoreSum += g.score;
-    maxSum += maxScores.get(g.assessment_id) ?? 0;
-  }
-  return maxSum > 0 ? (scoreSum / maxSum) * 100 : null;
-}
 
 export async function getReportCardData(
   studentId: string,

@@ -42,7 +42,7 @@ export async function createDriverAccount(input: {
 
   const { error: profileError } = await admin.from("profiles").insert({
     id: authUser.user.id,
-    role: "driver",
+    role: "teacher",
     full_name: input.fullName.trim(),
     email: input.email.trim(),
     phone: input.phone?.trim() || null,
@@ -54,6 +54,19 @@ export async function createDriverAccount(input: {
     // an orphaned login with no matching profile row.
     await admin.auth.admin.deleteUser(authUser.user.id);
     throw new Error(profileError.message);
+  }
+
+  const { error: teacherProfileError } = await admin.from("teacher_profiles").insert({
+    id: authUser.user.id,
+    staff_role: "driver",
+  });
+  if (teacherProfileError) {
+    // Same rollback reasoning as above — don't leave a profiles row with
+    // no matching teacher_profiles row, since every staff_role check in
+    // this app (is_bursar, is_librarian, assertCanUpdateTrip, etc.)
+    // requires both rows to exist together.
+    await admin.auth.admin.deleteUser(authUser.user.id);
+    throw new Error(teacherProfileError.message);
   }
 
   if (input.vehicleId) {
