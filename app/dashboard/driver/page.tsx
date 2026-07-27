@@ -22,7 +22,7 @@ export default async function DriverHomePage() {
       <div className="max-w-lg p-6">
         <h1 className="mb-1 font-display text-2xl font-semibold text-ink">My Route</h1>
         <p className="text-sm text-ink-soft">
-          You aren't currently linked to a vehicle. Ask an admin to link your account from Transport
+          You aren&apos;t currently linked to a vehicle. Ask an admin to link your account from Transport
           management.
         </p>
       </div>

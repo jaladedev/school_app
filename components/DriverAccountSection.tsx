@@ -75,13 +75,13 @@ export function DriverAccountSection({
     return (
       <div className="bg-marigold-soft rounded-lg border border-marigold p-3 text-xs">
         <p className="mb-1 font-medium text-ink">
-          Driver account created — share these sign-in details now, they won't be shown again:
+          Driver account created — share these sign-in details now, they won&apos;t be shown again:
         </p>
         <p className="font-mono text-ink">
           {email} / {tempPassword}
         </p>
         <p className="mt-1 text-ink-soft">
-          They'll be asked to set their own password on first login.
+          They&apos;ll be asked to set their own password on first login.
         </p>
         <button
           onClick={() => setTempPassword(null)}
