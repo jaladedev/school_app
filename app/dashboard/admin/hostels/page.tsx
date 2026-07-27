@@ -2,10 +2,17 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateHostelForm } from "@/components/CreateHostelForm";
 import { CreateHostelRoomForm } from "@/components/CreateHostelRoomForm";
+import { HostelFeeSection } from "@/components/HostelFeeSection";
 import { EmptyState } from "@/components/EmptyState";
 
 export default async function HostelsPage() {
   const supabase = createClient();
+
+  const { data: settings } = await supabase
+    .from("school_settings")
+    .select("current_academic_year, current_term")
+    .eq("id", 1)
+    .single();
 
   const { data: hostels } = await supabase
     .from("hostels")
@@ -20,6 +27,11 @@ export default async function HostelsPage() {
     .from("hostel_assignments")
     .select("room_id")
     .is("unassigned_at", null);
+
+  const { data: feeStructures } = await supabase
+    .from("hostel_fee_structures")
+    .select("id, hostel_id, title, amount_kobo, term, academic_year, voided_at")
+    .order("created_at", { ascending: false });
 
   const occupancyByRoom = new Map<string, number>();
   for (const a of activeAssignments ?? []) {
@@ -98,6 +110,15 @@ export default async function HostelsPage() {
 
               <div className="mt-3">
                 <CreateHostelRoomForm hostelId={h.id} />
+              </div>
+
+              <div className="mt-3">
+                <HostelFeeSection
+                  hostelId={h.id}
+                  feeStructures={(feeStructures ?? []).filter((f) => f.hostel_id === h.id)}
+                  defaultTerm={settings?.current_term ?? 1}
+                  defaultAcademicYear={settings?.current_academic_year ?? ""}
+                />
               </div>
             </div>
           );

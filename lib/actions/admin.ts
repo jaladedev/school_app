@@ -247,6 +247,7 @@ export async function createStudentAccount(input: {
   admissionNo?: string;
   guardianName?: string;
   guardianPhone?: string;
+  gender?: "male" | "female" | "";
 }) {
   await assertRole(["admin"], "Only an admin can perform this action.");
 
@@ -287,6 +288,7 @@ export async function createStudentAccount(input: {
     admission_no: input.admissionNo ?? null,
     guardian_name: input.guardianName ?? null,
     guardian_phone: input.guardianPhone ?? null,
+    gender: input.gender || null,
   });
 
   if (studentError) {
@@ -494,6 +496,7 @@ export async function updateStudentAccount(input: {
   guardianName?: string;
   guardianPhone?: string;
   classId?: string;
+  gender?: "male" | "female" | "";
 }) {
   await assertRole(["admin"], "Only an admin can perform this action.");
   const admin = createAdminClient();
@@ -511,6 +514,7 @@ export async function updateStudentAccount(input: {
       admission_no: input.admissionNo || null,
       guardian_name: input.guardianName || null,
       guardian_phone: input.guardianPhone || null,
+      gender: input.gender || null,
       ...(input.classId ? { class_id: input.classId } : {}),
     })
     .eq("id", input.studentId);

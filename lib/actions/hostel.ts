@@ -54,6 +54,32 @@ async function assertCanManageStudentLeave(studentId: string): Promise<{ actorId
   return { actorId: id };
 }
 
+/**
+ * Admin or the house parent of the given hostel directly (as opposed to
+ * assertCanManageRoom, which is scoped by room). Used for hostel-level
+ * actions — fee structures and the waitlist — that aren't tied to one
+ * specific room.
+ */
+async function assertCanManageHostel(hostelId: string): Promise<{ actorId: string }> {
+  const { id } = await assertRole(
+    ["admin", "teacher"],
+    "Only an admin or that hostel's house parent can do this."
+  );
+  const admin = createAdminClient();
+  const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
+  if (profile?.role === "admin") return { actorId: id };
+
+  const { data: hostel } = await admin
+    .from("hostels")
+    .select("house_parent_id")
+    .eq("id", hostelId)
+    .single();
+  if (hostel?.house_parent_id !== id) {
+    throw new Error("Only an admin or that hostel's house parent can do this.");
+  }
+  return { actorId: id };
+}
+
 // ---------- Admin: hostel / room setup ----------
 
 export async function createHostel(input: {
@@ -130,42 +156,19 @@ export async function assignStudentToRoom(input: {
   roomId: string;
   academicYear: string;
 }) {
-  const { actorId } = await assertCanManageRoom(input.roomId);
+  // The room lock, capacity check, gender-match check, close-old-
+  // assignment, insert-new-assignment, and waitlist auto-fulfill all
+  // happen inside assign_student_to_hostel_room in one transaction —
+  // closes the race window the old sequential app-side calls had.
+  await assertCanManageRoom(input.roomId);
   const admin = createAdminClient();
 
-  const { data: room } = await admin
-    .from("hostel_rooms")
-    .select("capacity")
-    .eq("id", input.roomId)
-    .single();
-  if (!room) throw new Error("Room not found.");
-
-  const { count: occupied } = await admin
-    .from("hostel_assignments")
-    .select("id", { count: "exact", head: true })
-    .eq("room_id", input.roomId)
-    .is("unassigned_at", null);
-  if ((occupied ?? 0) >= room.capacity) {
-    throw new Error("This room is already at capacity.");
-  }
-
-  // Close out any existing active assignment first — a student can only
-  // have one active row (enforced by the partial unique index too, this
-  // just gives a clearer error path and keeps history correct).
-  const { error: closeError } = await admin
-    .from("hostel_assignments")
-    .update({ unassigned_at: new Date().toISOString() })
-    .eq("student_id", input.studentId)
-    .is("unassigned_at", null);
-  if (closeError) throw new Error(closeError.message);
-
-  const { error: insertError } = await admin.from("hostel_assignments").insert({
-    student_id: input.studentId,
-    room_id: input.roomId,
-    academic_year: input.academicYear,
-    assigned_by: actorId,
+  const { error } = await admin.rpc("assign_student_to_hostel_room", {
+    p_student_id: input.studentId,
+    p_room_id: input.roomId,
+    p_academic_year: input.academicYear,
   });
-  if (insertError) throw new Error(insertError.message);
+  if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin/hostels");
 }
@@ -217,4 +220,42 @@ export async function recordHostelReturn(leaveLogId: string, studentId: string) 
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin/hostels");
+}
+
+// ---------- Admin or house parent: capacity waitlist ----------
+
+/**
+ * Puts a student on the waitlist for a hostel that's currently full.
+ * assignStudentToRoom auto-fulfills the matching entry (by student +
+ * hostel) whenever a room in that hostel opens up and the student is
+ * assigned to it — no separate "promote from waitlist" step needed.
+ */
+export async function joinHostelWaitlist(studentId: string, hostelId: string) {
+  await assertCanManageHostel(hostelId);
+  const admin = createAdminClient();
+
+  const { error } = await admin.rpc("join_hostel_waitlist", {
+    p_student_id: studentId,
+    p_hostel_id: hostelId,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/hostels");
+  revalidatePath("/dashboard/hostels");
+}
+
+export async function cancelHostelWaitlistEntry(entryId: string, hostelId: string) {
+  await assertCanManageHostel(hostelId);
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from("hostel_waitlist")
+    .update({ cancelled_at: new Date().toISOString() })
+    .eq("id", entryId)
+    .is("fulfilled_at", null)
+    .is("cancelled_at", null);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/hostels");
+  revalidatePath("/dashboard/hostels");
 }

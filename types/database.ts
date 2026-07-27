@@ -1,4 +1,4 @@
-export type UserRole = "student" | "teacher" | "admin" | "parent" | "driver";
+export type UserRole = "student" | "teacher" | "admin" | "parent";
 export type NoteStatus = "draft" | "published" | "archived";
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disciplinary";
@@ -48,6 +48,7 @@ export type StudentProfile = {
   guardian_name: string | null;
   guardian_phone: string | null;
   class_id: string | null;
+  gender: "male" | "female" | null;
 };
 
 export type TeacherProfile = {
@@ -285,6 +286,7 @@ export type Invoice = {
   student_id: string;
   fee_structure_id: string | null;
   transport_fee_structure_id: string | null;
+  hostel_fee_structure_id: string | null;
   term: number;
   academic_year: string;
   total_amount_kobo: number;
@@ -423,7 +425,6 @@ export type Vehicle = {
   capacity: number;
   driver_name: string | null;
   driver_phone: string | null;
-  driver_profile_id: string | null;
   is_archived: boolean;
   created_at: string;
 };
@@ -561,6 +562,31 @@ export type TransportFeeStructure = {
   created_at: string;
   voided_at: string | null;
   voided_by: string | null;
+};
+
+export type HostelFeeStructure = {
+  id: string;
+  hostel_id: string;
+  term: number;
+  academic_year: string;
+  title: string;
+  amount_kobo: number;
+  due_date: string | null;
+  created_by: string | null;
+  created_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
+};
+
+export type HostelWaitlistEntry = {
+  id: string;
+  student_id: string;
+  hostel_id: string;
+  requested_at: string;
+  requested_by: string | null;
+  fulfilled_at: string | null;
+  fulfilled_room_id: string | null;
+  cancelled_at: string | null;
 };
 
 export type Database = {
@@ -1039,6 +1065,41 @@ export type Database = {
           },
         ];
       };
+      hostel_fee_structures: {
+        Row: HostelFeeStructure;
+        Insert: Partial<HostelFeeStructure>;
+        Update: Partial<HostelFeeStructure>;
+        Relationships: [
+          {
+            foreignKeyName: "hostel_fee_structures_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      hostel_waitlist: {
+        Row: HostelWaitlistEntry;
+        Insert: Partial<HostelWaitlistEntry>;
+        Update: Partial<HostelWaitlistEntry>;
+        Relationships: [
+          {
+            foreignKeyName: "hostel_waitlist_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hostel_waitlist_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       invoices: {
         Row: Invoice;
         Insert: Partial<Invoice>;
@@ -1063,6 +1124,13 @@ export type Database = {
             columns: ["transport_fee_structure_id"];
             isOneToOne: false;
             referencedRelation: "transport_fee_structures";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_hostel_fee_structure_id_fkey";
+            columns: ["hostel_fee_structure_id"];
+            isOneToOne: false;
+            referencedRelation: "hostel_fee_structures";
             referencedColumns: ["id"];
           },
           {
@@ -1274,15 +1342,7 @@ export type Database = {
         Row: Vehicle;
         Insert: Partial<Vehicle>;
         Update: Partial<Vehicle>;
-        Relationships: [
-          {
-            foreignKeyName: "vehicles_driver_profile_id_fkey";
-            columns: ["driver_profile_id"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-        ];
+        Relationships: [];
       };
       transport_routes: {
         Row: TransportRoute;
@@ -1502,6 +1562,14 @@ export type Database = {
       student_current_hostel: {
         Args: { sid: string };
         Returns: string | null;
+      };
+      assign_student_to_hostel_room: {
+        Args: { p_student_id: string; p_room_id: string; p_academic_year: string };
+        Returns: HostelAssignment;
+      };
+      join_hostel_waitlist: {
+        Args: { p_student_id: string; p_hostel_id: string };
+        Returns: HostelWaitlistEntry;
       };
       record_invoice_payment: {
         Args: {

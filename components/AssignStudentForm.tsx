@@ -3,14 +3,16 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { StudentTypeahead, type StudentOption } from "@/components/StudentTypeahead";
-import { assignStudentToRoom } from "@/lib/actions/hostel";
+import { assignStudentToRoom, joinHostelWaitlist } from "@/lib/actions/hostel";
 import { emitToast } from "@/lib/toast";
 
 export function AssignStudentForm({
   roomId,
+  hostelId,
   students,
 }: {
   roomId: string;
+  hostelId: string;
   students: StudentOption[];
 }) {
   const router = useRouter();
@@ -18,10 +20,12 @@ export function AssignStudentForm({
   const [academicYear, setAcademicYear] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [roomFull, setRoomFull] = useState(false);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setRoomFull(false);
     if (!studentId) {
       setError("Pick a student first.");
       return;
@@ -38,7 +42,24 @@ export function AssignStudentForm({
         setStudentId("");
         router.refresh();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        const message = err instanceof Error ? err.message : "Something went wrong.";
+        setError(message);
+        if (message === "This room is already at capacity.") setRoomFull(true);
+      }
+    });
+  }
+
+  function handleJoinWaitlist() {
+    startTransition(async () => {
+      try {
+        await joinHostelWaitlist(studentId, hostelId);
+        emitToast("Added to the waitlist.");
+        setError(null);
+        setRoomFull(false);
+        setStudentId("");
+        router.refresh();
+      } catch (err) {
+        emitToast(err instanceof Error ? err.message : "Something went wrong.", "error");
       }
     });
   }
@@ -61,7 +82,21 @@ export function AssignStudentForm({
       >
         {isPending ? "Assigning…" : "Assign"}
       </button>
-      {error && <p className="w-full text-sm text-clay">{error}</p>}
+      {error && (
+        <div className="w-full">
+          <p className="text-sm text-clay">{error}</p>
+          {roomFull && studentId && (
+            <button
+              type="button"
+              onClick={handleJoinWaitlist}
+              disabled={isPending}
+              className="mt-1 rounded-lg border border-rule px-3 py-1.5 text-xs font-medium text-ink hover:bg-leaf-soft disabled:opacity-60"
+            >
+              Room&apos;s full — add this student to the hostel waitlist instead
+            </button>
+          )}
+        </div>
+      )}
     </form>
   );
 }

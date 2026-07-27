@@ -17,6 +17,7 @@ export function CreateStudentForm({
   const [admissionNo, setAdmissionNo] = useState("");
   const [guardianName, setGuardianName] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "">("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -46,6 +47,7 @@ export function CreateStudentForm({
       admissionNo: admissionNo || undefined,
       guardianName: guardianName || undefined,
       guardianPhone: guardianPhone || undefined,
+      gender: gender || undefined,
     };
 
     const errors = fieldErrorsFrom(createStudentSchema, input);
@@ -65,6 +67,7 @@ export function CreateStudentForm({
         setAdmissionNo("");
         setGuardianName("");
         setGuardianPhone("");
+        setGender("");
       } catch (err: any) {
         setError(err.message ?? "Something went wrong.");
       }
@@ -157,6 +160,18 @@ export function CreateStudentForm({
           onChange={(e) => setGuardianPhone(e.target.value)}
           className="rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
         />
+      </div>
+
+      <div>
+        <select
+          value={gender}
+          onChange={(e) => setGender(e.target.value as "male" | "female" | "")}
+          className="w-full rounded-lg border border-rule px-3 py-2 text-sm"
+        >
+          <option value="">Gender (optional — used to match boarding hostels)</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
       </div>
 
       <div className="flex gap-2">

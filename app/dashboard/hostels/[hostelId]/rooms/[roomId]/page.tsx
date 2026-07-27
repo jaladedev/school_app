@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { RoomOccupants } from "@/components/RoomOccupants";
 import { AssignStudentForm } from "@/components/AssignStudentForm";
+import { HostelWaitlistPanel } from "@/components/HostelWaitlistPanel";
 
 export default async function HostelRoomPage({
   params,
@@ -41,6 +42,14 @@ export default async function HostelRoomPage({
     .select("id, admission_no, profiles(full_name)")
     .order("admission_no", { ascending: true });
 
+  const { data: waitlist } = await supabase
+    .from("hostel_waitlist")
+    .select("id, student_id, requested_at, student_profiles(admission_no, profiles(full_name))")
+    .eq("hostel_id", hostelId)
+    .is("fulfilled_at", null)
+    .is("cancelled_at", null)
+    .order("requested_at", { ascending: true });
+
   const studentOptions = (allStudents ?? [])
     .filter((s) => !studentIds.includes(s.id))
     .map((s) => ({
@@ -74,8 +83,23 @@ export default async function HostelRoomPage({
 
       <div className="mb-6">
         <h2 className="mb-2 font-display text-lg font-semibold text-ink">Assign a student</h2>
-        <AssignStudentForm roomId={roomId} students={studentOptions} />
+        <AssignStudentForm roomId={roomId} hostelId={hostelId} students={studentOptions} />
       </div>
+
+      {!!waitlist?.length && (
+        <div className="mb-6">
+          <h2 className="mb-2 font-display text-lg font-semibold text-ink">Waitlist</h2>
+          <HostelWaitlistPanel
+            hostelId={hostelId}
+            entries={waitlist.map((w) => ({
+              id: w.id,
+              fullName: w.student_profiles?.profiles?.full_name ?? "Unknown",
+              admissionNo: w.student_profiles?.admission_no ?? null,
+              requestedAt: w.requested_at,
+            }))}
+          />
+        </div>
+      )}
 
       <div>
         <h2 className="mb-2 font-display text-lg font-semibold text-ink">Occupants</h2>

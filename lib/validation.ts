@@ -8,6 +8,7 @@ export const createStudentSchema = z.object({
   admissionNo: z.string().trim().optional(),
   guardianName: z.string().trim().optional(),
   guardianPhone: z.string().trim().optional(),
+  gender: z.enum(["male", "female", ""]).optional(),
 });
 export type CreateStudentInput = z.infer<typeof createStudentSchema>;
 

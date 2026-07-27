@@ -12,6 +12,7 @@ export function EditStudentForm({
   currentGuardianName,
   currentGuardianPhone,
   currentClassId,
+  currentGender,
   classes,
 }: {
   studentId: string;
@@ -20,6 +21,7 @@ export function EditStudentForm({
   currentGuardianName: string | null;
   currentGuardianPhone: string | null;
   currentClassId: string | null;
+  currentGender: "male" | "female" | null;
   classes: { id: string; name: string; arm: string | null }[];
 }) {
   const router = useRouter();
@@ -28,6 +30,7 @@ export function EditStudentForm({
   const [guardianName, setGuardianName] = useState(currentGuardianName ?? "");
   const [guardianPhone, setGuardianPhone] = useState(currentGuardianPhone ?? "");
   const [classId, setClassId] = useState(currentClassId ?? "");
+  const [gender, setGender] = useState<"male" | "female" | "">(currentGender ?? "");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +47,7 @@ export function EditStudentForm({
           guardianName: guardianName || undefined,
           guardianPhone: guardianPhone || undefined,
           classId: classId !== currentClassId ? classId : undefined,
+          gender,
         });
         emitToast("Student updated.");
         router.refresh();
@@ -120,6 +124,21 @@ export function EditStudentForm({
             className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
           />
         </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-soft">
+          Gender
+        </label>
+        <select
+          value={gender}
+          onChange={(e) => setGender(e.target.value as "male" | "female" | "")}
+          className="w-full rounded-lg border border-rule px-3 py-2 text-sm"
+        >
+          <option value="">Not set</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
       </div>
 
       <button

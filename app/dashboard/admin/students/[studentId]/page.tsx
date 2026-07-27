@@ -88,6 +88,7 @@ export default async function StudentInfoPage({
             currentGuardianName={student.guardian_name}
             currentGuardianPhone={student.guardian_phone}
             currentClassId={student.class_id}
+            currentGender={student.gender}
             classes={classes ?? []}
           />
         </div>
