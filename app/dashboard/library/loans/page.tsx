@@ -31,6 +31,7 @@ export default async function AdminLibraryLoansPage() {
           "id, total_amount_kobo, discount_kobo, amount_paid_kobo, created_at, student_profiles(admission_no, profiles(full_name)), fee_structures!inner(title)"
         )
         .eq("fee_structures.title", "Library Fine")
+        .is("voided_at", null)
         .in("status", ["unpaid", "partial"])
         .order("created_at", { ascending: false }),
     ]

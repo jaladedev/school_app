@@ -30,6 +30,7 @@ export default async function StudentFeesPage() {
     .from("invoices")
     .select("*, fee_structures(title, due_date)")
     .eq("student_id", profile.id)
+    .is("voided_at", null)
     .order("created_at", { ascending: false });
 
   const { data: payments } = await supabase

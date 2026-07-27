@@ -220,6 +220,10 @@ export async function waiveLibraryFine(invoiceId: string, reason?: string) {
     throw new Error("This fine has already been waived.");
   }
 
+  if (invoice.voided_at) {
+    throw new Error("This fine's invoice has been voided.");
+  }
+
   const { error } = await admin
     .from("invoices")
     .update({

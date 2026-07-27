@@ -17,6 +17,7 @@ export function ExportDefaultersButton() {
         "total_amount_kobo, discount_kobo, amount_paid_kobo, status, term, academic_year, student_profiles(admission_no, guardian_phone, profiles(full_name)), fee_structures(title)"
       )
       .in("status", ["unpaid", "partial"])
+      .is("voided_at", null)
       .order("student_id");
 
     setLoading(false);

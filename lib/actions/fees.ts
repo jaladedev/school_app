@@ -99,6 +99,14 @@ export async function recordPayment(input: {
     throw new Error("Payment amount must be greater than zero.");
   }
 
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("voided_at")
+    .eq("id", input.invoiceId)
+    .single();
+  if (invoice?.voided_at)
+    throw new Error("This invoice has been voided and can't accept payments.");
+
   const { data: result, error } = await admin.rpc("record_invoice_payment", {
     p_invoice_id: input.invoiceId,
     p_amount_kobo: input.amountKobo,
@@ -124,6 +132,7 @@ export async function applyDiscount(invoiceId: string, discountKobo: number) {
   const { data: invoice } = await admin.from("invoices").select("*").eq("id", invoiceId).single();
 
   if (!invoice) throw new Error("Invoice not found.");
+  if (invoice.voided_at) throw new Error("This invoice has been voided and can't be discounted.");
 
   const newStatus = computeInvoiceStatus(
     invoice.total_amount_kobo,
@@ -139,6 +148,58 @@ export async function applyDiscount(invoiceId: string, discountKobo: number) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin/fees");
+}
+
+/**
+ * Voids an invoice that shouldn't have existed (wrong student, duplicate
+ * generation, wrong fee structure, etc.) — distinct from applyDiscount,
+ * which is for a legitimate reduction/waiver of an amount actually owed.
+ * A voided invoice drops out of balances, defaulters, and collection
+ * totals entirely rather than showing as "paid" or a $0 discount.
+ *
+ * Blocked once any payment has landed on the invoice — reversing money
+ * already collected needs a real refund/reversal flow, not a void.
+ */
+export async function voidInvoice(invoiceId: string, reason: string) {
+  const { id } = await assertRole(["admin"], "Only an admin can void an invoice.");
+  const admin = createAdminClient();
+
+  const trimmedReason = reason.trim();
+  if (!trimmedReason) {
+    throw new Error("A reason is required to void an invoice.");
+  }
+
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("voided_at, amount_paid_kobo")
+    .eq("id", invoiceId)
+    .single();
+
+  if (!invoice) throw new Error("Invoice not found.");
+  if (invoice.voided_at) throw new Error("This invoice has already been voided.");
+  if (invoice.amount_paid_kobo > 0) {
+    throw new Error(
+      "This invoice already has a payment recorded — reverse or refund the payment before voiding."
+    );
+  }
+
+  const { error } = await admin
+    .from("invoices")
+    .update({
+      voided_at: new Date().toISOString(),
+      voided_by: id,
+      void_reason: trimmedReason,
+    })
+    .eq("id", invoiceId)
+    .is("voided_at", null);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/fees/invoices");
+  revalidatePath("/dashboard/student/fees");
+  revalidatePath("/dashboard/parent/fees");
+  revalidatePath("/dashboard/parent");
+  revalidatePath("/dashboard/library/loans");
 }
 
 // ---------- Paystack (student-initiated, server-verified) ----------
@@ -167,6 +228,7 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
     .single();
 
   if (!invoice) throw new Error("Invoice not found.");
+  if (invoice.voided_at) throw new Error("This invoice has been voided and can't accept payments.");
 
   // Who can trigger verification for this invoice:
   //  1. The student themselves — checked against auth.getUser()'s id,

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatKobo, type InvoiceStatus } from "@/types/database";
 import { RecordPaymentForm } from "@/components/RecordPaymentForm";
+import { VoidInvoiceForm } from "@/components/VoidInvoiceForm";
 import { ExportDefaultersButton } from "@/components/ExportDefaultersButton";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 import { EmptyState } from "@/components/EmptyState";
@@ -13,6 +14,8 @@ const STATUS_STYLES: Record<InvoiceStatus, string> = {
 };
 
 const VALID_STATUSES: InvoiceStatus[] = ["unpaid", "partial", "paid"];
+const VALID_TABS = [...VALID_STATUSES, "voided"] as const;
+type TabFilter = (typeof VALID_TABS)[number];
 
 export default async function AdminInvoicesPage({
   searchParams,
@@ -22,9 +25,11 @@ export default async function AdminInvoicesPage({
   const resolvedSearchParams = await searchParams;
 
   const supabase = createClient();
-  const statusFilter = VALID_STATUSES.includes(resolvedSearchParams.status as InvoiceStatus)
-    ? (resolvedSearchParams.status as InvoiceStatus)
+  const tabFilter = VALID_TABS.includes(resolvedSearchParams.status as TabFilter)
+    ? (resolvedSearchParams.status as TabFilter)
     : undefined;
+  const showingVoided = tabFilter === "voided";
+  const statusFilter = showingVoided ? undefined : (tabFilter as InvoiceStatus | undefined);
   const page = parsePage(resolvedSearchParams.page);
   const { from, to } = pageRange(page, DEFAULT_PAGE_SIZE);
 
@@ -48,18 +53,39 @@ export default async function AdminInvoicesPage({
     query = query.eq("academic_year", academicYear).eq("term", term);
   }
 
-  if (statusFilter) {
-    query = query.eq("status", statusFilter);
+  if (showingVoided) {
+    query = query.not("voided_at", "is", null);
+  } else {
+    query = query.is("voided_at", null);
+    if (statusFilter) {
+      query = query.eq("status", statusFilter);
+    }
   }
 
   const { data: invoices, count } = await query.range(from, to);
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / DEFAULT_PAGE_SIZE));
 
-  const { data: totals } = await supabase.rpc("invoice_dashboard_totals").single();
-  const totalBilled = totals?.total_billed ?? 0;
-  const totalCollected = totals?.total_collected ?? 0;
-  const totalOutstanding = totals?.total_outstanding ?? 0;
-  const defaulterCount = totals?.unpaid_invoice_count ?? 0;
+  // Computed directly here (rather than via the invoice_dashboard_totals
+  // RPC) so voided invoices are guaranteed to be excluded and the totals
+  // stay scoped to the same academic year/term as the list above.
+  let totalsQuery = supabase
+    .from("invoices")
+    .select("total_amount_kobo, discount_kobo, amount_paid_kobo, status")
+    .is("voided_at", null);
+  if (academicYear && term) {
+    totalsQuery = totalsQuery.eq("academic_year", academicYear).eq("term", term);
+  }
+  const { data: totalsRows } = await totalsQuery;
+
+  let totalBilled = 0;
+  let totalCollected = 0;
+  let defaulterCount = 0;
+  for (const row of totalsRows ?? []) {
+    totalBilled += row.total_amount_kobo - row.discount_kobo;
+    totalCollected += row.amount_paid_kobo;
+    if (row.status !== "paid") defaulterCount += 1;
+  }
+  const totalOutstanding = totalBilled - totalCollected;
 
   return (
     <div>
@@ -109,7 +135,7 @@ export default async function AdminInvoicesPage({
       </div>
 
       <div className="mb-4 flex gap-2">
-        {["all", "unpaid", "partial", "paid"].map((s) => (
+        {["all", "unpaid", "partial", "paid", "voided"].map((s) => (
           <Link
             key={s}
             href={
@@ -118,7 +144,7 @@ export default async function AdminInvoicesPage({
                 : `/dashboard/admin/fees/invoices?status=${s}`
             }
             className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize ${
-              (statusFilter ?? "all") === s
+              (tabFilter ?? "all") === s
                 ? "border-leaf bg-leaf-soft text-leaf"
                 : "border-rule text-ink-soft"
             }`}
@@ -136,9 +162,13 @@ export default async function AdminInvoicesPage({
           const owed = inv.total_amount_kobo - inv.discount_kobo;
           const balance = owed - inv.amount_paid_kobo;
           const status = inv.status as InvoiceStatus;
+          const isVoided = Boolean(inv.voided_at);
 
           return (
-            <div key={inv.id} className="rounded-lg border border-rule bg-white p-4">
+            <div
+              key={inv.id}
+              className={`rounded-lg border border-rule bg-white p-4 ${isVoided ? "opacity-70" : ""}`}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium text-ink">{profile?.full_name ?? "Unknown"}</p>
@@ -147,20 +177,36 @@ export default async function AdminInvoicesPage({
                   </p>
                 </div>
                 <div className="text-right">
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}
-                  >
-                    {status}
-                  </span>
+                  {isVoided ? (
+                    <span className="rounded-full bg-clay/10 px-2.5 py-1 text-xs font-medium text-clay">
+                      Voided
+                    </span>
+                  ) : (
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}
+                    >
+                      {status}
+                    </span>
+                  )}
                   <p className="mt-1 text-sm text-ink">
                     {formatKobo(inv.amount_paid_kobo)} / {formatKobo(owed)}
                   </p>
-                  {balance > 0 && (
+                  {!isVoided && balance > 0 && (
                     <p className="text-xs text-clay">{formatKobo(balance)} outstanding</p>
                   )}
                 </div>
               </div>
-              {status !== "paid" && <RecordPaymentForm invoiceId={inv.id} />}
+              {isVoided ? (
+                <p className="mt-2 text-xs text-ink-soft">
+                  Voided {new Date(inv.voided_at!).toLocaleDateString()}
+                  {inv.void_reason ? ` — ${inv.void_reason}` : ""}
+                </p>
+              ) : (
+                <div className="mt-2 flex items-center gap-3">
+                  {status !== "paid" && <RecordPaymentForm invoiceId={inv.id} />}
+                  {inv.amount_paid_kobo === 0 && <VoidInvoiceForm invoiceId={inv.id} />}
+                </div>
+              )}
             </div>
           );
         })}

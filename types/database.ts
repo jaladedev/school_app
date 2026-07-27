@@ -292,6 +292,9 @@ export type Invoice = {
   amount_paid_kobo: number;
   status: InvoiceStatus;
   created_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
 };
 
 export type Payment = {
@@ -1059,6 +1062,13 @@ export type Database = {
             columns: ["transport_fee_structure_id"];
             isOneToOne: false;
             referencedRelation: "transport_fee_structures";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];

@@ -39,7 +39,8 @@ export default async function ParentHome({
   const { data: invoices } = await supabase
     .from("invoices")
     .select("total_amount_kobo, discount_kobo, amount_paid_kobo")
-    .eq("student_id", selected.id);
+    .eq("student_id", selected.id)
+    .is("voided_at", null);
 
   const balance = (invoices ?? []).reduce(
     (sum, i) => sum + (i.total_amount_kobo - i.discount_kobo - i.amount_paid_kobo),

@@ -38,7 +38,8 @@ export async function getFeeCollectionTrend(
 ): Promise<FeeCollectionPoint[]> {
   const { data } = await supabase
     .from("invoices")
-    .select("academic_year, term, total_amount_kobo, discount_kobo, amount_paid_kobo, status");
+    .select("academic_year, term, total_amount_kobo, discount_kobo, amount_paid_kobo, status")
+    .is("voided_at", null);
 
   const byTerm = new Map<string, FeeCollectionPoint>();
   for (const row of data ?? []) {
