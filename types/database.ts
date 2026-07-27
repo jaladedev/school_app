@@ -478,6 +478,17 @@ export const TRIP_STATUS_LABELS: Record<TripStatusValue, string> = {
   arrived: "Arrived",
 };
 
+export type TransportLocation = {
+  id: string;
+  route_id: string;
+  trip_date: string;
+  direction: TripDirection;
+  lat: number;
+  lng: number;
+  recorded_at: string;
+  recorded_by: string | null;
+};
+
 export type RouteVehicleHistory = {
   id: string;
   route_id: string;
@@ -1416,6 +1427,20 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "transport_trip_status_route_id_fkey";
+            columns: ["route_id"];
+            isOneToOne: false;
+            referencedRelation: "transport_routes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      transport_locations: {
+        Row: TransportLocation;
+        Insert: Partial<TransportLocation>;
+        Update: Partial<TransportLocation>;
+        Relationships: [
+          {
+            foreignKeyName: "transport_locations_route_id_fkey";
             columns: ["route_id"];
             isOneToOne: false;
             referencedRelation: "transport_routes";

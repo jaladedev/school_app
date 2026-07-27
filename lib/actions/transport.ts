@@ -28,6 +28,51 @@ async function assertCanManageTransport(): Promise<{ actorId: string }> {
   return { actorId: id };
 }
 
+/**
+ * Admin, the transport officer, or the driver of the specific route being
+ * acted on — scoped to per-trip actions (status updates, GPS pings) that
+ * a driver legitimately performs from their own phone. A driver isn't a
+ * teacher_profiles row at all (role: "driver" on profiles is its own
+ * top-level role), so they can never satisfy assertCanManageTransport's
+ * admin/teacher check; this mirrors the DB's own is_driver_of_route()
+ * RLS check instead of relying on it silently, since the admin client
+ * bypasses RLS. Used by both updateTripStatus and
+ * recordTransportLocation — anything else driver-facing on a per-trip
+ * basis should go through this too, not assertCanManageTransport.
+ */
+async function assertCanActOnTrip(routeId: string): Promise<{ actorId: string }> {
+  const { id, role } = await assertRole(
+    ["admin", "teacher", "driver"],
+    "Only an admin, the transport officer, or this route's driver can do this."
+  );
+  const admin = createAdminClient();
+
+  if (role === "admin") return { actorId: id };
+
+  if (role === "driver") {
+    const { data: route } = await admin
+      .from("transport_routes")
+      .select("vehicle_id, vehicles(driver_profile_id)")
+      .eq("id", routeId)
+      .single();
+    if (route?.vehicles?.driver_profile_id !== id) {
+      throw new Error("You can only do this for your own route.");
+    }
+    return { actorId: id };
+  }
+
+  // role === "teacher": must be the transport officer.
+  const { data: teacherProfile } = await admin
+    .from("teacher_profiles")
+    .select("staff_role")
+    .eq("id", id)
+    .single();
+  if (teacherProfile?.staff_role !== "transport_officer") {
+    throw new Error("Only an admin, the transport officer, or this route's driver can do this.");
+  }
+  return { actorId: id };
+}
+
 // ---------- Admin: fleet setup ----------
 
 export async function createVehicle(input: {
@@ -266,7 +311,7 @@ export async function unassignStudentFromRoute(assignmentId: string) {
   revalidatePath("/dashboard/admin/transport");
 }
 
-// ---------- Admin or transport officer: live status ----------
+// ---------- Admin, transport officer, or the route's own driver: live status ----------
 
 export async function updateTripStatus(input: {
   routeId: string;
@@ -274,7 +319,7 @@ export async function updateTripStatus(input: {
   direction: TripDirection;
   status: TripStatusValue;
 }) {
-  const { actorId } = await assertCanManageTransport();
+  const { actorId } = await assertCanActOnTrip(input.routeId);
   const admin = createAdminClient();
 
   const { error } = await admin.from("transport_trip_status").upsert(
@@ -292,4 +337,41 @@ export async function updateTripStatus(input: {
 
   revalidatePath("/dashboard/admin/transport");
   revalidatePath("/dashboard/transport");
+}
+
+/**
+ * Records one GPS position update from the driver/transport officer's
+ * phone during a trip. Deliberately a plain insert (append history)
+ * rather than an upsert on "current position" — the read side only
+ * ever wants the latest row anyway, and keeping history costs nothing
+ * now while leaving room for a route-path view later without another
+ * migration.
+ */
+export async function recordTransportLocation(input: {
+  routeId: string;
+  tripDate: string;
+  direction: TripDirection;
+  lat: number;
+  lng: number;
+}) {
+  const { actorId } = await assertCanActOnTrip(input.routeId);
+  if (
+    !Number.isFinite(input.lat) ||
+    !Number.isFinite(input.lng) ||
+    Math.abs(input.lat) > 90 ||
+    Math.abs(input.lng) > 180
+  ) {
+    throw new Error("Invalid coordinates.");
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("transport_locations").insert({
+    route_id: input.routeId,
+    trip_date: input.tripDate,
+    direction: input.direction,
+    lat: input.lat,
+    lng: input.lng,
+    recorded_by: actorId,
+  });
+  if (error) throw new Error(error.message);
 }

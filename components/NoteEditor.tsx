@@ -3,6 +3,9 @@
 import { useRef, useState, useTransition } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { saveTopicNote, createMermaidResource } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
@@ -39,6 +42,21 @@ const TOOLBAR_BUTTONS: { label: string; title: string; action: ToolbarAction }[]
     label: "H",
     title: "Heading",
     action: { kind: "linePrefix", prefix: "## " },
+  },
+  {
+    label: "∑",
+    title: "Inline math (LaTeX) — e.g. \\frac{a}{b}, x^2, \\sqrt{n}",
+    action: { kind: "wrap", before: "$", after: "$", placeholder: "x^2 + 3x - 4 = 0" },
+  },
+  {
+    label: "∑∑",
+    title: "Block math (LaTeX, own line) — for a full worked step or equation",
+    action: {
+      kind: "wrap",
+      before: "\n$$\n",
+      after: "\n$$\n",
+      placeholder: "\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+    },
   },
   {
     label: "Table",
@@ -352,13 +370,15 @@ export function NoteEditor({
             onChange={(e) => setContent(e.target.value)}
             rows={24}
             className="w-full rounded-lg border border-rule bg-white p-3 font-mono text-sm text-ink outline-none focus-visible:border-marigold"
-            placeholder="## Introduction&#10;Write the topic explanation here. Use markdown tables for summaries."
+            placeholder="## Introduction&#10;Write the topic explanation here. Use markdown tables for summaries, and $...$ or $$...$$ for math."
           />
         </div>
         <div>
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft">Preview</p>
           <div className="topic-prose h-[calc(24*1.5rem)] overflow-y-auto rounded-lg border border-rule bg-white p-4">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+              {content}
+            </ReactMarkdown>
           </div>
         </div>
       </div>
@@ -366,7 +386,9 @@ export function NoteEditor({
       <p className="mt-3 text-xs text-ink-soft">
         Images, videos, and other uploaded resources are attached separately after publishing — use
         &quot;Insert resource&quot; to place one at a specific point in the text, or &quot;Generate
-        Mermaid diagram&quot; to create and insert a new diagram directly.
+        Mermaid diagram&quot; to create and insert a new diagram directly. For calculations and
+        formulas, wrap LaTeX in single $ for inline math (e.g. $x^2$) or double $$ on its own line
+        for a full equation or worked step — use the ∑ / ∑∑ buttons to insert either.
       </p>
       {error && <p className="mt-2 text-sm text-clay">{error}</p>}
     </div>

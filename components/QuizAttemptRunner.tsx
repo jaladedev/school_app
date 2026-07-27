@@ -9,6 +9,7 @@ import {
   submitQuizAttempt,
 } from "@/lib/actions/quizAttempt";
 import { emitToast } from "@/lib/toast";
+import { QuestionText } from "@/components/QuestionText";
 import type { QuizAttemptQuestionRow } from "@/types/database";
 
 type Question = {
@@ -176,9 +177,13 @@ export function QuizAttemptRunner({
       <div className="space-y-4">
         {questions.map((q, i) => (
           <div key={q.id} className="rounded-xl border border-rule bg-white p-4">
-            <p className="mb-3 text-sm font-medium text-ink">
-              {i + 1}. {q.text} <span className="text-ink-soft">({q.points} pts)</span>
-            </p>
+            <div className="mb-3 flex items-baseline justify-between gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                Question {i + 1}
+              </span>
+              <span className="text-xs text-ink-soft">{q.points} pts</span>
+            </div>
+            <QuestionText text={q.text} className="mb-3" />
             <div className="space-y-2">
               {q.options.map((o) => (
                 <label

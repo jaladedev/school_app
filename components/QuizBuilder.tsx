@@ -215,7 +215,7 @@ export function QuizBuilder({
 
             <textarea
               required
-              placeholder="Question text"
+              placeholder="Question text — use $...$ for inline math, e.g. $x^2 + 3x - 4 = 0$"
               value={q.questionText}
               onChange={(e) => updateQuestion(qIndex, { questionText: e.target.value })}
               rows={2}

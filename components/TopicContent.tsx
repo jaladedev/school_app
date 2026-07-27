@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import type { TopicResource } from "@/types/database";
 
@@ -105,7 +108,9 @@ export function TopicContent({
       {parts.map((part, i) =>
         part.type === "text" ? (
           <div className="topic-prose" key={i}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.value}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+              {part.value}
+            </ReactMarkdown>
           </div>
         ) : (
           <TopicResourceItem key={part.resource.id} resource={part.resource} />

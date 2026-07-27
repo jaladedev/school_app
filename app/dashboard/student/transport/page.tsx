@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { TransportStatusBadge } from "@/components/TransportStatusBadge";
+import { RouteMap } from "@/components/RouteMap";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -29,14 +30,32 @@ export default async function StudentTransportPage() {
     );
   }
 
+  const routeId = assignment.route_id;
+
   const { data: statuses } = await supabase
     .from("transport_trip_status")
     .select("direction, status")
-    .eq("route_id", assignment.route_id)
+    .eq("route_id", routeId)
     .eq("trip_date", tripDate);
 
   const morning = statuses?.find((s) => s.direction === "morning")?.status ?? "not_started";
   const afternoon = statuses?.find((s) => s.direction === "afternoon")?.status ?? "not_started";
+
+  async function latestLocation(direction: "morning" | "afternoon") {
+    const { data } = await supabase
+      .from("transport_locations")
+      .select("lat, lng, recorded_at")
+      .eq("route_id", routeId)
+      .eq("trip_date", tripDate)
+      .eq("direction", direction)
+      .order("recorded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data;
+  }
+
+  const morningLocation = morning === "en_route" ? await latestLocation("morning") : null;
+  const afternoonLocation = afternoon === "en_route" ? await latestLocation("afternoon") : null;
 
   return (
     <div className="max-w-lg">
@@ -60,6 +79,17 @@ export default async function StudentTransportPage() {
             initialStatus={morning as "not_started" | "en_route" | "arrived"}
           />
         </div>
+        {morningLocation && (
+          <RouteMap
+            routeId={assignment.route_id}
+            tripDate={tripDate}
+            direction="morning"
+            initialLat={morningLocation.lat}
+            initialLng={morningLocation.lng}
+            initialRecordedAt={morningLocation.recorded_at}
+            label={assignment.transport_routes?.name ?? "Your bus"}
+          />
+        )}
         <div className="flex items-center justify-between">
           <span className="text-sm text-ink">Afternoon drop-off</span>
           <TransportStatusBadge
@@ -69,6 +99,17 @@ export default async function StudentTransportPage() {
             initialStatus={afternoon as "not_started" | "en_route" | "arrived"}
           />
         </div>
+        {afternoonLocation && (
+          <RouteMap
+            routeId={assignment.route_id}
+            tripDate={tripDate}
+            direction="afternoon"
+            initialLat={afternoonLocation.lat}
+            initialLng={afternoonLocation.lng}
+            initialRecordedAt={afternoonLocation.recorded_at}
+            label={assignment.transport_routes?.name ?? "Your bus"}
+          />
+        )}
       </div>
     </div>
   );

@@ -8,6 +8,30 @@ import type { EducationLevel, PaymentMethod } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
 import { computeInvoiceStatus } from "@/lib/invoiceStatus";
 
+/**
+ * Admin or the bursar. The DB already grants staff_role: "bursar" write
+ * access to fee_structures/invoices/payments (is_bursar() policies) —
+ * this mirrors that at the app layer instead of leaving it as dead RLS
+ * that bursar accounts could never actually reach, since every action
+ * here used the admin client and was previously hard-locked to admin
+ * only.
+ */
+async function assertCanManageFees(errorMessage: string): Promise<{ id: string }> {
+  const { id, role } = await assertRole(["admin", "teacher"], errorMessage);
+  if (role === "admin") return { id };
+
+  const admin = createAdminClient();
+  const { data: teacherProfile } = await admin
+    .from("teacher_profiles")
+    .select("staff_role")
+    .eq("id", id)
+    .single();
+  if (teacherProfile?.staff_role !== "bursar") {
+    throw new Error(errorMessage);
+  }
+  return { id };
+}
+
 export async function createFeeStructure(input: {
   educationLevel: EducationLevel;
   levelNumber: number;
@@ -17,7 +41,7 @@ export async function createFeeStructure(input: {
   amountKobo: number;
   dueDate?: string;
 }) {
-  const { id } = await assertRole(["admin"], "Only an admin can manage fees.");
+  const { id } = await assertCanManageFees("Only an admin or the bursar can manage fees.");
   const admin = createAdminClient();
 
   const { error } = await admin.from("fee_structures").insert({
@@ -37,7 +61,7 @@ export async function createFeeStructure(input: {
 }
 
 export async function generateInvoicesForClass(feeStructureId: string, classId: string) {
-  await assertRole(["admin"], "Only an admin can manage fees.");
+  await assertCanManageFees("Only an admin or the bursar can manage fees.");
   const admin = createAdminClient();
 
   const { data: feeStructure } = await admin
@@ -92,7 +116,7 @@ export async function recordPayment(input: {
   method: PaymentMethod;
   reference?: string;
 }) {
-  const { id } = await assertRole(["admin"], "Only an admin can manage fees.");
+  const { id } = await assertCanManageFees("Only an admin or the bursar can manage fees.");
   const admin = createAdminClient();
 
   if (input.amountKobo <= 0) {
@@ -126,7 +150,7 @@ export async function recordPayment(input: {
 }
 
 export async function applyDiscount(invoiceId: string, discountKobo: number) {
-  await assertRole(["admin"], "Only an admin can manage fees.");
+  await assertCanManageFees("Only an admin or the bursar can manage fees.");
   const admin = createAdminClient();
 
   const { data: invoice } = await admin.from("invoices").select("*").eq("id", invoiceId).single();
@@ -161,7 +185,7 @@ export async function applyDiscount(invoiceId: string, discountKobo: number) {
  * already collected needs a real refund/reversal flow, not a void.
  */
 export async function voidInvoice(invoiceId: string, reason: string) {
-  const { id } = await assertRole(["admin"], "Only an admin can void an invoice.");
+  const { id } = await assertCanManageFees("Only an admin or the bursar can void an invoice.");
   const admin = createAdminClient();
 
   const trimmedReason = reason.trim();

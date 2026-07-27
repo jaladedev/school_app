@@ -236,7 +236,7 @@
 All four require running `hostel_module_migration.sql` against Supabase (new tables, RLS policies, an audit trigger, and the two new RPCs) — not yet applied, since this sandbox has no DB access.
 
 **Transport module**
-No GPS tracking — status is hand-set (Not started / En route / Arrived) by the transport officer or admin, same "manually marked" spirit as attendance, not live location
+[x] GPS tracking — driver/transport officer's phone shares its location via the browser Geolocation API (`LiveLocationSender`, throttled to one update per ~20s) into a new `transport_locations` table; parents/students see it live on a Leaflet map (`RouteMap`) via a Supabase Realtime subscription, shown whenever that direction's trip status is "en_route". Requires an actual hardware GPS tracker only if phone-based sharing isn't reliable enough in practice (driver's phone must stay on with the page open and a signal) — that's a separate, larger project (vendor device + webhook ingestion) not attempted here. Needs `transport_gps_migration.sql` run against Supabase — not yet applied.
 No route-capacity enforcement — a route/vehicle can be assigned more riders than its seating capacity; nothing blocks it (unlike hostel rooms, which do check capacity before assigning)
 No transport fee integration — no wiring into fee_structures/invoices for a transport levy; that would need its own fee-structure entries, not built here
 No stop reordering/editing UI — stops are append-only via sequence_order; no drag-to-reorder or edit-in-place once added

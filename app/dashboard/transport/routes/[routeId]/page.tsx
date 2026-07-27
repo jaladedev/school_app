@@ -6,6 +6,7 @@ import { StopList } from "@/components/StopList";
 import { AssignStudentToRouteForm } from "@/components/AssignStudentToRouteForm";
 import { RouteOccupants } from "@/components/RouteOccupants";
 import { TripStatusControls } from "@/components/TripStatusControls";
+import { LiveLocationSender } from "@/components/LiveLocationSender";
 import { ReassignVehicleForm } from "@/components/ReassignVehicleForm";
 import { VehicleHistoryList } from "@/components/VehicleHistoryList";
 import { TransportFeeSection } from "@/components/TransportFeeSection";
@@ -163,12 +164,14 @@ export default async function TransportRoutePage({
           direction="morning"
           currentStatus={statusByDirection.get("morning") ?? "not_started"}
         />
+        <LiveLocationSender routeId={routeId} tripDate={tripDate} direction="morning" />
         <TripStatusControls
           routeId={routeId}
           tripDate={tripDate}
           direction="afternoon"
           currentStatus={statusByDirection.get("afternoon") ?? "not_started"}
         />
+        <LiveLocationSender routeId={routeId} tripDate={tripDate} direction="afternoon" />
       </div>
 
       <div className="mb-6">

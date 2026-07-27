@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { PublishToggle } from "@/components/PublishToggle";
+import { QuestionText } from "@/components/QuestionText";
 
 export default async function TeacherQuizDetailPage({
   params,
@@ -67,9 +68,13 @@ export default async function TeacherQuizDetailPage({
         <div className="space-y-3">
           {(questions ?? []).map((q, i) => (
             <div key={q.id} className="rounded-lg border border-rule bg-white p-3">
-              <p className="mb-2 text-sm font-medium text-ink">
-                {i + 1}. {q.question_text} <span className="text-ink-soft">({q.points} pts)</span>
-              </p>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  Question {i + 1}
+                </span>
+                <span className="text-xs text-ink-soft">{q.points} pts</span>
+              </div>
+              <QuestionText text={q.question_text} className="mb-2" />
               <ul className="space-y-1 text-sm">
                 {(q.quiz_options ?? [])
                   .sort((a, b) => a.sequence_order - b.sequence_order)
