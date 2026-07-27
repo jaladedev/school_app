@@ -19,7 +19,7 @@ import type { UserRole } from "@/types/database";
 export async function assertRole(
   allowedRoles: UserRole[],
   errorMessage: string
-): Promise<{ id: string }> {
+): Promise<{ id: string; role: UserRole }> {
   const supabase = createClient();
   const {
     data: { user },
@@ -40,7 +40,7 @@ export async function assertRole(
     throw new Error(errorMessage);
   }
 
-  return { id: user.id };
+  return { id: user.id, role: profile.role };
 }
 
 /** Clears only the current user's first-login password-change flag. */

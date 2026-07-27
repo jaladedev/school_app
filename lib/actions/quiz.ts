@@ -22,10 +22,28 @@ export async function createQuiz(input: {
   closesAt?: string;
   questions: QuestionInput[];
 }) {
-  const { id: actorId } = await assertRole(
+  const { id: actorId, role: actorRole } = await assertRole(
     ["admin", "teacher"],
     "Only an admin or a teacher can create a quiz."
   );
+
+  // Teachers may only create quizzes for subjects they're assigned to.
+  // RLS (assessments_write_teacher_admin) only checks created_by, not
+  // subjects_taught, so this has to be enforced here.
+  if (actorRole === "teacher") {
+    const admin = createAdminClient();
+    const { data: teacherProfile, error: teacherError } = await admin
+      .from("teacher_profiles")
+      .select("subjects_taught")
+      .eq("id", actorId)
+      .single();
+    if (teacherError) throw new Error(teacherError.message);
+
+    const assignedSubjects = teacherProfile?.subjects_taught ?? [];
+    if (!assignedSubjects.includes(input.subjectId)) {
+      throw new Error("You can only create quizzes for subjects you teach.");
+    }
+  }
 
   if (!input.title.trim()) throw new Error("Title is required.");
   if (!input.questions.length) throw new Error("Add at least one question.");
