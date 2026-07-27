@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateVehicleForm } from "@/components/CreateVehicleForm";
 import { CreateRouteForm } from "@/components/CreateRouteForm";
+import { DriverAccountSection } from "@/components/DriverAccountSection";
 import { EmptyState } from "@/components/EmptyState";
 
 export default async function TransportPage() {
@@ -9,9 +10,17 @@ export default async function TransportPage() {
 
   const { data: vehicles } = await supabase
     .from("vehicles")
-    .select("id, plate_number, model, capacity, driver_name, driver_phone")
+    .select(
+      "id, plate_number, model, capacity, driver_name, driver_phone, driver_profile_id, profiles(full_name)"
+    )
     .eq("is_archived", false)
     .order("plate_number", { ascending: true });
+
+  const { data: existingDrivers } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .eq("role", "driver")
+    .eq("is_active", true);
 
   const { data: routes } = await supabase
     .from("transport_routes")
@@ -45,11 +54,18 @@ export default async function TransportPage() {
               <p className="font-medium text-ink">
                 {v.plate_number} {v.model ? `· ${v.model}` : ""}
               </p>
-              <p className="text-xs text-ink-soft">
+              <p className="mb-2 text-xs text-ink-soft">
                 Capacity {v.capacity}
-                {v.driver_name ? ` · Driver: ${v.driver_name}` : ""}
+                {v.driver_name ? ` · Contact: ${v.driver_name}` : ""}
                 {v.driver_phone ? ` (${v.driver_phone})` : ""}
               </p>
+              <DriverAccountSection
+                vehicleId={v.id}
+                currentDriverName={v.profiles?.full_name ?? null}
+                existingDrivers={(existingDrivers ?? [])
+                  .filter((d) => d.id !== v.driver_profile_id)
+                  .map((d) => ({ id: d.id, name: d.full_name }))}
+              />
             </div>
           ))}
           {!vehicles?.length && <EmptyState message="No vehicles yet — add the first one above." />}

@@ -66,6 +66,8 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Messages", href: "/dashboard/messages" },
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
+
+  driver: [{ label: "My Route", href: "/dashboard/driver" }],
 };
 
 /**

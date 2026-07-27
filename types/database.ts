@@ -1,4 +1,4 @@
-export type UserRole = "student" | "teacher" | "admin" | "parent";
+export type UserRole = "student" | "teacher" | "admin" | "parent" | "driver";
 export type NoteStatus = "draft" | "published" | "archived";
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disciplinary";
@@ -423,6 +423,7 @@ export type Vehicle = {
   capacity: number;
   driver_name: string | null;
   driver_phone: string | null;
+  driver_profile_id: string | null;
   is_archived: boolean;
   created_at: string;
 };
@@ -1273,7 +1274,15 @@ export type Database = {
         Row: Vehicle;
         Insert: Partial<Vehicle>;
         Update: Partial<Vehicle>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "vehicles_driver_profile_id_fkey";
+            columns: ["driver_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       transport_routes: {
         Row: TransportRoute;
