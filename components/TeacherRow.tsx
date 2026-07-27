@@ -116,6 +116,10 @@ export function TeacherRow({
             <option value="teacher">Teacher</option>
             <option value="hod">HOD</option>
             <option value="bursar">Bursar</option>
+            <option value="librarian">Librarian</option>
+            <option value="house_parent">House parent</option>
+            <option value="transport_officer">Transport officer</option>
+            <option value="driver">Driver</option>
           </select>
           <ResetPasswordButton userId={teacherId} />
           <DeactivateUserButton userId={teacherId} isActive={isActive} />

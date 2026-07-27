@@ -66,9 +66,16 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Messages", href: "/dashboard/messages" },
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
-
-  driver: [{ label: "My Route", href: "/dashboard/driver" }],
 };
+
+// A driver isn't teaching staff — they only need their own route and
+// the general messaging/announcements areas, not the full teacher menu
+// (classes, grades, quizzes, etc. don't apply to them).
+const DRIVER_NAV: { label: string; href: string }[] = [
+  { label: "My route", href: "/dashboard/driver" },
+  { label: "Messages", href: "/dashboard/messages" },
+  { label: "Announcements", href: "/dashboard/announcements" },
+];
 
 /**
  * Picks the single most specific matching nav item for the current path,
@@ -104,7 +111,9 @@ export function Sidebar({
         ? [...NAV_BY_ROLE.teacher, { label: "Hostel", href: "/dashboard/hostel" }]
         : role === "teacher" && staffRole === "transport_officer"
           ? [...NAV_BY_ROLE.teacher, { label: "Transport", href: "/dashboard/transport" }]
-          : NAV_BY_ROLE[role];
+          : role === "teacher" && staffRole === "driver"
+            ? DRIVER_NAV
+            : NAV_BY_ROLE[role];
   const pathname = usePathname();
   const activeHref = findActiveHref(pathname, items);
   const [mobileOpen, setMobileOpen] = useState(false);

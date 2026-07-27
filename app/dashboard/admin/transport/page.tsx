@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CreateVehicleForm } from "@/components/CreateVehicleForm";
 import { CreateRouteForm } from "@/components/CreateRouteForm";
-import { DriverAccountSection } from "@/components/DriverAccountSection";
+import { LinkDriverForm } from "@/components/LinkDriverForm";
 import { EmptyState } from "@/components/EmptyState";
 
 export default async function TransportPage() {
@@ -10,17 +10,18 @@ export default async function TransportPage() {
 
   const { data: vehicles } = await supabase
     .from("vehicles")
-    .select(
-      "id, plate_number, model, capacity, driver_name, driver_phone, driver_profile_id, profiles(full_name)"
-    )
+    .select("id, plate_number, model, capacity, driver_name, driver_phone, driver_profile_id")
     .eq("is_archived", false)
     .order("plate_number", { ascending: true });
 
-  const { data: existingDrivers } = await supabase
-    .from("profiles")
-    .select("id, full_name")
-    .eq("role", "driver")
-    .eq("is_active", true);
+  const { data: driverStaff } = await supabase
+    .from("teacher_profiles")
+    .select("id, profiles(full_name)")
+    .eq("staff_role", "driver");
+  const drivers = (driverStaff ?? []).map((d) => ({
+    id: d.id,
+    fullName: d.profiles?.full_name ?? "Unknown",
+  }));
 
   const { data: routes } = await supabase
     .from("transport_routes")
@@ -54,18 +55,19 @@ export default async function TransportPage() {
               <p className="font-medium text-ink">
                 {v.plate_number} {v.model ? `· ${v.model}` : ""}
               </p>
-              <p className="mb-2 text-xs text-ink-soft">
+              <p className="text-xs text-ink-soft">
                 Capacity {v.capacity}
-                {v.driver_name ? ` · Contact: ${v.driver_name}` : ""}
+                {v.driver_name ? ` · Driver: ${v.driver_name}` : ""}
                 {v.driver_phone ? ` (${v.driver_phone})` : ""}
               </p>
-              <DriverAccountSection
-                vehicleId={v.id}
-                currentDriverName={v.profiles?.full_name ?? null}
-                existingDrivers={(existingDrivers ?? [])
-                  .filter((d) => d.id !== v.driver_profile_id)
-                  .map((d) => ({ id: d.id, name: d.full_name }))}
-              />
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-ink-soft">Driver login:</span>
+                <LinkDriverForm
+                  vehicleId={v.id}
+                  currentDriverProfileId={v.driver_profile_id}
+                  drivers={drivers}
+                />
+              </div>
             </div>
           ))}
           {!vehicles?.length && <EmptyState message="No vehicles yet — add the first one above." />}

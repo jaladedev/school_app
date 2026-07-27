@@ -29,48 +29,45 @@ async function assertCanManageTransport(): Promise<{ actorId: string }> {
 }
 
 /**
- * Admin, the transport officer, or the driver of the specific route being
- * acted on — scoped to per-trip actions (status updates, GPS pings) that
- * a driver legitimately performs from their own phone. A driver isn't a
- * teacher_profiles row at all (role: "driver" on profiles is its own
- * top-level role), so they can never satisfy assertCanManageTransport's
- * admin/teacher check; this mirrors the DB's own is_driver_of_route()
- * RLS check instead of relying on it silently, since the admin client
- * bypasses RLS. Used by both updateTripStatus and
- * recordTransportLocation — anything else driver-facing on a per-trip
- * basis should go through this too, not assertCanManageTransport.
+ * Narrower than assertCanManageTransport — used only for the two
+ * things a driver is allowed to do (update trip status, share live
+ * location), and only for whichever route their vehicle is currently
+ * assigned to. Everything else in the module (routes, stops, student
+ * assignments, vehicle reassignment) stays behind assertCanManageTransport.
  */
-async function assertCanActOnTrip(routeId: string): Promise<{ actorId: string }> {
-  const { id, role } = await assertRole(
-    ["admin", "teacher", "driver"],
-    "Only an admin, the transport officer, or this route's driver can do this."
+async function assertCanUpdateTrip(routeId: string): Promise<{ actorId: string }> {
+  const { id } = await assertRole(
+    ["admin", "teacher"],
+    "Only an admin, the transport officer, or that route's driver can do this."
   );
   const admin = createAdminClient();
+  const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
+  if (profile?.role === "admin") return { actorId: id };
 
-  if (role === "admin") return { actorId: id };
-
-  if (role === "driver") {
-    const { data: route } = await admin
-      .from("transport_routes")
-      .select("vehicle_id, vehicles(driver_profile_id)")
-      .eq("id", routeId)
-      .single();
-    if (route?.vehicles?.driver_profile_id !== id) {
-      throw new Error("You can only do this for your own route.");
-    }
-    return { actorId: id };
-  }
-
-  // role === "teacher": must be the transport officer.
   const { data: teacherProfile } = await admin
     .from("teacher_profiles")
     .select("staff_role")
     .eq("id", id)
     .single();
-  if (teacherProfile?.staff_role !== "transport_officer") {
-    throw new Error("Only an admin, the transport officer, or this route's driver can do this.");
+  if (teacherProfile?.staff_role === "transport_officer") return { actorId: id };
+
+  if (teacherProfile?.staff_role === "driver") {
+    const { data: route } = await admin
+      .from("transport_routes")
+      .select("vehicle_id")
+      .eq("id", routeId)
+      .single();
+    if (route?.vehicle_id) {
+      const { data: vehicle } = await admin
+        .from("vehicles")
+        .select("driver_profile_id")
+        .eq("id", route.vehicle_id)
+        .single();
+      if (vehicle?.driver_profile_id === id) return { actorId: id };
+    }
   }
-  return { actorId: id };
+
+  throw new Error("Only an admin, the transport officer, or that route's driver can do this.");
 }
 
 // ---------- Admin: fleet setup ----------
@@ -96,6 +93,38 @@ export async function createVehicle(input: {
     driver_name: input.driverName?.trim() || null,
     driver_phone: input.driverPhone?.trim() || null,
   });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/transport");
+}
+
+/**
+ * Links a vehicle to an actual driver account (a teacher_profiles row
+ * with staff_role = 'driver') so that person can log in and update
+ * trip status / share live location for whichever route the vehicle is
+ * on. Optional — a vehicle with no linked account still works exactly
+ * as before, with the transport officer or admin updating status on
+ * the driver's behalf via driver_name/driver_phone alone.
+ */
+export async function linkVehicleDriver(vehicleId: string, driverProfileId: string | null) {
+  await assertRole(["admin"], "Only an admin can link a driver account to a vehicle.");
+  const admin = createAdminClient();
+
+  if (driverProfileId) {
+    const { data: teacherProfile } = await admin
+      .from("teacher_profiles")
+      .select("staff_role")
+      .eq("id", driverProfileId)
+      .single();
+    if (teacherProfile?.staff_role !== "driver") {
+      throw new Error("That account isn't set up with the driver staff role.");
+    }
+  }
+
+  const { error } = await admin
+    .from("vehicles")
+    .update({ driver_profile_id: driverProfileId })
+    .eq("id", vehicleId);
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin/transport");
@@ -311,7 +340,7 @@ export async function unassignStudentFromRoute(assignmentId: string) {
   revalidatePath("/dashboard/admin/transport");
 }
 
-// ---------- Admin, transport officer, or the route's own driver: live status ----------
+// ---------- Admin, transport officer, or that route's driver: live status ----------
 
 export async function updateTripStatus(input: {
   routeId: string;
@@ -319,7 +348,7 @@ export async function updateTripStatus(input: {
   direction: TripDirection;
   status: TripStatusValue;
 }) {
-  const { actorId } = await assertCanActOnTrip(input.routeId);
+  const { actorId } = await assertCanUpdateTrip(input.routeId);
   const admin = createAdminClient();
 
   const { error } = await admin.from("transport_trip_status").upsert(
@@ -354,7 +383,7 @@ export async function recordTransportLocation(input: {
   lat: number;
   lng: number;
 }) {
-  const { actorId } = await assertCanActOnTrip(input.routeId);
+  const { actorId } = await assertCanUpdateTrip(input.routeId);
   if (
     !Number.isFinite(input.lat) ||
     !Number.isFinite(input.lng) ||

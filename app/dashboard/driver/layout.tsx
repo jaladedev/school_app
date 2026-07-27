@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentProfile } from "@/lib/supabase/server";
+import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 
 export default async function DriverLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
@@ -8,9 +8,22 @@ export default async function DriverLayout({ children }: { children: React.React
     redirect("/login");
   }
 
-  if (profile.role !== "driver") {
-    redirect(`/dashboard/${profile.role}`);
+  if (profile.role === "admin") {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  if (profile.role === "teacher") {
+    const supabase = createClient();
+    const { data: teacher } = await supabase
+      .from("teacher_profiles")
+      .select("staff_role")
+      .eq("id", profile.id)
+      .single();
+
+    if (teacher?.staff_role === "driver") {
+      return <>{children}</>;
+    }
+  }
+
+  redirect(`/dashboard/${profile.role}`);
 }

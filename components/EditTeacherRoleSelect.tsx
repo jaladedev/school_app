@@ -12,6 +12,7 @@ const LABELS: Record<StaffRole, string> = {
   librarian: "Librarian",
   house_parent: "House parent",
   transport_officer: "Transport officer",
+  driver: "Driver",
 };
 
 export function EditTeacherRoleSelect({

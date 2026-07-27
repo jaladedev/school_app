@@ -1,4 +1,4 @@
-export type UserRole = "student" | "teacher" | "admin" | "parent" | "driver";
+export type UserRole = "student" | "teacher" | "admin" | "parent";
 export type NoteStatus = "draft" | "published" | "archived";
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disciplinary";
@@ -9,7 +9,7 @@ export type AssessmentType =
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
 export type StaffRole =
-  "teacher" | "hod" | "bursar" | "librarian" | "house_parent" | "transport_officer";
+  "teacher" | "hod" | "bursar" | "librarian" | "house_parent" | "transport_officer" | "driver";
 export type GradeModerationStatus = "pending" | "approved";
 export type ResourceType = "image" | "diagram_mermaid" | "video" | "pdf" | "link" | "audio";
 export type AssetCondition = "new" | "good" | "fair" | "poor" | "damaged";
