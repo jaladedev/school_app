@@ -33,12 +33,16 @@ export type Profile = {
   id: string;
   role: UserRole;
   full_name: string;
-  email: string;
-  phone: string | null;
   avatar_url: string | null;
   must_change_password: boolean;
   is_active: boolean;
   created_at: string;
+};
+
+export type ProfileContact = {
+  id: string;
+  email: string;
+  phone: string | null;
 };
 
 export type StudentProfile = {
@@ -609,6 +613,20 @@ export type Database = {
         Insert: Partial<Profile>;
         Update: Partial<Profile>;
         Relationships: [];
+      };
+      profile_contacts: {
+        Row: ProfileContact;
+        Insert: Partial<ProfileContact>;
+        Update: Partial<ProfileContact>;
+        Relationships: [
+          {
+            foreignKeyName: "profile_contacts_id_fkey";
+            columns: ["id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       student_profiles: {
         Row: StudentProfile;

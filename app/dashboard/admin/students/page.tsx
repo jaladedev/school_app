@@ -43,7 +43,11 @@ export default async function AdminStudentsPage({
 
     const [byFullName, byEmail, byAdmission] = await Promise.all([
       supabase.from("profiles").select("id").eq("role", "student").ilike("full_name", pattern),
-      supabase.from("profiles").select("id").eq("role", "student").ilike("email", pattern),
+      supabase
+        .from("profile_contacts")
+        .select("id, profiles!inner(role)")
+        .eq("profiles.role", "student")
+        .ilike("email", pattern),
       supabase.from("student_profiles").select("id").ilike("admission_no", pattern),
     ]);
 
@@ -58,7 +62,9 @@ export default async function AdminStudentsPage({
 
   let query = supabase
     .from("student_profiles")
-    .select("*, profiles(full_name, email, is_active), classes(name, arm)", { count: "exact" })
+    .select("*, profiles(full_name, is_active, profile_contacts(email)), classes(name, arm)", {
+      count: "exact",
+    })
     .order("admission_no", { ascending: true });
 
   if (matchingIds !== null) {
@@ -119,7 +125,7 @@ export default async function AdminStudentsPage({
                     <span className="ml-2 text-xs font-normal text-clay">(deactivated)</span>
                   )}
                 </p>
-                <p className="text-sm text-ink-soft">{profile?.email}</p>
+                <p className="text-sm text-ink-soft">{profile?.profile_contacts?.email}</p>
                 {s.admission_no && (
                   <p className="text-xs text-ink-soft">Admission no. {s.admission_no}</p>
                 )}

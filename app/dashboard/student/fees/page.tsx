@@ -25,6 +25,16 @@ export default async function StudentFeesPage() {
     redirect("/login");
   }
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  // profiles.phone/email were split into profile_contacts (see
+  // types/database.ts ProfileContact) to stop RLS row-level policies from
+  // over-exposing contact info. For a student paying their own invoice,
+  // the Auth session's own email is the actual source of truth anyway
+  // (profiles.email was always just a denormalized copy of it), so this
+  // avoids adding a profile_contacts join just for this one field.
+  const email = user?.email ?? "";
 
   const { data: invoices } = await supabase
     .from("invoices")
@@ -97,11 +107,7 @@ export default async function StudentFeesPage() {
               </div>
               {balance > 0 && (
                 <div className="mt-3">
-                  <PaystackPayButton
-                    invoiceId={inv.id}
-                    email={profile.email}
-                    amountKobo={balance}
-                  />
+                  <PaystackPayButton invoiceId={inv.id} email={email} amountKobo={balance} />
                 </div>
               )}
             </div>

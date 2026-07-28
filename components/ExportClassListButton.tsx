@@ -19,7 +19,9 @@ export function ExportClassListButton({
 
     const { data: students } = await supabase
       .from("student_profiles")
-      .select("admission_no, guardian_name, guardian_phone, profiles(full_name, email)")
+      .select(
+        "admission_no, guardian_name, guardian_phone, profiles(full_name, profile_contacts(email))"
+      )
       .eq("class_id", classId)
       .order("admission_no", { ascending: true });
 
@@ -30,7 +32,7 @@ export function ExportClassListButton({
     const headers = ["Full Name", "Email", "Admission No", "Guardian Name", "Guardian Phone"];
     const rows = students.map((s) => [
       s.profiles?.full_name ?? "",
-      s.profiles?.email ?? "",
+      s.profiles?.profile_contacts?.email ?? "",
       s.admission_no ?? "",
       s.guardian_name ?? "",
       s.guardian_phone ?? "",

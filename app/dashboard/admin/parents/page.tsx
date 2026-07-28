@@ -8,7 +8,7 @@ export default async function AdminParentsPage() {
 
   const { data: parents } = await supabase
     .from("profiles")
-    .select("id, full_name, email, is_active")
+    .select("id, full_name, is_active, profile_contacts(email)")
     .eq("role", "parent")
     .order("full_name");
 
@@ -61,7 +61,7 @@ export default async function AdminParentsPage() {
                       <span className="ml-2 text-xs font-normal text-clay">(deactivated)</span>
                     )}
                   </p>
-                  <p className="text-sm text-ink-soft">{p.email}</p>
+                  <p className="text-sm text-ink-soft">{p.profile_contacts?.email}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <ResetPasswordButton userId={p.id} />

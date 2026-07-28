@@ -17,7 +17,7 @@ export default async function StudentInfoPage({
   const { data: student } = await supabase
     .from("student_profiles")
     .select(
-      "*, profiles(full_name, email, avatar_url), classes(id, name, arm, education_level, level_number)"
+      "*, profiles(full_name, avatar_url, profile_contacts(email)), classes(id, name, arm, education_level, level_number)"
     )
     .eq("id", resolvedParams.studentId)
     .single();
@@ -68,7 +68,7 @@ export default async function StudentInfoPage({
         )}
       </div>
       <p className="mb-6 text-sm text-ink-soft">
-        {profile?.email}
+        {profile?.profile_contacts?.email}
         {cls
           ? ` · ${cls.name} ${cls.arm ?? ""} (${formatLevel(cls.education_level, cls.level_number)})`
           : " · Unassigned"}

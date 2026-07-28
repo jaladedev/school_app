@@ -66,13 +66,32 @@ function generateTempPassword() {
 // path) we already know will fail.
 async function assertEmailAvailable(admin: ReturnType<typeof createAdminClient>, email: string) {
   const { data: existing } = await admin
-    .from("profiles")
+    .from("profile_contacts")
     .select("id")
     .ilike("email", email)
     .maybeSingle();
 
   if (existing) {
     throw new Error(`An account with the email "${email}" already exists.`);
+  }
+}
+
+// Every account-creation flow needs both a `profiles` row and a matching
+// `profile_contacts` row (email/phone live there now — see
+// profile_contacts_migration.sql). This centralizes the "insert contact,
+// roll back the auth user and profile row on failure" step so it isn't
+// duplicated with slightly different error handling at each of the four
+// call sites.
+async function insertProfileContact(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  email: string,
+  phone: string | null = null
+) {
+  const { error } = await admin.from("profile_contacts").insert({ id: userId, email, phone });
+  if (error) {
+    await deleteUserAfterFailedSetup(admin, userId);
+    throw new Error(error.message);
   }
 }
 
@@ -216,13 +235,14 @@ export async function createTeacherAccount(input: {
     id: userId,
     role: "teacher",
     full_name: input.fullName,
-    email: input.email,
   });
 
   if (profileError) {
     await deleteUserAfterFailedSetup(admin, userId);
     throw new Error(profileError.message);
   }
+
+  await insertProfileContact(admin, userId, input.email);
 
   const { error: teacherError } = await admin.from("teacher_profiles").insert({
     id: userId,
@@ -274,13 +294,14 @@ export async function createStudentAccount(input: {
     id: userId,
     role: "student",
     full_name: input.fullName,
-    email: input.email,
   });
 
   if (profileError) {
     await deleteUserAfterFailedSetup(admin, userId);
     throw new Error(profileError.message);
   }
+
+  await insertProfileContact(admin, userId, input.email);
 
   const { error: studentError } = await admin.from("student_profiles").insert({
     id: userId,
@@ -357,13 +378,13 @@ export async function createStudentsBulk(input: {
   // import row of "john@example.com" — this avoids that gap. Fine at
   // school-roster scale; if `profiles` ever got huge, this would want to
   // become a targeted case-insensitive query instead.
-  const { data: allProfiles, error: existingProfilesError } = await admin
-    .from("profiles")
+  const { data: allContacts, error: existingProfilesError } = await admin
+    .from("profile_contacts")
     .select("email");
 
   if (existingProfilesError) throw new Error(existingProfilesError.message);
 
-  const existingEmails = new Set((allProfiles ?? []).map((profile) => profile.email.toLowerCase()));
+  const existingEmails = new Set((allContacts ?? []).map((c) => c.email.toLowerCase()));
 
   const created = await mapWithConcurrency<BulkStudentRow, BulkCreationAttempt>(
     input.students,
@@ -404,7 +425,6 @@ export async function createStudentsBulk(input: {
           id: userId,
           role: "student",
           full_name: row.fullName,
-          email: row.email,
         });
 
         if (profileError) {
@@ -414,6 +434,20 @@ export async function createStudentsBulk(input: {
             fullName: row.fullName,
             success: false,
             error: profileError.message,
+          } satisfies BulkStudentResult;
+        }
+
+        const { error: contactError } = await admin
+          .from("profile_contacts")
+          .insert({ id: userId, email: row.email });
+
+        if (contactError) {
+          await deleteUserAfterFailedSetup(admin, userId);
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: contactError.message,
           } satisfies BulkStudentResult;
         }
 
@@ -734,13 +768,14 @@ export async function createParentAccount(input: {
     id: userId,
     role: "parent",
     full_name: input.fullName,
-    email: input.email,
   });
 
   if (profileError) {
     await deleteUserAfterFailedSetup(admin, userId);
     throw new Error(profileError.message);
   }
+
+  await insertProfileContact(admin, userId, input.email);
 
   const { error: linksError } = await admin.from("guardian_links").insert(
     input.children.map((c) => ({

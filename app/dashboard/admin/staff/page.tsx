@@ -33,7 +33,11 @@ export default async function AdminStaffPage({
 
     const [byFullName, byEmail] = await Promise.all([
       supabase.from("profiles").select("id").eq("role", "teacher").ilike("full_name", pattern),
-      supabase.from("profiles").select("id").eq("role", "teacher").ilike("email", pattern),
+      supabase
+        .from("profile_contacts")
+        .select("id, profiles!inner(role)")
+        .eq("profiles.role", "teacher")
+        .ilike("email", pattern),
     ]);
 
     matchingIds = [
@@ -46,7 +50,7 @@ export default async function AdminStaffPage({
 
   let teacherQuery = supabase
     .from("teacher_profiles")
-    .select("*, profiles(full_name, email, is_active)", { count: "exact" })
+    .select("*, profiles(full_name, is_active, profile_contacts(email))", { count: "exact" })
     .order("id");
 
   if (matchingIds !== null) {
@@ -92,7 +96,7 @@ export default async function AdminStaffPage({
               key={teacher.id}
               teacherId={teacher.id}
               fullName={profile?.full_name ?? "Unknown"}
-              email={profile?.email ?? ""}
+              email={profile?.profile_contacts?.email ?? ""}
               isActive={profile?.is_active ?? true}
               subjectNames={subjectIds.map((id: string) => subjectNameById.get(id) ?? "Unknown")}
               currentSubjectIds={subjectIds}

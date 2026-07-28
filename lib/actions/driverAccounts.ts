@@ -42,10 +42,18 @@ export async function createDriverAccount(input: {
 
   const { error: profileError } = await admin.from("profiles").insert({
     id: authUser.user.id,
+    // "driver" is a teacher_profiles.staff_role value, not a profiles.role
+    // value (profiles.role is only "student" | "teacher" | "admin" |
+    // "parent" — see UserRole in types/database.ts). Every other staff
+    // role (bursar, librarian, transport_officer, house_parent) follows
+    // the same pattern: role: "teacher" here, plus a teacher_profiles row
+    // with staff_role set. assertCanUpdateTrip() in transport.ts already
+    // depends on that shape (assertRole(["admin","teacher"]) first, then
+    // teacher_profiles.staff_role === "driver"), so without the
+    // teacher_profiles row below a driver created here couldn't actually
+    // do anything a driver needs to do.
     role: "teacher",
     full_name: input.fullName.trim(),
-    email: input.email.trim(),
-    phone: input.phone?.trim() || null,
     must_change_password: true,
     is_active: true,
   });
@@ -54,6 +62,18 @@ export async function createDriverAccount(input: {
     // an orphaned login with no matching profile row.
     await admin.auth.admin.deleteUser(authUser.user.id);
     throw new Error(profileError.message);
+  }
+
+  // email/phone live in profile_contacts now, not profiles — see
+  // profile_contacts_migration.sql.
+  const { error: contactError } = await admin.from("profile_contacts").insert({
+    id: authUser.user.id,
+    email: input.email.trim(),
+    phone: input.phone?.trim() || null,
+  });
+  if (contactError) {
+    await admin.auth.admin.deleteUser(authUser.user.id);
+    throw new Error(contactError.message);
   }
 
   const { error: teacherProfileError } = await admin.from("teacher_profiles").insert({

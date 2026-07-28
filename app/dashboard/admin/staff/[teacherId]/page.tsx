@@ -46,7 +46,7 @@ export default async function TeacherProfilePage({
 
   const { data: teacherProfile } = await supabase
     .from("teacher_profiles")
-    .select("*, profiles(full_name, email, is_active)")
+    .select("*, profiles(full_name, is_active, profile_contacts(email))")
     .eq("id", resolvedParams.teacherId)
     .single();
 
@@ -104,7 +104,7 @@ export default async function TeacherProfilePage({
   }
 
   const fullName = teacherProfile.profiles?.full_name ?? "Unknown";
-  const email = teacherProfile.profiles?.email ?? "";
+  const email = teacherProfile.profiles?.profile_contacts?.email ?? "";
   const isActive = teacherProfile.profiles?.is_active ?? true;
 
   return (
