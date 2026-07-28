@@ -37,6 +37,14 @@ export default async function HostelRoomPage({
         .is("returned_at", null)
     : { data: [] };
 
+  const { data: openVisitorLogs } = studentIds.length
+    ? await supabase
+        .from("hostel_visitor_logs")
+        .select("id, student_id, visitor_name, purpose, checked_in_at")
+        .in("student_id", studentIds)
+        .is("checked_out_at", null)
+    : { data: [] };
+
   const { data: allStudents } = await supabase
     .from("student_profiles")
     .select("id, admission_no, profiles(full_name)")
@@ -117,6 +125,13 @@ export default async function HostelRoomPage({
             reason: l.reason,
             outAt: l.out_at,
             expectedReturnAt: l.expected_return_at,
+          }))}
+          openVisitorLogs={(openVisitorLogs ?? []).map((v) => ({
+            id: v.id,
+            studentId: v.student_id,
+            visitorName: v.visitor_name,
+            purpose: v.purpose,
+            checkedInAt: v.checked_in_at,
           }))}
         />
         {!assignments?.length && <p className="text-sm text-ink-soft">No one assigned yet.</p>}

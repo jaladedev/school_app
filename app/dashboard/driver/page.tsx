@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { TripStatusControls } from "@/components/TripStatusControls";
 import { LiveLocationSender } from "@/components/LiveLocationSender";
+import { StudentPickupChecklist } from "@/components/StudentPickupChecklist";
 import { EmptyState } from "@/components/EmptyState";
 
 function todayIso() {
@@ -66,6 +67,34 @@ export default async function DriverPage() {
   const afternoonStatus =
     statuses?.find((s) => s.direction === "afternoon")?.status ?? "not_started";
 
+  const { data: riderAssignments } = await supabase
+    .from("transport_assignments")
+    .select("student_id, stop_id, student_profiles(profiles(full_name)), transport_stops(name)")
+    .eq("route_id", route.id)
+    .is("unassigned_at", null);
+
+  const { data: pickupLogs } = await supabase
+    .from("transport_pickup_logs")
+    .select("student_id, direction, picked_up_at, dropped_off_at")
+    .eq("route_id", route.id)
+    .eq("trip_date", tripDate);
+
+  const ridersWithStatus = (riderAssignments ?? []).map((a) => {
+    const morningLog = pickupLogs?.find(
+      (p) => p.student_id === a.student_id && p.direction === "morning"
+    );
+    const afternoonLog = pickupLogs?.find(
+      (p) => p.student_id === a.student_id && p.direction === "afternoon"
+    );
+    return {
+      studentId: a.student_id,
+      fullName: a.student_profiles?.profiles?.full_name ?? "Unknown",
+      stopName: a.transport_stops?.name ?? null,
+      pickedUpAt: morningLog?.picked_up_at ?? null,
+      droppedOffAt: afternoonLog?.dropped_off_at ?? null,
+    };
+  });
+
   return (
     <div className="max-w-lg">
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">{route.name}</h1>
@@ -108,6 +137,26 @@ export default async function DriverPage() {
           currentStatus={afternoonStatus as "not_started" | "en_route" | "arrived"}
         />
         <LiveLocationSender routeId={route.id} tripDate={tripDate} direction="afternoon" />
+      </div>
+
+      <div className="mt-6">
+        <h2 className="mb-2 font-display text-lg font-semibold text-ink">Morning pickup</h2>
+        <StudentPickupChecklist
+          routeId={route.id}
+          tripDate={tripDate}
+          direction="morning"
+          riders={ridersWithStatus}
+        />
+      </div>
+
+      <div className="mt-6">
+        <h2 className="mb-2 font-display text-lg font-semibold text-ink">Afternoon drop-off</h2>
+        <StudentPickupChecklist
+          routeId={route.id}
+          tripDate={tripDate}
+          direction="afternoon"
+          riders={ridersWithStatus}
+        />
       </div>
     </div>
   );

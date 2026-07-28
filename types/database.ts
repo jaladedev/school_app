@@ -39,6 +39,13 @@ export type Profile = {
   created_at: string;
 };
 
+// Split out of `profiles` deliberately: `phone`/`email` are the only
+// columns on this table that shouldn't be broadly readable (Postgres RLS
+// is row-level only, it can't mask individual columns within a row a
+// policy already grants access to — see profile_contacts RLS in the
+// matching migration). Everything else on `profiles` (name, avatar, role)
+// is fine for any authenticated user or staff member to read for directory
+// / embedded-join purposes; contact info is not.
 export type ProfileContact = {
   id: string;
   email: string;
@@ -412,6 +419,24 @@ export function isOnLeave(log: HostelLeaveLog): boolean {
   return log.returned_at === null;
 }
 
+export type HostelVisitorLog = {
+  id: string;
+  student_id: string;
+  visitor_name: string;
+  visitor_phone: string | null;
+  relationship: string | null;
+  purpose: string | null;
+  checked_in_at: string;
+  checked_out_at: string | null;
+  logged_by: string | null;
+  checked_out_logged_by: string | null;
+  created_at: string;
+};
+
+export function isVisitorCheckedIn(log: HostelVisitorLog): boolean {
+  return log.checked_out_at === null;
+}
+
 export type Testimonial = {
   id: string;
   student_id: string;
@@ -465,6 +490,18 @@ export type TransportAssignment = {
 
 export type TripDirection = "morning" | "afternoon";
 export type TripStatusValue = "not_started" | "en_route" | "arrived";
+
+export type TransportPickupLog = {
+  id: string;
+  student_id: string;
+  route_id: string;
+  trip_date: string;
+  direction: TripDirection;
+  picked_up_at: string | null;
+  dropped_off_at: string | null;
+  marked_by: string | null;
+  updated_at: string;
+};
 
 export type TransportTripStatus = {
   id: string;
@@ -1347,6 +1384,34 @@ export type Database = {
           },
         ];
       };
+      hostel_visitor_logs: {
+        Row: HostelVisitorLog;
+        Insert: Partial<HostelVisitorLog>;
+        Update: Partial<HostelVisitorLog>;
+        Relationships: [
+          {
+            foreignKeyName: "hostel_visitor_logs_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hostel_visitor_logs_logged_by_fkey";
+            columns: ["logged_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hostel_visitor_logs_checked_out_logged_by_fkey";
+            columns: ["checked_out_logged_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       testimonials: {
         Row: Testimonial;
         Insert: Partial<Testimonial>;
@@ -1445,6 +1510,27 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "transport_trip_status_route_id_fkey";
+            columns: ["route_id"];
+            isOneToOne: false;
+            referencedRelation: "transport_routes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      transport_pickup_logs: {
+        Row: TransportPickupLog;
+        Insert: Partial<TransportPickupLog>;
+        Update: Partial<TransportPickupLog>;
+        Relationships: [
+          {
+            foreignKeyName: "transport_pickup_logs_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "transport_pickup_logs_route_id_fkey";
             columns: ["route_id"];
             isOneToOne: false;
             referencedRelation: "transport_routes";

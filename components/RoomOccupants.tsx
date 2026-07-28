@@ -2,7 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { unassignStudentFromRoom, logHostelLeave, recordHostelReturn } from "@/lib/actions/hostel";
+import {
+  unassignStudentFromRoom,
+  logHostelLeave,
+  recordHostelReturn,
+  logHostelVisitorCheckIn,
+  recordHostelVisitorCheckOut,
+} from "@/lib/actions/hostel";
 import { emitToast } from "@/lib/toast";
 
 type Occupant = { id: string; studentId: string; fullName: string; admissionNo: string | null };
@@ -13,21 +19,34 @@ type OpenLeave = {
   outAt: string;
   expectedReturnAt: string | null;
 };
+type OpenVisitor = {
+  id: string;
+  studentId: string;
+  visitorName: string;
+  purpose: string | null;
+  checkedInAt: string;
+};
 
 export function RoomOccupants({
   roomId,
   assignments,
   openLeaveLogs,
+  openVisitorLogs,
 }: {
   roomId: string;
   assignments: Occupant[];
   openLeaveLogs: OpenLeave[];
+  openVisitorLogs: OpenVisitor[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [leaveFormFor, setLeaveFormFor] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [expectedReturn, setExpectedReturn] = useState("");
+  const [visitorFormFor, setVisitorFormFor] = useState<string | null>(null);
+  const [visitorName, setVisitorName] = useState("");
+  const [visitorPhone, setVisitorPhone] = useState("");
+  const [visitorPurpose, setVisitorPurpose] = useState("");
 
   function unassign(assignmentId: string) {
     startTransition(async () => {
@@ -72,10 +91,44 @@ export function RoomOccupants({
     });
   }
 
+  function submitVisitor(studentId: string) {
+    startTransition(async () => {
+      try {
+        await logHostelVisitorCheckIn({
+          studentId,
+          visitorName,
+          visitorPhone: visitorPhone || undefined,
+          purpose: visitorPurpose || undefined,
+        });
+        emitToast("Visitor checked in.");
+        setVisitorFormFor(null);
+        setVisitorName("");
+        setVisitorPhone("");
+        setVisitorPurpose("");
+        router.refresh();
+      } catch (err) {
+        emitToast(err instanceof Error ? err.message : "Something went wrong.", "error");
+      }
+    });
+  }
+
+  function checkOutVisitor(visitorLogId: string, studentId: string) {
+    startTransition(async () => {
+      try {
+        await recordHostelVisitorCheckOut(visitorLogId, studentId);
+        emitToast("Visitor checked out.");
+        router.refresh();
+      } catch (err) {
+        emitToast(err instanceof Error ? err.message : "Something went wrong.", "error");
+      }
+    });
+  }
+
   return (
     <div className="space-y-2">
       {assignments.map((occ) => {
         const openLeave = openLeaveLogs.find((l) => l.studentId === occ.studentId);
+        const openVisitor = openVisitorLogs.find((v) => v.studentId === occ.studentId);
         return (
           <div key={occ.id} className="rounded-lg border border-rule bg-white p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -107,6 +160,29 @@ export function RoomOccupants({
                     Log leave
                   </button>
                 )}
+                {openVisitor ? (
+                  <>
+                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-ink">
+                      Visitor: {openVisitor.visitorName}
+                    </span>
+                    <button
+                      onClick={() => checkOutVisitor(openVisitor.id, occ.studentId)}
+                      disabled={isPending}
+                      className="rounded-lg border border-rule px-3 py-1.5 text-sm font-medium text-ink hover:bg-leaf-soft disabled:opacity-60"
+                    >
+                      Check out visitor
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() =>
+                      setVisitorFormFor(visitorFormFor === occ.studentId ? null : occ.studentId)
+                    }
+                    className="rounded-lg border border-rule px-3 py-1.5 text-sm font-medium text-ink hover:bg-leaf-soft"
+                  >
+                    Log visitor
+                  </button>
+                )}
                 <button
                   onClick={() => unassign(occ.id)}
                   disabled={isPending}
@@ -119,6 +195,9 @@ export function RoomOccupants({
 
             {openLeave?.reason && (
               <p className="mt-1 text-xs text-ink-soft">Reason: {openLeave.reason}</p>
+            )}
+            {openVisitor?.purpose && (
+              <p className="mt-1 text-xs text-ink-soft">Visiting for: {openVisitor.purpose}</p>
             )}
 
             {leaveFormFor === occ.studentId && (
@@ -141,6 +220,36 @@ export function RoomOccupants({
                   className="rounded-lg bg-leaf px-3 py-2 text-sm font-medium text-white hover:bg-leaf/90 disabled:opacity-60"
                 >
                   {isPending ? "Logging…" : "Log leave"}
+                </button>
+              </div>
+            )}
+
+            {visitorFormFor === occ.studentId && (
+              <div className="mt-3 flex flex-wrap items-start gap-2 border-t border-rule pt-3">
+                <input
+                  placeholder="Visitor name"
+                  value={visitorName}
+                  onChange={(e) => setVisitorName(e.target.value)}
+                  className="rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+                />
+                <input
+                  placeholder="Phone (optional)"
+                  value={visitorPhone}
+                  onChange={(e) => setVisitorPhone(e.target.value)}
+                  className="rounded-lg border border-rule px-3 py-2 text-sm"
+                />
+                <input
+                  placeholder="Purpose (optional)"
+                  value={visitorPurpose}
+                  onChange={(e) => setVisitorPurpose(e.target.value)}
+                  className="rounded-lg border border-rule px-3 py-2 text-sm"
+                />
+                <button
+                  onClick={() => submitVisitor(occ.studentId)}
+                  disabled={isPending || !visitorName.trim()}
+                  className="rounded-lg bg-leaf px-3 py-2 text-sm font-medium text-white hover:bg-leaf/90 disabled:opacity-60"
+                >
+                  {isPending ? "Checking in…" : "Check in visitor"}
                 </button>
               </div>
             )}

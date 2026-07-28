@@ -222,6 +222,57 @@ export async function recordHostelReturn(leaveLogId: string, studentId: string) 
   revalidatePath("/dashboard/admin/hostels");
 }
 
+// ---------- Admin or house parent: visitor log ----------
+//
+// Distinct from logHostelLeave/recordHostelReturn above: those track a
+// RESIDENT leaving the hostel and coming back. This tracks an EXTERNAL
+// visitor coming in to see a resident student — same actor/permission
+// shape (assertCanManageStudentLeave), separate table
+// (hostel_visitor_logs) since the two aren't the same event and querying
+// "who's currently out" vs "who's currently visiting" separately is
+// clearer than overloading one table with a `kind` column.
+
+export async function logHostelVisitorCheckIn(input: {
+  studentId: string;
+  visitorName: string;
+  visitorPhone?: string;
+  relationship?: string;
+  purpose?: string;
+}) {
+  const { actorId } = await assertCanManageStudentLeave(input.studentId);
+  const admin = createAdminClient();
+
+  if (!input.visitorName.trim()) {
+    throw new Error("Visitor name is required.");
+  }
+
+  const { error } = await admin.from("hostel_visitor_logs").insert({
+    student_id: input.studentId,
+    visitor_name: input.visitorName.trim(),
+    visitor_phone: input.visitorPhone?.trim() || null,
+    relationship: input.relationship?.trim() || null,
+    purpose: input.purpose?.trim() || null,
+    logged_by: actorId,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/hostels");
+}
+
+export async function recordHostelVisitorCheckOut(visitorLogId: string, studentId: string) {
+  const { actorId } = await assertCanManageStudentLeave(studentId);
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from("hostel_visitor_logs")
+    .update({ checked_out_at: new Date().toISOString(), checked_out_logged_by: actorId })
+    .eq("id", visitorLogId)
+    .is("checked_out_at", null);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/hostels");
+}
+
 // ---------- Admin or house parent: capacity waitlist ----------
 
 /**

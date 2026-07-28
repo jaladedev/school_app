@@ -369,6 +369,56 @@ export async function updateTripStatus(input: {
 }
 
 /**
+ * Marks one student as boarded or dropped off for a specific trip
+ * (route + date + direction). Distinct from updateTripStatus above —
+ * that tracks the whole trip's state, this tracks individual students
+ * within it, so a driver can confirm "this specific kid is on the bus"
+ * rather than only "the bus has left."
+ */
+export async function markStudentPickup(input: {
+  studentId: string;
+  routeId: string;
+  tripDate: string;
+  direction: TripDirection;
+  event: "picked_up" | "dropped_off";
+}) {
+  const { actorId } = await assertCanUpdateTrip(input.routeId);
+  const admin = createAdminClient();
+
+  const now = new Date().toISOString();
+  const { error } =
+    input.event === "picked_up"
+      ? await admin.from("transport_pickup_logs").upsert(
+          {
+            student_id: input.studentId,
+            route_id: input.routeId,
+            trip_date: input.tripDate,
+            direction: input.direction,
+            picked_up_at: now,
+            marked_by: actorId,
+            updated_at: now,
+          },
+          { onConflict: "student_id,route_id,trip_date,direction" }
+        )
+      : await admin.from("transport_pickup_logs").upsert(
+          {
+            student_id: input.studentId,
+            route_id: input.routeId,
+            trip_date: input.tripDate,
+            direction: input.direction,
+            dropped_off_at: now,
+            marked_by: actorId,
+            updated_at: now,
+          },
+          { onConflict: "student_id,route_id,trip_date,direction" }
+        );
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/driver");
+  revalidatePath("/dashboard/admin/transport");
+}
+
+/**
  * Records one GPS position update from the driver/transport officer's
  * phone during a trip. Deliberately a plain insert (append history)
  * rather than an upsert on "current position" — the read side only
