@@ -327,3 +327,26 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
 
   return { alreadyRecorded: result?.[0]?.already_recorded ?? false, amountKobo: paidAmountKobo };
 }
+
+/** Admin/bursar: message every guardian (or the student, if unlinked) of a
+ *  still-owing invoice not already reminded in the last p_minDaysBetween days. */
+export async function sendFeeReminders(minDaysBetween = 7) {
+  await assertCanManageFees("Only an admin or the bursar can send fee reminders.");
+
+  // Use the request-scoped client (not the admin client) so auth.uid()
+  // inside send_fee_reminders() resolves to the caller — the RPC uses it
+  // as the message sender_id.
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("send_fee_reminders", {
+    p_min_days_between: minDaysBetween,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/admin/fees/invoices");
+
+  return {
+    remindersSent: data?.[0]?.reminders_sent ?? 0,
+    invoicesConsidered: data?.[0]?.invoices_considered ?? 0,
+  };
+}

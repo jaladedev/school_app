@@ -322,6 +322,7 @@ export type Invoice = {
   voided_at: string | null;
   voided_by: string | null;
   void_reason: string | null;
+  last_reminded_at: string | null;
 };
 
 export type Payment = {
@@ -1792,6 +1793,10 @@ export type Database = {
       submit_quiz_attempt: {
         Args: { p_attempt_id: string };
         Returns: { score: number; total_points: number }[];
+      };
+      send_fee_reminders: {
+        Args: { p_min_days_between?: number };
+        Returns: { reminders_sent: number; invoices_considered: number }[];
       };
     };
   };

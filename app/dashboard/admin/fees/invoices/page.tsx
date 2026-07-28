@@ -4,6 +4,7 @@ import { formatKobo, type InvoiceStatus } from "@/types/database";
 import { RecordPaymentForm } from "@/components/RecordPaymentForm";
 import { VoidInvoiceForm } from "@/components/VoidInvoiceForm";
 import { ExportDefaultersButton } from "@/components/ExportDefaultersButton";
+import { SendFeeRemindersButton } from "@/components/SendFeeRemindersButton";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -93,6 +94,7 @@ export default async function AdminInvoicesPage({
         <h1 className="font-display text-2xl font-semibold text-ink">Invoices & Payments</h1>
         <div className="flex gap-2">
           <ExportDefaultersButton />
+          <SendFeeRemindersButton />
           <Link
             href="/dashboard/admin/fees/payments"
             className="rounded-lg border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-paper"
