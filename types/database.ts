@@ -1705,6 +1705,15 @@ export type Database = {
         Args: { p_student_id: string; p_room_id: string; p_academic_year: string };
         Returns: HostelAssignment;
       };
+      assign_student_to_route: {
+        Args: {
+          p_student_id: string;
+          p_route_id: string;
+          p_stop_id: string;
+          p_academic_year: string;
+        };
+        Returns: TransportAssignment;
+      };
       join_hostel_waitlist: {
         Args: { p_student_id: string; p_hostel_id: string };
         Returns: HostelWaitlistEntry;

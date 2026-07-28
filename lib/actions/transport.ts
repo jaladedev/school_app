@@ -283,45 +283,21 @@ export async function assignStudentToRoute(input: {
   stopId: string;
   academicYear: string;
 }) {
-  const { actorId } = await assertCanManageTransport();
+  await assertCanManageTransport();
   const admin = createAdminClient();
 
-  const { data: route } = await admin
-    .from("transport_routes")
-    .select("vehicle_id, vehicles(capacity)")
-    .eq("id", input.routeId)
-    .single();
-
-  // Only enforced once a vehicle is actually assigned to the route — a
-  // route with no vehicle yet has no known capacity to check against,
-  // so assignment isn't blocked on that basis (just on the route
-  // existing at all).
-  if (route?.vehicle_id && route.vehicles?.capacity != null) {
-    const { count: currentRiders } = await admin
-      .from("transport_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("route_id", input.routeId)
-      .is("unassigned_at", null);
-    if ((currentRiders ?? 0) >= route.vehicles.capacity) {
-      throw new Error("This route's vehicle is already at seating capacity.");
-    }
-  }
-
-  const { error: closeError } = await admin
-    .from("transport_assignments")
-    .update({ unassigned_at: new Date().toISOString() })
-    .eq("student_id", input.studentId)
-    .is("unassigned_at", null);
-  if (closeError) throw new Error(closeError.message);
-
-  const { error: insertError } = await admin.from("transport_assignments").insert({
-    student_id: input.studentId,
-    route_id: input.routeId,
-    stop_id: input.stopId,
-    academic_year: input.academicYear,
-    assigned_by: actorId,
+  // The route lock, capacity check, stop-belongs-to-route check,
+  // close-old-assignment, and insert-new-assignment all happen inside
+  // assign_student_to_route in one transaction — closes the race window
+  // the old sequential app-side calls had (mirrors
+  // assign_student_to_hostel_room for hostels).
+  const { error } = await admin.rpc("assign_student_to_route", {
+    p_student_id: input.studentId,
+    p_route_id: input.routeId,
+    p_stop_id: input.stopId,
+    p_academic_year: input.academicYear,
   });
-  if (insertError) throw new Error(insertError.message);
+  if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin/transport");
 }

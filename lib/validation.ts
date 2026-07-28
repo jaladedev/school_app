@@ -63,6 +63,25 @@ export const createAssessmentSchema = z.object({
 });
 export type CreateAssessmentInput = z.infer<typeof createAssessmentSchema>;
 
+export const curriculumTopicSchema = z.object({
+  subjectId: z.string().min(1, "Select a subject."),
+  levelNumber: z.coerce.number().int().min(1, "Level must be 1 or higher."),
+  term: z.coerce.number().int().min(1).max(3, "Term must be 1, 2, or 3."),
+  academicYear: z
+    .string()
+    .trim()
+    .regex(/^\d{4}\/\d{4}$/, "Use the format 2025/2026."),
+  weekNumber: z.coerce
+    .number()
+    .int()
+    .min(1, "Week must be 1 or higher.")
+    .max(14, "Week must be 14 or lower."),
+  sequenceOrder: z.coerce.number().int().min(1, "Order must be 1 or higher."),
+  title: z.string().trim().min(2, "Enter a topic title."),
+  description: z.string().trim().optional(),
+});
+export type CurriculumTopicInput = z.infer<typeof curriculumTopicSchema>;
+
 export const announcementSchema = z.object({
   title: z.string().trim().min(3, "Title must be at least 3 characters."),
   content: z.string().trim().min(10, "Write at least a short sentence."),
