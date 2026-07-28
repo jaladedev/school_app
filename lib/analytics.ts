@@ -6,6 +6,22 @@ type SupabaseServerClient = ReturnType<typeof createClient>;
 
 export type EnrollmentTrendPoint = { label: string; count: number };
 
+// Cap how many distinct (academic_year, term) points these two trends will
+// ever render. Without this, every term the school has ever existed for
+// gets its own bar — fine at low data volumes, but unbounded growth over
+// many years of use. Keeping the most *recent* N terms (not just the first
+// N found) since that's what's actually useful on a dashboard.
+const TERM_TREND_CAP = 12;
+
+function capToRecentTerms<T extends { label: string }>(points: T[]): T[] {
+  // labels sort correctly as strings here because they're built as
+  // `${academic_year} · Term ${term}` and academic years are "YYYY/YYYY"-
+  // style strings that sort chronologically; term 1/2/3 sorts correctly
+  // within a year too since it's a single digit.
+  const sorted = [...points].sort((a, b) => a.label.localeCompare(b.label));
+  return sorted.slice(-TERM_TREND_CAP);
+}
+
 export async function getEnrollmentTrend(
   supabase: SupabaseServerClient
 ): Promise<EnrollmentTrendPoint[]> {
@@ -17,9 +33,11 @@ export async function getEnrollmentTrend(
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
 
-  return [...counts.entries()]
+  const points = [...counts.entries()]
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => a.label.localeCompare(b.label));
+
+  return capToRecentTerms(points);
 }
 
 // ---------- Fee collection vs defaulters ----------
@@ -61,13 +79,14 @@ export async function getFeeCollectionTrend(
     byTerm.set(key, point);
   }
 
-  return [...byTerm.values()].sort((a, b) => a.label.localeCompare(b.label));
+  return capToRecentTerms([...byTerm.values()].sort((a, b) => a.label.localeCompare(b.label)));
 }
 
-// ---------- Average grades by subject ----------
+// ---------- Average grades by subject and class ----------
 
 export type SubjectGradeAverage = {
   subjectName: string;
+  className: string;
   averagePercent: number;
   gradeCount: number;
 };
@@ -79,7 +98,7 @@ export async function getAverageGradesBySubject(
 ): Promise<SubjectGradeAverage[]> {
   const { data: assessments } = await supabase
     .from("assessments")
-    .select("id, subject_id, max_score, subjects(name)")
+    .select("id, subject_id, class_id, max_score, subjects(name), classes(name, arm)")
     .eq("academic_year", academicYear)
     .eq("term", term);
 
@@ -93,26 +112,38 @@ export async function getAverageGradesBySubject(
     .eq("moderation_status", "approved");
 
   const assessmentById = new Map((assessments ?? []).map((a) => [a.id, a]));
-  const bySubject = new Map<string, { name: string; totalPercent: number; count: number }>();
+  // Keyed by subject_id + class_id together — this is the actual change
+  // from before, which only keyed by subject_id and silently merged every
+  // class's grades for a subject into one bar.
+  const bySubjectAndClass = new Map<
+    string,
+    { subjectName: string; className: string; totalPercent: number; count: number }
+  >();
 
   for (const g of grades ?? []) {
     const assessment = assessmentById.get(g.assessment_id);
     if (!assessment || !assessment.max_score) continue;
     const subjectName = assessment.subjects?.name ?? "Unknown subject";
+    const className = assessment.classes
+      ? `${assessment.classes.name}${assessment.classes.arm ? ` ${assessment.classes.arm}` : ""}`
+      : "Unknown class";
+    const key = `${assessment.subject_id}::${assessment.class_id}`;
     const percent = (g.score / assessment.max_score) * 100;
-    const entry = bySubject.get(assessment.subject_id) ?? {
-      name: subjectName,
+    const entry = bySubjectAndClass.get(key) ?? {
+      subjectName,
+      className,
       totalPercent: 0,
       count: 0,
     };
     entry.totalPercent += percent;
     entry.count += 1;
-    bySubject.set(assessment.subject_id, entry);
+    bySubjectAndClass.set(key, entry);
   }
 
-  return [...bySubject.values()]
+  return [...bySubjectAndClass.values()]
     .map((e) => ({
-      subjectName: e.name,
+      subjectName: e.subjectName,
+      className: e.className,
       averagePercent: Math.round(e.totalPercent / e.count),
       gradeCount: e.count,
     }))

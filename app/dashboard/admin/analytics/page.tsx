@@ -107,13 +107,13 @@ export default async function AdminAnalyticsPage() {
         </Card>
 
         <Card
-          title="Average grades by subject"
+          title="Average grades by subject and class"
           subtitle={`Approved grades, ${academicYear} · Term ${term}`}
         >
           {subjectGrades.length ? (
             <BarList
               items={subjectGrades.map((s) => ({
-                label: s.subjectName,
+                label: `${s.subjectName} · ${s.className}`,
                 value: s.averagePercent,
                 displayValue: `${s.averagePercent}% (${s.gradeCount} grades)`,
               }))}
