@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { curriculumTopicSchema, fieldErrorsFrom } from "@/lib/validation";
-import type { EducationLevel } from "@/types/database";
+import type { CurriculumTopic, EducationLevel } from "@/types/database";
 
 type SubjectOption = {
   id: string;
@@ -18,12 +18,19 @@ export function CreateTopicForm({
   subjects,
   defaultAcademicYear,
   defaultTerm,
-  nextSequenceOrder,
+  existingTopics,
 }: {
   subjects: SubjectOption[];
   defaultAcademicYear: string;
   defaultTerm: number;
-  nextSequenceOrder: (subjectId: string, levelNumber: number, term: number) => number;
+  // Passed as plain data rather than a "next sequence order" function —
+  // Server Components can't hand a client component a plain closure
+  // (only Server Actions cross that boundary), so the computation has to
+  // happen here instead of in the page.
+  existingTopics: Pick<
+    CurriculumTopic,
+    "subject_id" | "level_number" | "term" | "sequence_order"
+  >[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -78,7 +85,12 @@ export function CreateTopicForm({
     }
     setFieldErrors({});
 
-    const sequenceOrder = nextSequenceOrder(subjectId, levelNumber, term);
+    const matching = existingTopics.filter(
+      (t) => t.subject_id === subjectId && t.level_number === levelNumber && t.term === term
+    );
+    const sequenceOrder = matching.length
+      ? Math.max(...matching.map((t) => t.sequence_order)) + 1
+      : 1;
 
     startTransition(async () => {
       const { error: insertError } = await supabase.from("curriculum_topics").insert({

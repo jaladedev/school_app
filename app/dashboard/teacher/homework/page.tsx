@@ -1,7 +1,19 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { HOMEWORK_SUBMISSION_BUCKET } from "@/lib/storageBuckets";
 import { HomeworkStatusToggle } from "@/components/HomeworkStatusToggle";
+import { HomeworkSubmissionReview } from "@/components/HomeworkSubmissionReview";
 import { redirect } from "next/navigation";
-import type { HomeworkStatus } from "@/types/database";
+import type { HomeworkStatus, HomeworkSubmissionStatus } from "@/types/database";
+
+type SubmissionRow = {
+  id: string;
+  file_url: string;
+  file_name: string | null;
+  status: HomeworkSubmissionStatus;
+  teacher_remark: string | null;
+  student_profiles: { profiles: { full_name: string } | null } | null;
+};
 
 type HomeworkLessonRow = {
   id: string;
@@ -11,6 +23,7 @@ type HomeworkLessonRow = {
   classes: { name: string; arm: string | null } | null;
   curriculum_topics: { title: string } | null;
   timetable_entries: { subjects: { name: string } | null } | null;
+  homework_submissions: SubmissionRow[];
 };
 
 function summaryLine(givenCount: number, reviewedCount: number): string {
@@ -32,7 +45,7 @@ export default async function TeacherHomeworkPage() {
   const { data: lessons } = await supabase
     .from("lessons")
     .select(
-      "id, lesson_date, homework, homework_status, classes(name, arm), curriculum_topics(title), timetable_entries(subjects(name))"
+      "id, lesson_date, homework, homework_status, classes(name, arm), curriculum_topics(title), timetable_entries(subjects(name)), homework_submissions(id, file_url, file_name, status, teacher_remark, student_profiles(profiles(full_name)))"
     )
     .eq("teacher_id", profile.id)
     .not("homework", "is", null)
@@ -42,6 +55,20 @@ export default async function TeacherHomeworkPage() {
 
   const givenCount = (lessons ?? []).filter((l) => l.homework_status === "given").length;
   const reviewedCount = (lessons ?? []).filter((l) => l.homework_status === "reviewed").length;
+
+  const admin = createAdminClient();
+  const signedUrlByPath = new Map<string, string>();
+  const allPaths = (lessons ?? []).flatMap(
+    (l) => l.homework_submissions?.map((s) => s.file_url) ?? []
+  );
+  if (allPaths.length) {
+    const { data: signed } = await admin.storage
+      .from(HOMEWORK_SUBMISSION_BUCKET)
+      .createSignedUrls(allPaths, 60 * 60);
+    signed?.forEach((s) => {
+      if (s.signedUrl && s.path) signedUrlByPath.set(s.path, s.signedUrl);
+    });
+  }
 
   return (
     <div className="max-w-2xl">
@@ -65,6 +92,24 @@ export default async function TeacherHomeworkPage() {
               <p className="mb-1 text-xs text-ink-soft">{l.curriculum_topics.title}</p>
             )}
             <p className="text-sm text-ink">{l.homework}</p>
+
+            {l.homework_submissions?.length ? (
+              <div className="mt-3 rounded-lg border border-rule bg-paper p-2">
+                {l.homework_submissions.map((s) => (
+                  <HomeworkSubmissionReview
+                    key={s.id}
+                    submissionId={s.id}
+                    studentName={s.student_profiles?.profiles?.full_name ?? "Student"}
+                    fileName={s.file_name}
+                    signedUrl={signedUrlByPath.get(s.file_url) ?? null}
+                    status={s.status}
+                    remark={s.teacher_remark}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-ink-soft">No submissions yet.</p>
+            )}
           </div>
         ))}
 

@@ -51,13 +51,6 @@ export default async function AdminCurriculumPage({
     return aLevel - bLevel || aTerm - bTerm;
   });
 
-  function nextSequenceOrderFor(subjectId: string, levelNumber: number, term: number): number {
-    const matching = (topics ?? []).filter(
-      (t) => t.subject_id === subjectId && t.level_number === levelNumber && t.term === term
-    );
-    return matching.length ? Math.max(...matching.map((t) => t.sequence_order)) + 1 : 1;
-  }
-
   return (
     <div>
       <div className="mb-6">
@@ -96,7 +89,7 @@ export default async function AdminCurriculumPage({
             subjects={[activeSubject]}
             defaultAcademicYear={settings?.current_academic_year ?? ""}
             defaultTerm={settings?.current_term ?? 1}
-            nextSequenceOrder={nextSequenceOrderFor}
+            existingTopics={topics ?? []}
           />
 
           {groupKeys.length === 0 && (

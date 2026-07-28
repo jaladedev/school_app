@@ -1,7 +1,8 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/EmptyState";
-import type { HomeworkStatus } from "@/types/database";
+import { HomeworkSubmissionUpload } from "@/components/HomeworkSubmissionUpload";
+import type { HomeworkStatus, HomeworkSubmissionStatus } from "@/types/database";
 
 type HomeworkLessonRow = {
   id: string;
@@ -10,6 +11,11 @@ type HomeworkLessonRow = {
   homework_status: HomeworkStatus;
   curriculum_topics: { title: string } | null;
   timetable_entries: { subjects: { name: string } | null } | null;
+  homework_submissions: {
+    file_name: string | null;
+    status: HomeworkSubmissionStatus;
+    teacher_remark: string | null;
+  }[];
 };
 
 export default async function StudentHomeworkPage() {
@@ -29,7 +35,7 @@ export default async function StudentHomeworkPage() {
   const { data: lessons } = await supabase
     .from("lessons")
     .select(
-      "id, lesson_date, homework, homework_status, curriculum_topics(title), timetable_entries(subjects(name))"
+      "id, lesson_date, homework, homework_status, curriculum_topics(title), timetable_entries(subjects(name)), homework_submissions(file_name, status, teacher_remark)"
     )
     .eq("class_id", studentProfile?.class_id ?? "")
     .not("homework", "is", null)
@@ -74,6 +80,18 @@ export default async function StudentHomeworkPage() {
               <p className="mb-1 text-xs text-ink-soft">{l.curriculum_topics.title}</p>
             )}
             <p className="text-sm text-ink">{l.homework}</p>
+            <HomeworkSubmissionUpload
+              lessonId={l.id}
+              existing={
+                l.homework_submissions?.[0]
+                  ? {
+                      fileName: l.homework_submissions[0].file_name,
+                      status: l.homework_submissions[0].status,
+                      remark: l.homework_submissions[0].teacher_remark,
+                    }
+                  : null
+              }
+            />
           </div>
         ))}
 

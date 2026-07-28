@@ -4,6 +4,7 @@ export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disciplinary";
 export type AnnouncementAudience = "all" | "students" | "teachers" | "class";
 export type HomeworkStatus = "given" | "reviewed" | "graded";
+export type HomeworkSubmissionStatus = "submitted" | "reviewed";
 export type AssessmentType =
   "first_ca" | "second_ca" | "exam" | "test" | "assignment" | "project" | "practical" | "other";
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
@@ -183,6 +184,19 @@ export type Attendance = {
   status: AttendanceStatus;
   marked_by: string | null;
   marked_at: string;
+};
+
+export type HomeworkSubmission = {
+  id: string;
+  lesson_id: string;
+  student_id: string;
+  file_url: string;
+  file_name: string | null;
+  submitted_at: string;
+  status: HomeworkSubmissionStatus;
+  teacher_remark: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
 };
 
 export type Assessment = {
@@ -917,6 +931,34 @@ export type Database = {
           {
             foreignKeyName: "attendance_marked_by_fkey";
             columns: ["marked_by"];
+            isOneToOne: false;
+            referencedRelation: "teacher_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      homework_submissions: {
+        Row: HomeworkSubmission;
+        Insert: Partial<HomeworkSubmission>;
+        Update: Partial<HomeworkSubmission>;
+        Relationships: [
+          {
+            foreignKeyName: "homework_submissions_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: false;
+            referencedRelation: "lessons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "homework_submissions_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "homework_submissions_reviewed_by_fkey";
+            columns: ["reviewed_by"];
             isOneToOne: false;
             referencedRelation: "teacher_profiles";
             referencedColumns: ["id"];
