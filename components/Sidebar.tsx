@@ -79,6 +79,17 @@ const DRIVER_NAV: { label: string; href: string }[] = [
   { label: "Announcements", href: "/dashboard/announcements" },
 ];
 
+// A bursar isn't teaching staff either — fee structures, invoices, and
+// payments cover their whole job, not the classroom-facing teacher menu.
+const BURSAR_NAV: { label: string; href: string }[] = [
+  { label: "Bursary", href: "/dashboard/bursar" },
+  { label: "Fee structures", href: "/dashboard/bursar/structures" },
+  { label: "Invoices & payments", href: "/dashboard/bursar/invoices" },
+  { label: "Payment history", href: "/dashboard/bursar/payments" },
+  { label: "Messages", href: "/dashboard/messages" },
+  { label: "Announcements", href: "/dashboard/announcements" },
+];
+
 /**
  * Picks the single most specific matching nav item for the current path,
  * so a nested route (e.g. /dashboard/admin/classes/promote) doesn't also
@@ -115,7 +126,9 @@ export function Sidebar({
           ? [...NAV_BY_ROLE.teacher, { label: "Transport", href: "/dashboard/transport" }]
           : role === "teacher" && staffRole === "driver"
             ? DRIVER_NAV
-            : NAV_BY_ROLE[role];
+            : role === "teacher" && staffRole === "bursar"
+              ? BURSAR_NAV
+              : NAV_BY_ROLE[role];
   const pathname = usePathname();
   const activeHref = findActiveHref(pathname, items);
   const [mobileOpen, setMobileOpen] = useState(false);
