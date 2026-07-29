@@ -3,6 +3,7 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { NoteWorkspace } from "@/components/NoteWorkspace";
 import { TopicResourceUpload } from "@/components/TopicResourceUpload";
 import { TopicResourceList } from "@/components/TopicResourceList";
+import { NoteVersionDiff } from "@/components/NoteVersionDiff";
 import { formatLevel } from "@/types/database";
 
 export default async function TeacherNoteEditPage({
@@ -115,6 +116,7 @@ export default async function TeacherNoteEditPage({
               </div>
             ))}
           </div>
+          <NoteVersionDiff versions={versions} />
         </section>
       )}
     </div>

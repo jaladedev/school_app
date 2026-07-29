@@ -444,6 +444,37 @@ export async function saveTopicNote(
   revalidatePath("/dashboard/teacher/notes");
 }
 
+/**
+ * Fetches one version's content on demand for the version-diff view.
+ * Deliberately not bundled into the initial version-history list query
+ * (which only selects id/version/status/moderation_status/updated_at) --
+ * note bodies can be a few paragraphs each, and most page loads never
+ * open the diff view, so there's no reason to pull every version's full
+ * text up front.
+ *
+ * Uses the session-scoped client, not createAdminClient(), so the same
+ * topic_note_visible() RLS rule that already governs who can read a note
+ * (author, admin, that subject's HOD, or any teacher/student/parent once
+ * approved) applies here too -- this doesn't open up any access a caller
+ * couldn't already get by reading the note directly.
+ */
+export async function getTopicNoteVersionContent(noteId: string): Promise<string> {
+  await assertRole(["admin", "teacher"], "Only teaching staff can compare lesson plan versions.");
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("topic_notes")
+    .select("content")
+    .eq("id", noteId)
+    .single();
+
+  if (error || !data) {
+    throw new Error(
+      "That version isn't available (it may have been removed, or you don't have access to it)."
+    );
+  }
+  return data.content;
+}
+
 const TOPIC_RESOURCE_BUCKET = "topic-resources";
 const MAX_TOPIC_RESOURCE_BYTES = 20 * 1024 * 1024;
 const RESOURCE_TYPES = new Map<string, Extract<ResourceType, "image" | "pdf" | "audio" | "video">>([
