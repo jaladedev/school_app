@@ -34,6 +34,15 @@ export default async function TeacherHome() {
     .eq("weekday", todayWeekday)
     .order("period_number", { ascending: true });
 
+  // "Now" in HH:MM, compared against each entry's start_time/end_time (both
+  // stored as HH:MM strings) to find which period is currently in session.
+  // This is only ever a suggestion -- the teacher can still open/close any
+  // row regardless of which one gets flagged as current.
+  const nowTime = today.toTimeString().slice(0, 5);
+  const currentEntryId =
+    (todaysEntries ?? []).find((entry) => entry.start_time <= nowTime && nowTime < entry.end_time)
+      ?.id ?? null;
+
   const { data: lessons } = await supabase
     .from("lessons")
     .select("id, timetable_entry_id")
@@ -135,6 +144,7 @@ export default async function TeacherHome() {
               lessonId={lessonByEntry.get(entry.id) ?? null}
               topics={topicsByKey.get(key) ?? []}
               suggestedTopicId={suggestedTopicByKey.get(key) ?? null}
+              isCurrent={entry.id === currentEntryId}
             />
           );
         })}

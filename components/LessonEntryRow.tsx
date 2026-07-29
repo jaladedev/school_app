@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CreateLessonForm } from "@/components/CreateLessonForm";
 
@@ -16,6 +16,7 @@ export function LessonEntryRow({
   lessonId,
   topics,
   suggestedTopicId,
+  isCurrent,
 }: {
   entryId: string;
   classId: string;
@@ -28,15 +29,39 @@ export function LessonEntryRow({
   lessonId: string | null;
   topics: { id: string; title: string }[];
   suggestedTopicId?: string | null;
+  isCurrent?: boolean;
 }) {
-  const [logging, setLogging] = useState(false);
+  // Current period is opened for logging by default (if not already logged),
+  // and scrolled into view -- but this is just a starting point. The teacher
+  // can close it and open any other period instead; nothing here is locked.
+  const [logging, setLogging] = useState(Boolean(isCurrent) && !lessonId);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isCurrent) {
+      rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+    // Only run on mount -- this is a one-time "bring the current period into
+    // view" nudge, not something that should re-trigger on later renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <div className="rounded-lg border border-rule bg-white px-4 py-3">
+    <div
+      ref={rowRef}
+      className={`rounded-lg border bg-white px-4 py-3 ${
+        isCurrent ? "border-leaf ring-1 ring-leaf" : "border-rule"
+      }`}
+    >
       <div className="flex items-center justify-between">
         <div>
           <p className="font-medium text-ink">
             {subjectName} — {className}
+            {isCurrent && (
+              <span className="ml-2 rounded-full bg-leaf-soft px-2 py-0.5 text-xs font-medium text-leaf">
+                Now
+              </span>
+            )}
           </p>
           <p className="text-sm text-ink-soft">
             Period {periodNumber} · {startTime}–{endTime}
