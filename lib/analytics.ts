@@ -231,6 +231,164 @@ export async function getTeacherWorkload(
     .sort((a, b) => b.periodsPerWeek - a.periodsPerWeek);
 }
 
+// ---------- Defaulter trend ----------
+
+export type DefaulterTrendPoint = {
+  label: string;
+  defaulterCount: number;
+  billedStudentCount: number;
+  defaulterRatePercent: number;
+};
+
+/**
+ * Distinct from getFeeCollectionTrend's `unpaidCount`, which counts
+ * unpaid/partial *invoices*. This counts distinct *students* who owe
+ * something for the term — a student with three unpaid invoices is one
+ * defaulter, not three, which is the number that actually matters for
+ * "how many families still owe us" rather than "how many line items".
+ */
+export async function getDefaulterTrend(
+  supabase: SupabaseServerClient
+): Promise<DefaulterTrendPoint[]> {
+  const { data } = await supabase
+    .from("invoices")
+    .select("academic_year, term, student_id, status")
+    .is("voided_at", null)
+    .not("student_id", "is", null);
+
+  const byTerm = new Map<string, { billedStudents: Set<string>; defaulters: Set<string> }>();
+
+  for (const row of data ?? []) {
+    if (!row.student_id) continue;
+    const key = `${row.academic_year} · Term ${row.term}`;
+    const bucket = byTerm.get(key) ?? { billedStudents: new Set(), defaulters: new Set() };
+    bucket.billedStudents.add(row.student_id);
+    if (row.status === "unpaid" || row.status === "partial") {
+      bucket.defaulters.add(row.student_id);
+    }
+    byTerm.set(key, bucket);
+  }
+
+  const points = [...byTerm.entries()]
+    .map(([label, { billedStudents, defaulters }]) => ({
+      label,
+      defaulterCount: defaulters.size,
+      billedStudentCount: billedStudents.size,
+      defaulterRatePercent: billedStudents.size
+        ? Math.round((defaulters.size / billedStudents.size) * 100)
+        : 0,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  return capToRecentTerms(points);
+}
+
+// ---------- Teacher punctuality ----------
+
+export type TeacherPunctualityPoint = {
+  teacherName: string;
+  lessonCount: number;
+  lateCount: number;
+  latePercent: number;
+  avgMinutesLate: number;
+};
+
+/**
+ * Grace period before an attendance mark counts as "late" relative to the
+ * scheduled period start — a couple of minutes of settling-in time is
+ * normal and shouldn't register as a punctuality problem.
+ */
+const PUNCTUALITY_GRACE_MINUTES = 10;
+
+/**
+ * "Punctuality" here is measured as how promptly a teacher took
+ * attendance relative to their period's scheduled start_time — the only
+ * timestamped, per-lesson signal of teacher timeliness this schema has.
+ * (There's no separate "teacher checked in" or "class started" event —
+ * attendance-marking is the actual proxy already used elsewhere in the
+ * app, e.g. the teacher attendance-history chart.)
+ */
+export async function getTeacherPunctuality(
+  supabase: SupabaseServerClient,
+  academicYear: string,
+  term: number
+): Promise<TeacherPunctualityPoint[]> {
+  const { data: lessons } = await supabase
+    .from("lessons")
+    .select(
+      "id, teacher_id, teacher_profiles(profiles(full_name)), timetable_entries!inner(start_time, academic_year, term)"
+    )
+    .eq("timetable_entries.academic_year", academicYear)
+    .eq("timetable_entries.term", term)
+    .not("teacher_id", "is", null);
+
+  const lessonIds = (lessons ?? []).map((l) => l.id);
+  if (!lessonIds.length) return [];
+
+  const { data: attendanceRows } = await supabase
+    .from("attendance")
+    .select("lesson_id, marked_at")
+    .in("lesson_id", lessonIds);
+
+  // Earliest mark per lesson — that's the moment attendance-taking
+  // actually started, regardless of how many students were marked.
+  const earliestMarkByLesson = new Map<string, string>();
+  for (const row of attendanceRows ?? []) {
+    if (!row.lesson_id || !row.marked_at) continue;
+    const existing = earliestMarkByLesson.get(row.lesson_id);
+    if (!existing || row.marked_at < existing) {
+      earliestMarkByLesson.set(row.lesson_id, row.marked_at);
+    }
+  }
+
+  const byTeacher = new Map<
+    string,
+    { name: string; lessonCount: number; lateCount: number; totalMinutesLate: number }
+  >();
+
+  for (const lesson of lessons ?? []) {
+    if (!lesson.teacher_id) continue;
+    const markedAt = earliestMarkByLesson.get(lesson.id);
+    // No attendance ever taken for this lesson isn't a punctuality data
+    // point one way or the other — skip rather than count as either.
+    if (!markedAt) continue;
+
+    const startTime = lesson.timetable_entries?.start_time;
+    if (!startTime) continue;
+
+    const markedDate = new Date(markedAt);
+    const [schedHour, schedMinute] = startTime.split(":").map(Number);
+    const scheduledDate = new Date(markedDate);
+    scheduledDate.setHours(schedHour, schedMinute, 0, 0);
+
+    const minutesLate = (markedDate.getTime() - scheduledDate.getTime()) / 60000;
+
+    const name = lesson.teacher_profiles?.profiles?.full_name ?? "Unknown teacher";
+    const entry = byTeacher.get(lesson.teacher_id) ?? {
+      name,
+      lessonCount: 0,
+      lateCount: 0,
+      totalMinutesLate: 0,
+    };
+    entry.lessonCount += 1;
+    if (minutesLate > PUNCTUALITY_GRACE_MINUTES) {
+      entry.lateCount += 1;
+      entry.totalMinutesLate += minutesLate;
+    }
+    byTeacher.set(lesson.teacher_id, entry);
+  }
+
+  return [...byTeacher.values()]
+    .map((e) => ({
+      teacherName: e.name,
+      lessonCount: e.lessonCount,
+      lateCount: e.lateCount,
+      latePercent: e.lessonCount ? Math.round((e.lateCount / e.lessonCount) * 100) : 0,
+      avgMinutesLate: e.lateCount ? Math.round(e.totalMinutesLate / e.lateCount) : 0,
+    }))
+    .sort((a, b) => b.latePercent - a.latePercent);
+}
+
 // ---------- Library overdue rate ----------
 
 export type OverdueRatePoint = {

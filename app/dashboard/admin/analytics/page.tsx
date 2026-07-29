@@ -9,6 +9,8 @@ import {
   getAttendanceTrend,
   getTeacherWorkload,
   getLibraryOverdueTrend,
+  getDefaulterTrend,
+  getTeacherPunctuality,
 } from "@/lib/analytics";
 
 function Card({
@@ -49,6 +51,8 @@ export default async function AdminAnalyticsPage() {
     attendanceTrend,
     teacherWorkload,
     libraryOverdueTrend,
+    defaulterTrend,
+    teacherPunctuality,
   ] = await Promise.all([
     getEnrollmentTrend(supabase),
     getFeeCollectionTrend(supabase),
@@ -56,6 +60,8 @@ export default async function AdminAnalyticsPage() {
     getAttendanceTrend(supabase, settings?.current_term_start_date ?? null),
     getTeacherWorkload(supabase, academicYear, term),
     getLibraryOverdueTrend(supabase),
+    getDefaulterTrend(supabase),
+    getTeacherPunctuality(supabase, academicYear, term),
   ]);
 
   const currentFeePoint = feeCollectionTrend.find(
@@ -181,6 +187,42 @@ export default async function AdminAnalyticsPage() {
             />
           ) : (
             <EmptyState message="No library loans in the last 30 days." />
+          )}
+        </Card>
+
+        <Card
+          title="Defaulter trend"
+          subtitle="Distinct students still owing something, per term (not invoice count)"
+        >
+          {defaulterTrend.length ? (
+            <BarList
+              colorClassName="bg-marigold"
+              items={defaulterTrend.map((p) => ({
+                label: p.label,
+                value: p.defaulterRatePercent,
+                displayValue: `${p.defaulterCount} of ${p.billedStudentCount} students (${p.defaulterRatePercent}%)`,
+              }))}
+            />
+          ) : (
+            <EmptyState message="No invoices recorded yet." />
+          )}
+        </Card>
+
+        <Card
+          title="Teacher punctuality"
+          subtitle={`Attendance-marking delay vs. scheduled period start, ${academicYear} · Term ${term}`}
+        >
+          {teacherPunctuality.length ? (
+            <BarList
+              colorClassName="bg-clay"
+              items={teacherPunctuality.map((t) => ({
+                label: t.teacherName,
+                value: t.latePercent,
+                displayValue: `${t.lateCount}/${t.lessonCount} late (${t.latePercent}%, avg ${t.avgMinutesLate}m)`,
+              }))}
+            />
+          ) : (
+            <EmptyState message="No attendance data for the current term yet." />
           )}
         </Card>
       </div>
