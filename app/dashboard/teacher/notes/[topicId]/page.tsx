@@ -31,7 +31,7 @@ export default async function TeacherNoteEditPage({
 
   const { data: versions } = await supabase
     .from("topic_notes")
-    .select("id, version, status, updated_at")
+    .select("id, version, status, moderation_status, updated_at")
     .eq("topic_id", resolvedParams.topicId)
     .order("version", { ascending: false });
 
@@ -62,6 +62,26 @@ export default async function TeacherNoteEditPage({
       </p>
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">{topic?.title}</h1>
 
+      {note?.status === "published" && (
+        <p className="mb-4 text-xs font-medium">
+          {note.moderation_status === "pending" && (
+            <span className="rounded-full bg-marigold/20 px-2.5 py-1 text-marigold-dark">
+              Awaiting HOD review — not visible to students yet
+            </span>
+          )}
+          {note.moderation_status === "approved" && (
+            <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-leaf">
+              Approved — visible to students
+            </span>
+          )}
+          {note.moderation_status === "rejected" && (
+            <span className="rounded-full bg-clay/20 px-2.5 py-1 text-clay">
+              Rejected by HOD — edit and republish to resubmit
+            </span>
+          )}
+        </p>
+      )}
+
       <NoteWorkspace
         topicId={resolvedParams.topicId}
         noteId={note?.id}
@@ -88,7 +108,9 @@ export default async function TeacherNoteEditPage({
               >
                 <span className="font-medium text-ink">Version {version.version}</span>
                 <span className="text-xs text-ink-soft">
-                  {version.status} · {new Date(version.updated_at).toLocaleString()}
+                  {version.status}
+                  {version.status === "published" ? ` (${version.moderation_status})` : ""} ·{" "}
+                  {new Date(version.updated_at).toLocaleString()}
                 </span>
               </div>
             ))}
