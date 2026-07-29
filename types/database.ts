@@ -1,5 +1,6 @@
 export type UserRole = "student" | "teacher" | "admin" | "parent";
 export type NoteStatus = "draft" | "published" | "archived";
+export type NoteModerationStatus = "pending" | "approved" | "rejected";
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 export type StudentNoteType = "behavioral" | "academic" | "commendation" | "disciplinary";
 export type AnnouncementAudience = "all" | "students" | "teachers" | "class";
@@ -132,6 +133,7 @@ export type TopicNote = {
   author_id: string | null;
   content: string;
   status: NoteStatus;
+  moderation_status: NoteModerationStatus;
   version: number;
   created_at: string;
   updated_at: string;

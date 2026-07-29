@@ -396,6 +396,36 @@ export async function saveTopicNote(
     .limit(1)
     .maybeSingle();
 
+  // Publishing goes through the same HOD review gate as grades: a new
+  // publish starts 'pending' and stays invisible to everyone but the
+  // author/admin/that subject's HOD until reviewed (see
+  // topic_note_visible() + notes_update_hod in the lesson-plan-approval
+  // migration). The one exception is a HOD publishing their own note for
+  // their own subject -- there's no one else to review it, so it
+  // auto-approves, same as how grades_insert_assigned_teacher still
+  // requires a HOD's own submitted grades to go through
+  // grades_update_hod... except unlike grades, a solo HOD here would
+  // otherwise be stuck unable to ever publish anything, so auto-approve
+  // is the deliberate difference. A draft's moderation_status is never
+  // read while it's still a draft (topic_note_visible short-circuits on
+  // status first), so 'approved' there is just an inert default.
+  let moderationStatus: "approved" | "pending" = "approved";
+  if (status === "published") {
+    const [{ data: topic }, { data: teacher }] = await Promise.all([
+      supabase.from("curriculum_topics").select("subject_id").eq("id", topicId).single(),
+      supabase
+        .from("teacher_profiles")
+        .select("staff_role, subjects_taught")
+        .eq("id", teacherId)
+        .single(),
+    ]);
+    const isHodOfThisSubject =
+      teacher?.staff_role === "hod" &&
+      !!topic?.subject_id &&
+      !!teacher.subjects_taught?.includes(topic.subject_id);
+    moderationStatus = isHodOfThisSubject ? "approved" : "pending";
+  }
+
   // Notes are append-only: publishing a revision never overwrites an
   // earlier draft or published copy, so teachers can review the full
   // topic history later and students continue seeing the latest publish.
@@ -404,12 +434,14 @@ export async function saveTopicNote(
     author_id: teacherId,
     content,
     status,
+    moderation_status: moderationStatus,
     version: (latest?.version ?? 0) + 1,
   });
 
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
+  revalidatePath("/dashboard/teacher/notes");
 }
 
 const TOPIC_RESOURCE_BUCKET = "topic-resources";
