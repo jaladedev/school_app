@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { formatKobo, type InvoiceStatus, type PaymentMethod } from "@/types/database";
 import { PaystackPayButton } from "@/components/PaystackPayButton";
+import { InstallmentScheduleView } from "@/components/InstallmentScheduleView";
 import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -38,10 +39,13 @@ export default async function StudentFeesPage() {
 
   const { data: invoices } = await supabase
     .from("invoices")
-    .select("*, fee_structures(title, due_date)")
+    .select(
+      "*, fee_structures(title, due_date), invoice_installments(id, sequence_order, due_date, amount_kobo)"
+    )
     .eq("student_id", profile.id)
     .is("voided_at", null)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("sequence_order", { foreignTable: "invoice_installments", ascending: true });
 
   const { data: payments } = await supabase
     .from("payments")
@@ -105,6 +109,12 @@ export default async function StudentFeesPage() {
                   <span className="font-medium text-clay">{formatKobo(balance)} due</span>
                 )}
               </div>
+              {!!inv.invoice_installments?.length && (
+                <InstallmentScheduleView
+                  installments={inv.invoice_installments}
+                  amountPaidKobo={inv.amount_paid_kobo}
+                />
+              )}
               {balance > 0 && (
                 <div className="mt-3">
                   <PaystackPayButton invoiceId={inv.id} email={email} amountKobo={balance} />

@@ -16,7 +16,7 @@ import { computeInvoiceStatus } from "@/lib/invoiceStatus";
  * here used the admin client and was previously hard-locked to admin
  * only.
  */
-async function assertCanManageFees(errorMessage: string): Promise<{ id: string }> {
+export async function assertCanManageFees(errorMessage: string): Promise<{ id: string }> {
   const { id, role } = await assertRole(["admin", "teacher"], errorMessage);
   if (role === "admin") return { id };
 

@@ -4,6 +4,8 @@ import { formatKobo, type InvoiceStatus } from "@/types/database";
 import { RecordPaymentForm } from "@/components/RecordPaymentForm";
 import { VoidInvoiceForm } from "@/components/VoidInvoiceForm";
 import { ApplyDiscountForm } from "@/components/ApplyDiscountForm";
+import { InstallmentPlanForm } from "@/components/InstallmentPlanForm";
+import { InstallmentScheduleView } from "@/components/InstallmentScheduleView";
 import { ExportDefaultersButton } from "@/components/ExportDefaultersButton";
 import { SendFeeRemindersButton } from "@/components/SendFeeRemindersButton";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
@@ -46,10 +48,12 @@ export default async function AdminInvoicesPage({
 
   let query = supabase
     .from("invoices")
-    .select("*, student_profiles(profiles(full_name), classes(name, arm)), fee_structures(title)", {
-      count: "exact",
-    })
-    .order("created_at", { ascending: false });
+    .select(
+      "*, student_profiles(profiles(full_name), classes(name, arm)), fee_structures(title), invoice_installments(id, sequence_order, due_date, amount_kobo)",
+      { count: "exact" }
+    )
+    .order("created_at", { ascending: false })
+    .order("sequence_order", { foreignTable: "invoice_installments", ascending: true });
 
   if (academicYear && term) {
     query = query.eq("academic_year", academicYear).eq("term", term);
@@ -210,15 +214,34 @@ export default async function AdminInvoicesPage({
                   {inv.void_reason ? ` — ${inv.void_reason}` : ""}
                 </p>
               ) : (
-                <div className="mt-2 flex items-center gap-3">
-                  {status !== "paid" && <RecordPaymentForm invoiceId={inv.id} />}
-                  <ApplyDiscountForm
-                    invoiceId={inv.id}
-                    totalAmountKobo={inv.total_amount_kobo}
-                    currentDiscountKobo={inv.discount_kobo}
-                  />
-                  {inv.amount_paid_kobo === 0 && <VoidInvoiceForm invoiceId={inv.id} />}
-                </div>
+                <>
+                  <div className="mt-2 flex items-center gap-3">
+                    {status !== "paid" && <RecordPaymentForm invoiceId={inv.id} />}
+                    <ApplyDiscountForm
+                      invoiceId={inv.id}
+                      totalAmountKobo={inv.total_amount_kobo}
+                      currentDiscountKobo={inv.discount_kobo}
+                    />
+                    {status !== "paid" && (
+                      <InstallmentPlanForm
+                        invoiceId={inv.id}
+                        netPayableKobo={owed}
+                        hasExistingPlan={!!inv.invoice_installments?.length}
+                        initialRows={inv.invoice_installments?.map((i) => ({
+                          dueDate: i.due_date,
+                          amountNaira: String(i.amount_kobo / 100),
+                        }))}
+                      />
+                    )}
+                    {inv.amount_paid_kobo === 0 && <VoidInvoiceForm invoiceId={inv.id} />}
+                  </div>
+                  {!!inv.invoice_installments?.length && (
+                    <InstallmentScheduleView
+                      installments={inv.invoice_installments}
+                      amountPaidKobo={inv.amount_paid_kobo}
+                    />
+                  )}
+                </>
               )}
             </div>
           );

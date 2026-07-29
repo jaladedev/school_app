@@ -327,6 +327,16 @@ export type Invoice = {
   last_reminded_at: string | null;
 };
 
+export type InvoiceInstallment = {
+  id: string;
+  invoice_id: string;
+  sequence_order: number;
+  due_date: string;
+  amount_kobo: number;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type Payment = {
   id: string;
   invoice_id: string;
@@ -1250,6 +1260,20 @@ export type Database = {
             columns: ["voided_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      invoice_installments: {
+        Row: InvoiceInstallment;
+        Insert: Partial<InvoiceInstallment>;
+        Update: Partial<InvoiceInstallment>;
+        Relationships: [
+          {
+            foreignKeyName: "invoice_installments_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
             referencedColumns: ["id"];
           },
         ];

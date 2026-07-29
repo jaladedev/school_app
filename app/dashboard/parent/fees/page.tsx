@@ -4,6 +4,7 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { getLinkedChildren, resolveSelectedChild } from "@/lib/parent";
 import { ChildSwitcher } from "@/components/ChildSwitcher";
 import { EmptyState } from "@/components/EmptyState";
+import { InstallmentScheduleView } from "@/components/InstallmentScheduleView";
 import { formatKobo, type InvoiceStatus, type PaymentMethod } from "@/types/database";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
@@ -42,10 +43,13 @@ export default async function ParentFeesPage({
 
   const { data: invoices } = await supabase
     .from("invoices")
-    .select("*, fee_structures(title, due_date)")
+    .select(
+      "*, fee_structures(title, due_date), invoice_installments(id, sequence_order, due_date, amount_kobo)"
+    )
     .eq("student_id", selected.id)
     .is("voided_at", null)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("sequence_order", { foreignTable: "invoice_installments", ascending: true });
 
   const { data: payments } = await supabase
     .from("payments")
@@ -110,6 +114,12 @@ export default async function ParentFeesPage({
                   <span className="font-medium text-clay">{formatKobo(balance)} due</span>
                 )}
               </div>
+              {!!inv.invoice_installments?.length && (
+                <InstallmentScheduleView
+                  installments={inv.invoice_installments}
+                  amountPaidKobo={inv.amount_paid_kobo}
+                />
+              )}
             </div>
           );
         })}
