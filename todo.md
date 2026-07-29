@@ -315,7 +315,9 @@ Verified against the repo, not just the "how additive is this" reasoning that pr
 
 ---
 
-## Notes carried through the whole build
+## Classroom Display
+
+- [x] **Bell timer / lesson countdown** — done, lives in Present mode (not the dashboard, not a standalone TV route). `BellTimer.tsx` (client component): given a teacher's today's timetable entries, ticks every second against wall-clock time to find whichever entry's `start_time`–`end_time` window contains "now". Deliberately renders nothing for most of a period — the banner only appears in the last 5 minutes (`WARNING_THRESHOLD_SECONDS`) with a live `mm:ss` countdown, then flashes a solid "Time's up" banner for 60 seconds after the bell (`TIME_UP_GRACE_SECONDS`) before disappearing again. A two-tone chime (Web Audio API oscillator, no audio asset needed) fires once entering the warning window and once at period end, tracked per-entry-id so it can't refire on every tick; a bell/mute toggle turns it off for the session. Wired into `NoteWorkspace.tsx`'s existing Edit/Present toggle — rendered above `NoteSlideView` only in Present mode, since that's what actually gets projected on the classroom TV while teaching, not the teacher-only dashboard. `TeacherNoteEditPage` (`/dashboard/teacher/notes/[topicId]`) fetches today's timetable entries for the signed-in teacher (same shape/query pattern the dashboard uses) and passes them down as a new optional `todaysEntries` prop on `NoteWorkspace`. `tsc --noEmit`, `eslint`, and the full Vitest suite (28 tests) all pass.
 
 - All money values stored as integer kobo — followed throughout the fees module, including Paystack amounts (native kobo for NGN, no conversion needed)
 - All dates stored as ISO date strings, displayed formatted per locale

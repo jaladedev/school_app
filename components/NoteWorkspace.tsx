@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { NoteEditor } from "@/components/NoteEditor";
 import { NoteSlideView } from "@/components/NoteSlideView";
+import { BellTimer, type BellTimerEntry } from "@/components/BellTimer";
 import type { TopicResource } from "@/types/database";
 
 export function NoteWorkspace({
@@ -11,12 +12,14 @@ export function NoteWorkspace({
   initialContent,
   initialStatus,
   resources,
+  todaysEntries = [],
 }: {
   topicId: string;
   noteId?: string;
   initialContent: string;
   initialStatus: "draft" | "published" | "archived" | "unwritten";
   resources: TopicResource[];
+  todaysEntries?: BellTimerEntry[];
 }) {
   const [mode, setMode] = useState<"edit" | "present">("edit");
 
@@ -62,7 +65,15 @@ export function NoteWorkspace({
           resources={resources}
         />
       ) : (
-        <NoteSlideView content={initialContent} resources={resources} />
+        <>
+          {/* Bell timer sits above the slide content in Present mode
+              specifically — this is what actually gets projected on the
+              classroom TV while a teacher is teaching, so the countdown
+              needs to live here rather than on the (teacher-only) dashboard
+              a student in the room never sees. */}
+          <BellTimer entries={todaysEntries} />
+          <NoteSlideView content={initialContent} resources={resources} />
+        </>
       )}
     </div>
   );

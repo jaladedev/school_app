@@ -49,6 +49,19 @@ export default async function TeacherNoteEditPage({
         .order("sequence_order", { ascending: true })
     : { data: [] };
 
+  // For the bell timer shown in Present mode — today's schedule for this
+  // teacher, same query/shape the teacher dashboard already uses.
+  const today = new Date();
+  const todayWeekday = today.getDay() === 0 ? 7 : today.getDay();
+  const { data: todaysEntries } = profile
+    ? await supabase
+        .from("timetable_entries")
+        .select("id, period_number, start_time, end_time, classes(name, arm), subjects(name)")
+        .eq("teacher_id", profile.id)
+        .eq("weekday", todayWeekday)
+        .order("period_number", { ascending: true })
+    : { data: [] };
+
   return (
     <div>
       <Link
@@ -89,6 +102,14 @@ export default async function TeacherNoteEditPage({
         initialContent={note?.content ?? `## Introduction\n\nWrite about "${topic?.title}" here.\n`}
         initialStatus={note?.status ?? "unwritten"}
         resources={resources ?? []}
+        todaysEntries={(todaysEntries ?? []).map((entry) => ({
+          id: entry.id,
+          periodNumber: entry.period_number,
+          startTime: entry.start_time,
+          endTime: entry.end_time,
+          subjectName: entry.subjects?.name ?? "",
+          className: `${entry.classes?.name ?? ""} ${entry.classes?.arm ?? ""}`.trim(),
+        }))}
       />
       {note ? (
         <section className="mt-4">
