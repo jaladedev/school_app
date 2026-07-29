@@ -35,6 +35,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Overview", href: "/dashboard/admin" },
     { label: "Classes", href: "/dashboard/admin/classes" },
     { label: "Promote Students", href: "/dashboard/admin/classes/promote" },
+    { label: "Academic Year Rollover", href: "/dashboard/admin/rollover" },
     { label: "Subjects", href: "/dashboard/admin/subjects" },
     { label: "Students", href: "/dashboard/admin/students" },
     { label: "Parents", href: "/dashboard/admin/parents" },
