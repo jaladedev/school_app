@@ -151,12 +151,23 @@ export async function recordPayment(input: {
 
 export async function applyDiscount(invoiceId: string, discountKobo: number) {
   await assertCanManageFees("Only an admin or the bursar can manage fees.");
+
+  if (!Number.isInteger(discountKobo) || discountKobo < 0) {
+    throw new Error("Discount amount must be zero or a positive amount.");
+  }
+
   const admin = createAdminClient();
 
   const { data: invoice } = await admin.from("invoices").select("*").eq("id", invoiceId).single();
 
   if (!invoice) throw new Error("Invoice not found.");
   if (invoice.voided_at) throw new Error("This invoice has been voided and can't be discounted.");
+  // Mirrors the DB's invoices_discount_not_exceeding_total CHECK constraint
+  // with a message a bursar can actually act on, instead of surfacing the
+  // raw constraint-violation error from Postgres.
+  if (discountKobo > invoice.total_amount_kobo) {
+    throw new Error("Discount can't be more than the invoice's total amount.");
+  }
 
   const newStatus = computeInvoiceStatus(
     invoice.total_amount_kobo,

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatKobo, type InvoiceStatus } from "@/types/database";
 import { RecordPaymentForm } from "@/components/RecordPaymentForm";
 import { VoidInvoiceForm } from "@/components/VoidInvoiceForm";
+import { ApplyDiscountForm } from "@/components/ApplyDiscountForm";
 import { ExportDefaultersButton } from "@/components/ExportDefaultersButton";
 import { SendFeeRemindersButton } from "@/components/SendFeeRemindersButton";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
@@ -196,6 +197,11 @@ export default async function AdminInvoicesPage({
                   {!isVoided && balance > 0 && (
                     <p className="text-xs text-clay">{formatKobo(balance)} outstanding</p>
                   )}
+                  {!isVoided && inv.discount_kobo > 0 && (
+                    <p className="text-xs text-marigold-dark">
+                      {formatKobo(inv.discount_kobo)} discount applied
+                    </p>
+                  )}
                 </div>
               </div>
               {isVoided ? (
@@ -206,6 +212,11 @@ export default async function AdminInvoicesPage({
               ) : (
                 <div className="mt-2 flex items-center gap-3">
                   {status !== "paid" && <RecordPaymentForm invoiceId={inv.id} />}
+                  <ApplyDiscountForm
+                    invoiceId={inv.id}
+                    totalAmountKobo={inv.total_amount_kobo}
+                    currentDiscountKobo={inv.discount_kobo}
+                  />
                   {inv.amount_paid_kobo === 0 && <VoidInvoiceForm invoiceId={inv.id} />}
                 </div>
               )}
