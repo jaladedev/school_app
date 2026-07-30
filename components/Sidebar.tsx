@@ -53,6 +53,7 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Audit Log", href: "/dashboard/admin/audit-log" },
     { label: "Messages", href: "/dashboard/messages" },
     { label: "Announcements", href: "/dashboard/announcements" },
+    { label: "Bulk Email", href: "/dashboard/admin/bulk-email" },
     { label: "Settings", href: "/dashboard/admin/settings" },
   ],
   parent: [
