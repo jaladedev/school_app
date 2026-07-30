@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   title: "School Management",
   description: "Timetables, lessons, notes and records for students, teachers and administration.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icons/favicon-32.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export const viewport = {
