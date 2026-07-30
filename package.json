@@ -16,6 +16,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.45.0",
+    "isomorphic-dompurify": "^3.20.0",
     "katex": "^0.18.1",
     "leaflet": "^1.9.4",
     "mermaid": "^10.9.1",

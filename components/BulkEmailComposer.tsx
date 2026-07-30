@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import DOMPurify from "isomorphic-dompurify";
 import {
   countBulkEmailRecipients,
   sendBulkEmailToAudience,
   type BulkEmailAudience,
   type BulkEmailAudienceRole,
 } from "@/lib/actions/bulkEmail";
+import { RichTextEditor } from "@/components/RichTextEditor";
 
 const ROLE_OPTIONS: { value: BulkEmailAudienceRole; label: string }[] = [
   { value: "student", label: "Students" },
@@ -14,6 +16,11 @@ const ROLE_OPTIONS: { value: BulkEmailAudienceRole; label: string }[] = [
   { value: "teacher", label: "Teachers & staff" },
   { value: "admin", label: "Admins" },
 ];
+
+/** contentEditable leaves behind "<br>" or nested empty tags when cleared -- a raw .trim() check would treat that as non-empty. */
+function isBodyEmpty(html: string): boolean {
+  return html.replace(/<[^>]*>/g, "").trim() === "";
+}
 
 export function BulkEmailComposer({
   classOptions,
@@ -74,7 +81,7 @@ export function BulkEmailComposer({
       setSendError("Enter a subject.");
       return;
     }
-    if (!body.trim()) {
+    if (isBodyEmpty(body)) {
       setSendError("Enter a message.");
       return;
     }
@@ -180,15 +187,13 @@ export function BulkEmailComposer({
 
       <div>
         <label className="mb-2 block text-sm font-medium text-ink">Message</label>
-        <textarea
+        <RichTextEditor
           value={body}
-          onChange={(e) => {
-            setBody(e.target.value);
+          onChange={(html) => {
+            setBody(html);
             setConfirming(false);
           }}
-          rows={8}
-          placeholder="Plain text — no formatting needed, this isn't a rich-text editor."
-          className="w-full rounded-lg border border-rule px-3 py-2 text-sm"
+          placeholder="e.g. Reminder: Term 2 resumes Monday. You can use bold, italics, lists, and links."
         />
       </div>
 
@@ -219,6 +224,10 @@ export function BulkEmailComposer({
             </strong>
             . This can&apos;t be undone once sent. Continue?
           </p>
+          <div
+            className="mb-3 max-h-40 overflow-y-auto rounded-lg border border-rule bg-white px-3 py-2 text-sm text-ink [&_a]:text-leaf [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(body) }}
+          />
           <div className="flex gap-2">
             <button
               onClick={handleConfirmSend}

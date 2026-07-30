@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { sendBulkEmail } from "@/lib/email";
 import { writeAuditLog } from "@/lib/audit";
+import DOMPurify from "isomorphic-dompurify";
 
 export type BulkEmailAudienceRole = "student" | "parent" | "teacher" | "admin";
 
@@ -105,14 +106,17 @@ export async function sendBulkEmailToAudience({
 }: {
   audience: BulkEmailAudience;
   subject: string;
+  /** Raw HTML from the compose form's rich text editor -- sanitized below before it ever reaches an email. */
   body: string;
 }): Promise<{ sent: number; failed: number; recipientCount: number }> {
   const { id: actorId } = await assertCanSendBulkEmail();
 
   const trimmedSubject = subject.trim();
-  const trimmedBody = body.trim();
+  // The editor leaves stray "<br>"/empty tags behind when "cleared" -- treat
+  // that as empty rather than sending a blank-looking email.
+  const bodyIsEmpty = body.replace(/<[^>]*>/g, "").trim() === "";
   if (!trimmedSubject) throw new Error("Enter a subject.");
-  if (!trimmedBody) throw new Error("Enter a message body.");
+  if (bodyIsEmpty) throw new Error("Enter a message body.");
   if (audience.roles.length === 0) throw new Error("Select at least one recipient group.");
 
   const recipients = await fetchRecipients(audience);
@@ -120,16 +124,18 @@ export async function sendBulkEmailToAudience({
     throw new Error("No recipients match this selection (or none have an email on file).");
   }
 
-  // Plain-text body wrapped in a minimal HTML shell — this composer takes
-  // plain text only (no rich-text editor), so `html` and `text` carry the
-  // same content rather than risking mismatched versions.
-  const html = `<div style="font-family: sans-serif; white-space: pre-wrap;">${escapeHtml(trimmedBody)}</div>`;
+  // The editor's contentEditable innerHTML is untrusted input (whatever the
+  // browser let through, plus anything pasted) -- sanitize before it's ever
+  // wrapped in an email, same as any other user-supplied HTML.
+  const sanitizedBody = DOMPurify.sanitize(body);
+  const html = `<div style="font-family: sans-serif;">${sanitizedBody}</div>`;
+  const text = htmlToPlainText(sanitizedBody);
 
   const result = await sendBulkEmail({
     recipients: recipients.map((r) => ({ email: r.email, name: r.fullName })),
     subject: trimmedSubject,
     html,
-    text: trimmedBody,
+    text,
   });
 
   await writeAuditLog({
@@ -149,11 +155,24 @@ export async function sendBulkEmailToAudience({
   return { sent: result.sent, failed: result.failed.length, recipientCount: recipients.length };
 }
 
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+/**
+ * Derives the plain-text fallback email clients use when they can't (or
+ * won't) render HTML. Block-level tags become line breaks and links show
+ * their URL inline, since a stripped-tags version would otherwise glue
+ * "Click hereTerm 2 resumes" into one unreadable line.
+ */
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<a\s+[^>]*href=["']([^"']*)["'][^>]*>(.*?)<\/a>/gi, "$2 ($1)")
+    .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }

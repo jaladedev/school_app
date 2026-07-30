@@ -23,22 +23,15 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     display: "standalone",
     background_color: "#faf7f0",
     theme_color: "#faf7f0",
-    // Falls back to static icons when the school hasn't uploaded a logo
-    // (public/icon-192.png, public/icon-512.png, plus a maskable variant
-    // with safe-zone padding so Android doesn't crop a plain square icon
-    // into a circle awkwardly). If a school logo IS set, we skip the
-    // maskable variant for that branch -- an admin-uploaded logo has no
-    // guaranteed safe-zone padding, so declaring it maskable could get
-    // it cropped badly on Android; "any" is the safer purpose for
-    // arbitrary uploaded images.
+    // Fallback icons for schools that haven't uploaded a logo yet
     icons: settings?.logo_url
       ? [
           { src: settings.logo_url, sizes: "192x192", type: "image/png" },
           { src: settings.logo_url, sizes: "512x512", type: "image/png" },
         ]
       : [
-          { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
           {
             src: "/icons/icon-maskable-512.png",
             sizes: "512x512",
