@@ -75,12 +75,14 @@ Currently: `[[resource:UUID]]` renders inline as a `ResourceChip` node (📷 �
 - Still need: Edit (still open for non-diagram resource types — images/PDFs/etc. don't have an update path yet, only diagrams do via #18's `updateMermaidResource`), Replace (swap for a different existing resource without reopening the whole insert flow)
 - Drag to reorder
 
-## 7. Drag & Drop Uploads
+## 7. Drag & Drop Uploads — DONE
 
 Currently: separate `TopicResourceUpload` panel (file picker, not drag-and-drop), supports image/pdf/audio/video already.
 
-- Add drag-and-drop directly onto the editor surface
-- Auto-insert as Resource Node on successful upload
+- ✅ Drag-and-drop directly onto the editor surface — dashed-border overlay while dragging, reuses `uploadTopicResource` (same server action the file-picker panel already used), gated on `noteId` existing (same requirement diagrams already had) with a toast telling the teacher to save a draft first if not
+- ✅ Auto-insert as Resource Node on successful upload — each accepted file gets uploaded then a `ResourceChip` inserted at the caret, same call `insertResourceMarker` already used for diagrams; multiple files drop = sequential upload with an "Uploading N files…" indicator
+- `uploadTopicResource` (lib/actions/teacher.ts) now returns the inserted row instead of void, so callers can insert a chip immediately without a full page refresh — the file-picker panel (`TopicResourceUpload.tsx`) still works unchanged since it never used the return value
+- Client-side mime-type filtering before the upload call (rejects with a toast) using the same accepted-type list as `TopicResourceUpload`'s `<input accept>`; the server action is still the source of truth and re-validates
 
 ## 8. Slash Commands
 

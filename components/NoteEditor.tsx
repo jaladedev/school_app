@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { Extension } from "@tiptap/core";
 import { BubbleMenu } from "@tiptap/react/menus";
@@ -22,7 +22,7 @@ import {
 } from "@/lib/tiptap/format-marks";
 import { Markdown } from "tiptap-markdown";
 import "katex/dist/katex.min.css";
-import { saveTopicNote, createMermaidResource } from "@/lib/actions/teacher";
+import { saveTopicNote, createMermaidResource, uploadTopicResource } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { ResourceChip } from "@/lib/tiptap/resource-node";
@@ -39,6 +39,22 @@ const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
 };
 
 const DEFAULT_MERMAID = "flowchart TD\n  A[Start] --> B[End]";
+
+// Kept in sync with TopicResourceUpload.tsx's <input accept> and
+// uploadTopicResource's RESOURCE_TYPES map -- checked client-side purely
+// so a drag of an unsupported file gets an immediate toast instead of a
+// round-trip to the server action just to find out.
+const ACCEPTED_RESOURCE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "audio/mpeg",
+  "audio/wav",
+  "audio/ogg",
+  "video/mp4",
+  "video/webm",
+]);
 
 // TipTap gives every extension its own separate keymap plugin rather than
 // merging them into one, and ProseMirror runs those plugins in order,
@@ -87,6 +103,9 @@ export function NoteEditor({
   const [mobileTab, setMobileTab] = useState<"write" | "preview">("write");
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [bubblePos, setBubblePos] = useState<{ top: number; left: number } | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const dragDepthRef = useRef(0);
   const pickerRef = useRef<HTMLDivElement | null>(null);
 
   // Same reasoning as the textarea version: resources is a one-time
@@ -305,6 +324,83 @@ export function NoteEditor({
     } finally {
       setIsSavingDiagram(false);
     }
+  }
+
+  // Drag-and-drop straight onto the editor surface (#7 of the to-do).
+  // Reuses the same uploadTopicResource server action as the file-picker
+  // panel (TopicResourceUpload.tsx) -- this isn't a second upload path,
+  // just a second entry point into the existing one -- and inserts a
+  // ResourceChip at the caret for each file that succeeds, the same way
+  // handleSaveDiagram does for a newly created diagram.
+  async function uploadDroppedFiles(files: File[]) {
+    if (!noteId) {
+      emitToast("Save the note once before dragging files in.", "error");
+      return;
+    }
+    const accepted = files.filter((f) => ACCEPTED_RESOURCE_MIME_TYPES.has(f.type));
+    const rejected = files.length - accepted.length;
+    if (rejected > 0) {
+      emitToast(
+        `${rejected} file${rejected === 1 ? "" : "s"} skipped -- use an image, PDF, audio, or video file.`,
+        "error"
+      );
+    }
+    if (accepted.length === 0) return;
+
+    setUploadingCount(accepted.length);
+    let failures = 0;
+    for (const file of accepted) {
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("title", "");
+      try {
+        const resource = await uploadTopicResource(topicId, noteId, formData);
+        if (resource) {
+          setLocalResources((prev) => [...prev, resource]);
+          insertResourceMarker(resource);
+        }
+      } catch (err: unknown) {
+        failures += 1;
+        const message = err instanceof Error ? err.message : `Could not upload "${file.name}".`;
+        emitToast(message, "error");
+      } finally {
+        setUploadingCount((count) => Math.max(0, count - 1));
+      }
+    }
+    if (accepted.length - failures > 0) {
+      emitToast(
+        accepted.length - failures === 1
+          ? "File uploaded and inserted."
+          : `${accepted.length - failures} files uploaded and inserted.`
+      );
+    }
+  }
+
+  function handleDragEnter(e: DragEvent) {
+    if (!e.dataTransfer?.types.includes("Files")) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDraggingFile(true);
+  }
+
+  function handleDragOver(e: DragEvent) {
+    if (!e.dataTransfer?.types.includes("Files")) return;
+    e.preventDefault();
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    if (!e.dataTransfer?.types.includes("Files")) return;
+    e.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDraggingFile(false);
+  }
+
+  function handleDrop(e: DragEvent) {
+    if (!e.dataTransfer?.files?.length) return;
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDraggingFile(false);
+    void uploadDroppedFiles(Array.from(e.dataTransfer.files));
   }
 
   if (!editor) return null;
@@ -741,16 +837,33 @@ export function NoteEditor({
       </div>
 
       <div
-        className={`topic-prose min-h-[24rem] rounded-lg border border-rule bg-white p-4 ${mobileTab === "preview" ? "md:block" : ""}`}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`topic-prose relative min-h-[24rem] rounded-lg border bg-white p-4 ${mobileTab === "preview" ? "md:block" : ""} ${isDraggingFile ? "border-2 border-dashed border-marigold bg-marigold/10" : "border-rule"}`}
       >
         <EditorContent editor={editor} />
+        {isDraggingFile && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/80">
+            <p className="rounded-lg border border-marigold bg-white px-4 py-2 text-sm font-medium text-ink shadow-sm">
+              {noteId ? "Drop to attach and insert" : "Save the note once before dragging files in"}
+            </p>
+          </div>
+        )}
+        {uploadingCount > 0 && (
+          <div className="pointer-events-none absolute bottom-3 right-3 rounded-lg border border-rule bg-white px-3 py-1.5 text-xs font-medium text-ink-soft shadow-sm">
+            Uploading {uploadingCount} file{uploadingCount === 1 ? "" : "s"}…
+          </div>
+        )}
       </div>
 
       <p className="mt-3 text-xs text-ink-soft">
         Images, videos, and other uploaded resources are attached separately after publishing — use
-        &quot;Insert resource&quot; to place one at a specific point in the text, or &quot;Generate
-        Mermaid diagram&quot; to create and insert a new diagram directly. Click the ∑ / ∑∑ buttons
-        to add math, then click the equation to edit its LaTeX.
+        &quot;Insert resource&quot; to place one at a specific point in the text, drag a file
+        straight onto the editor to upload and insert it in one step, or &quot;Generate Mermaid
+        diagram&quot; to create and insert a new diagram directly. Click the ∑ / ∑∑ buttons to add
+        math, then click the equation to edit its LaTeX.
       </p>
       {error && <p className="mt-2 text-sm text-clay">{error}</p>}
     </div>

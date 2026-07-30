@@ -546,15 +546,19 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
     .order("sequence_order", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const { error: insertError } = await admin.from("topic_resources").insert({
-    topic_id: topicId,
-    note_id: noteId,
-    resource_type: resourceType,
-    title: title || file.name,
-    file_url: objectPath,
-    sequence_order: (latestResource?.sequence_order ?? 0) + 1,
-    uploaded_by: teacherId,
-  });
+  const { data: inserted, error: insertError } = await admin
+    .from("topic_resources")
+    .insert({
+      topic_id: topicId,
+      note_id: noteId,
+      resource_type: resourceType,
+      title: title || file.name,
+      file_url: objectPath,
+      sequence_order: (latestResource?.sequence_order ?? 0) + 1,
+      uploaded_by: teacherId,
+    })
+    .select()
+    .single();
   if (insertError) {
     await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([objectPath]);
     throw new Error(insertError.message);
@@ -562,6 +566,7 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
 
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath(`/dashboard/student/topics/${topicId}`);
+  return inserted;
 }
 
 // A Mermaid diagram has no binary file to store — its "content" is the
