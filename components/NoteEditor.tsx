@@ -1,14 +1,20 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import { Table } from "@tiptap/extension-table";
+import { TableRow } from "@tiptap/extension-table-row";
+import { TableHeader } from "@tiptap/extension-table-header";
+import { TableCell } from "@tiptap/extension-table-cell";
+import { Placeholder } from "@tiptap/extension-placeholder";
+import { Markdown } from "tiptap-markdown";
 import "katex/dist/katex.min.css";
 import { saveTopicNote, createMermaidResource } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
+import { ResourceChip, resourceMarkdownPlugin } from "@/lib/tiptap/resource-node";
+import { MathInline, MathBlock, mathMarkdownPlugin } from "@/lib/tiptap/math-nodes";
 import type { TopicResource } from "@/types/database";
 
 const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
@@ -21,52 +27,6 @@ const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
 };
 
 const DEFAULT_MERMAID = "flowchart TD\n  A[Start] --> B[End]";
-
-type ToolbarAction =
-  | { kind: "wrap"; before: string; after: string; placeholder: string }
-  | { kind: "linePrefix"; prefix: string }
-  | { kind: "insert"; text: string };
-
-const TOOLBAR_BUTTONS: { label: string; title: string; action: ToolbarAction }[] = [
-  {
-    label: "B",
-    title: "Bold",
-    action: { kind: "wrap", before: "**", after: "**", placeholder: "bold text" },
-  },
-  {
-    label: "I",
-    title: "Italic",
-    action: { kind: "wrap", before: "_", after: "_", placeholder: "italic text" },
-  },
-  {
-    label: "H",
-    title: "Heading",
-    action: { kind: "linePrefix", prefix: "## " },
-  },
-  {
-    label: "∑",
-    title: "Inline math (LaTeX) — e.g. \\frac{a}{b}, x^2, \\sqrt{n}",
-    action: { kind: "wrap", before: "$", after: "$", placeholder: "x^2 + 3x - 4 = 0" },
-  },
-  {
-    label: "∑∑",
-    title: "Block math (LaTeX, own line) — for a full worked step or equation",
-    action: {
-      kind: "wrap",
-      before: "\n$$\n",
-      after: "\n$$\n",
-      placeholder: "\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
-    },
-  },
-  {
-    label: "Table",
-    title: "Insert table",
-    action: {
-      kind: "insert",
-      text: "| Column 1 | Column 2 |\n| --- | --- |\n| Cell | Cell |\n",
-    },
-  },
-];
 
 export function NoteEditor({
   topicId,
@@ -81,7 +41,6 @@ export function NoteEditor({
   initialStatus: "draft" | "published" | "archived" | "unwritten";
   resources?: TopicResource[];
 }) {
-  const [content, setContent] = useState(initialContent);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -89,117 +48,158 @@ export function NoteEditor({
   const [diagramTitle, setDiagramTitle] = useState("");
   const [diagramCode, setDiagramCode] = useState(DEFAULT_MERMAID);
   const [isSavingDiagram, setIsSavingDiagram] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [mobileTab, setMobileTab] = useState<"write" | "preview">("write");
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+
+  // Same reasoning as the textarea version: resources is a one-time
+  // server-component snapshot, so a diagram created via
+  // createMermaidResource wouldn't show up in the picker/chip resolution
+  // until a full refresh unless we keep a local copy.
+  const [localResources, setLocalResources] = useState(resources);
+  useEffect(() => setLocalResources(resources), [resources]);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Placeholder.configure({
+        placeholder:
+          "Write the topic explanation here. Use tables for summaries, and the ∑ button for math.",
+      }),
+      ResourceChip,
+      MathInline,
+      MathBlock,
+      Markdown.configure({
+        html: false,
+        transformPastedText: true,
+        // Wire the custom markdown-it rules for [[resource:ID]] and $/$$
+        // math so existing saved notes parse correctly on load, and so
+        // saves produce byte-compatible markdown for every other reader
+        // in the app (TopicContent.tsx, notifications, etc.).
+        markdownIt: (md: any) => {
+          resourceMarkdownPlugin(md);
+          mathMarkdownPlugin(md);
+        },
+      }),
+    ],
+    content: initialContent,
+    // contentType lets tiptap-markdown know `initialContent` is markdown
+    // text, not HTML -- it parses it through the markdown-it pipeline
+    // above on mount.
+    // @ts-expect-error -- provided by the Markdown extension
+    contentType: "markdown",
+  });
+
+  // Pass the live resource list into the ResourceChip node's storage so
+  // its NodeView can resolve id -> title/icon without re-serializing the
+  // doc every time a resource is renamed elsewhere.
+  useEffect(() => {
+    if (editor) editor.storage.resourceChip.resources = localResources;
+  }, [editor, localResources]);
+
+  const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;
+
+  const initialMarkdown = useMemo(() => initialContent, [initialContent]);
+  const [lastSavedContent, setLastSavedContent] = useState(initialMarkdown);
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    if (!editor) return;
+    function onUpdate() {
+      setIsDirty(getMarkdown() !== lastSavedContent);
+    }
+    editor.on("update", onUpdate);
+    return () => editor.off("update", onUpdate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, lastSavedContent]);
 
   function handleSave(status: "draft" | "published") {
+    if (!editor) return;
     setError(null);
+    if (status === "draft") setIsSavingDraft(true);
+    const content = getMarkdown();
     startTransition(async () => {
       try {
         await saveTopicNote(topicId, content, status);
+        setLastSavedContent(content);
+        setIsDirty(false);
         emitToast(status === "published" ? "Topic note published." : "Draft saved.");
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Unable to save the topic note.";
         setError(message);
         emitToast(message, "error");
+      } finally {
+        setIsSavingDraft(false);
       }
     });
   }
 
-  // Replaces the current selection (or inserts at the cursor if nothing is
-  // selected) and restores focus with the cursor placed sensibly afterward,
-  // so toolbar actions feel like a normal text editor rather than always
-  // appending to the end of the note.
-  function replaceSelection(
-    build: (
-      selected: string,
-      before: string,
-      after: string
-    ) => {
-      text: string;
-      cursorStart: number;
-      cursorEnd: number;
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
     }
-  ) {
-    const el = textareaRef.current;
-    const start = el?.selectionStart ?? content.length;
-    const end = el?.selectionEnd ?? content.length;
-    const before = content.slice(0, start);
-    const after = content.slice(end);
-    const selected = content.slice(start, end);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [pickerOpen]);
 
-    const { text, cursorStart, cursorEnd } = build(selected, before, after);
-    const nextContent = `${before}${text}${after}`;
-    setContent(nextContent);
-
-    const absoluteStart = before.length + cursorStart;
-    const absoluteEnd = before.length + cursorEnd;
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(absoluteStart, absoluteEnd);
-    });
-  }
-
-  function runToolbarAction(action: ToolbarAction) {
-    if (action.kind === "wrap") {
-      const { before, after, placeholder } = action;
-      replaceSelection((selected) => {
-        const inner = selected || placeholder;
-        return {
-          text: `${before}${inner}${after}`,
-          cursorStart: before.length,
-          cursorEnd: before.length + inner.length,
-        };
-      });
-      return;
+  // Same deliberate choice as before: warn on close, don't autosave --
+  // saveTopicNote is append-only (each save is a new version row), so
+  // autosaving on every navigation attempt would flood version history.
+  useEffect(() => {
+    if (!isDirty) return;
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
     }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
-    if (action.kind === "linePrefix") {
-      const el = textareaRef.current;
-      const start = el?.selectionStart ?? content.length;
-      const lineStart = content.lastIndexOf("\n", start - 1) + 1;
-      const alreadyPrefixed =
-        content.slice(lineStart, lineStart + action.prefix.length) === action.prefix;
-
-      const before = content.slice(0, lineStart);
-      const restOfLineAndAfter = content.slice(lineStart);
-      const nextContent = alreadyPrefixed
-        ? `${before}${restOfLineAndAfter.slice(action.prefix.length)}`
-        : `${before}${action.prefix}${restOfLineAndAfter}`;
-
-      setContent(nextContent);
-      const delta = alreadyPrefixed ? -action.prefix.length : action.prefix.length;
-      const cursorPos = Math.max(lineStart, start + delta);
-      requestAnimationFrame(() => {
-        el?.focus();
-        el?.setSelectionRange(cursorPos, cursorPos);
-      });
-      return;
+  // Ctrl/Cmd+S still saves a draft. Ctrl/Cmd+B and +I are now handled
+  // natively by StarterKit's keymap, so only the app-specific shortcut
+  // needs wiring here.
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        handleSave("draft");
+      }
     }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
 
-    // action.kind === "insert"
-    replaceSelection((_selected, before) => {
-      const needsLeadingNewline = before.length > 0 && !before.endsWith("\n");
-      const text = `${needsLeadingNewline ? "\n" : ""}${action.text}`;
-      return { text, cursorStart: text.length, cursorEnd: text.length };
-    });
-  }
-
-  // Inserts a [[resource:ID]] marker at the current cursor position (or
-  // replaces the current selection), then puts the cursor right after the
-  // inserted marker so a teacher can keep typing without hunting for it.
   function insertResourceMarker(resource: TopicResource) {
-    const marker = `[[resource:${resource.id}]]`;
-    replaceSelection((_selected, before, after) => {
-      const needsLeadingNewline = before.length > 0 && !before.endsWith("\n");
-      const needsTrailingNewline = after.length > 0 && !after.startsWith("\n");
-      const text = `${needsLeadingNewline ? "\n" : ""}${marker}${needsTrailingNewline ? "\n" : ""}`;
-      return { text, cursorStart: text.length, cursorEnd: text.length };
-    });
+    editor
+      ?.chain()
+      .focus()
+      .insertContent({ type: "resourceChip", attrs: { id: resource.id } })
+      .run();
   }
 
   function handlePickResource(resource: TopicResource) {
     insertResourceMarker(resource);
     setPickerOpen(false);
+  }
+
+  function insertTable() {
+    editor?.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run();
+  }
+
+  function insertMath(displayMode: boolean) {
+    editor
+      ?.chain()
+      .focus()
+      .insertContent({ type: displayMode ? "mathBlock" : "mathInline", attrs: { latex: "" } })
+      .run();
   }
 
   async function handleSaveDiagram() {
@@ -208,7 +208,6 @@ export function NoteEditor({
       emitToast("Write some Mermaid code before saving.", "error");
       return;
     }
-
     setIsSavingDiagram(true);
     try {
       const resource = await createMermaidResource(
@@ -217,6 +216,7 @@ export function NoteEditor({
         diagramTitle || "Diagram",
         diagramCode
       );
+      setLocalResources((prev) => [...prev, resource]);
       insertResourceMarker(resource);
       emitToast("Diagram added to the note.");
       setDiagramPanelOpen(false);
@@ -230,25 +230,31 @@ export function NoteEditor({
     }
   }
 
+  if (!editor) return null;
+
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs uppercase tracking-wide text-ink-soft">Currently: {initialStatus}</p>
+        <p className="text-xs uppercase tracking-wide text-ink-soft">
+          Currently: {initialStatus}
+          {isDirty && <span className="ml-2 normal-case text-marigold-dark">Unsaved changes</span>}
+        </p>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
+          <div className="relative" ref={pickerRef}>
             <button
               type="button"
               onClick={() => setPickerOpen((open) => !open)}
-              disabled={isPending || resources.length === 0}
+              disabled={isPending || localResources.length === 0}
               className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
-              title={resources.length === 0 ? "No resources attached to this topic yet" : undefined}
+              title={
+                localResources.length === 0 ? "No resources attached to this topic yet" : undefined
+              }
             >
               Insert resource
             </button>
-
-            {pickerOpen && resources.length > 0 && (
+            {pickerOpen && localResources.length > 0 && (
               <div className="absolute right-0 z-10 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-rule bg-white py-1 shadow-lg">
-                {resources.map((resource) => (
+                {localResources.map((resource) => (
                   <button
                     key={resource.id}
                     type="button"
@@ -280,7 +286,7 @@ export function NoteEditor({
             disabled={isPending}
             className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
           >
-            Save draft
+            {isSavingDraft ? "Saving…" : "Save draft"}
           </button>
           <button
             onClick={() => handleSave("published")}
@@ -347,48 +353,167 @@ export function NoteEditor({
         </section>
       )}
 
-      <div className="mb-2 flex items-center gap-1 rounded-lg border border-rule bg-paper p-1">
-        {TOOLBAR_BUTTONS.map((button) => (
-          <button
-            key={button.label}
-            type="button"
-            title={button.title}
-            onClick={() => runToolbarAction(button.action)}
-            className="min-w-[2rem] rounded-md px-2 py-1 text-sm font-semibold text-ink hover:bg-white"
-          >
-            {button.label}
-          </button>
-        ))}
+      {/* Toolbar — same button set as before, now driving TipTap commands
+          instead of string manipulation. Undo/redo, underline, strike,
+          blockquote, and hr are "free" wins from StarterKit's default
+          keymap/commands and just need buttons wired, per the to-do's #2. */}
+      <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper p-1">
+        <button
+          type="button"
+          title="Undo"
+          onClick={() => editor.chain().focus().undo().run()}
+          className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+        >
+          ↺
+        </button>
+        <button
+          type="button"
+          title="Redo"
+          onClick={() => editor.chain().focus().redo().run()}
+          className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+        >
+          ↻
+        </button>
+        <span className="mx-1 h-4 w-px bg-rule" />
+        <button
+          type="button"
+          title="Bold"
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm font-semibold hover:bg-white ${editor.isActive("bold") ? "bg-white" : ""}`}
+        >
+          B
+        </button>
+        <button
+          type="button"
+          title="Italic"
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm italic hover:bg-white ${editor.isActive("italic") ? "bg-white" : ""}`}
+        >
+          I
+        </button>
+        <button
+          type="button"
+          title="Heading"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm font-semibold hover:bg-white ${editor.isActive("heading", { level: 2 }) ? "bg-white" : ""}`}
+        >
+          H
+        </button>
+        <span className="mx-1 h-4 w-px bg-rule" />
+        <button
+          type="button"
+          title="Bulleted list"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("bulletList") ? "bg-white" : ""}`}
+        >
+          •
+        </button>
+        <button
+          type="button"
+          title="Numbered list"
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("orderedList") ? "bg-white" : ""}`}
+        >
+          1.
+        </button>
+        <button
+          type="button"
+          title="Blockquote"
+          onClick={() => editor.chain().focus().toggleBlockquote().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("blockquote") ? "bg-white" : ""}`}
+        >
+          &ldquo;
+        </button>
+        <span className="mx-1 h-4 w-px bg-rule" />
+        <button
+          type="button"
+          title="Inline math (LaTeX)"
+          onClick={() => insertMath(false)}
+          className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+        >
+          ∑
+        </button>
+        <button
+          type="button"
+          title="Block math (LaTeX)"
+          onClick={() => insertMath(true)}
+          className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+        >
+          ∑∑
+        </button>
+        <button
+          type="button"
+          title="Insert table"
+          onClick={insertTable}
+          className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+        >
+          Table
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft">Markdown</p>
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={24}
-            className="w-full rounded-lg border border-rule bg-white p-3 font-mono text-sm text-ink outline-none focus-visible:border-marigold"
-            placeholder="## Introduction&#10;Write the topic explanation here. Use markdown tables for summaries, and $...$ or $$...$$ for math."
-          />
-        </div>
-        <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft">Preview</p>
-          <div className="topic-prose h-[calc(24*1.5rem)] overflow-y-auto rounded-lg border border-rule bg-white p-4">
-            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-              {content}
-            </ReactMarkdown>
+      {editor && (
+        <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
+          <div className="flex items-center gap-1 rounded-lg border border-rule bg-white px-1 py-1 shadow-lg">
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              className="rounded px-2 py-1 text-sm font-semibold hover:bg-paper"
+            >
+              B
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              className="rounded px-2 py-1 text-sm italic hover:bg-paper"
+            >
+              I
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const url = window.prompt("Link URL (include https://)");
+                if (url) editor.chain().focus().setLink({ href: url }).run();
+              }}
+              className="rounded px-2 py-1 text-sm hover:bg-paper"
+            >
+              🔗
+            </button>
           </div>
-        </div>
+        </BubbleMenu>
+      )}
+
+      {/* Mobile: tabbed write/preview so the two panes aren't squeezed
+          side-by-side on a phone/tablet. Note: with TipTap the "editor"
+          IS the rendered view now, so "Preview" here is a read-only
+          render of the same doc rather than a second, separate pane. */}
+      <div className="mb-2 flex gap-1 rounded-lg border border-rule bg-paper p-1 md:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileTab("write")}
+          className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "write" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
+        >
+          Write
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab("preview")}
+          className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "preview" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
+        >
+          Preview
+        </button>
+      </div>
+
+      <div
+        className={`topic-prose min-h-[24rem] rounded-lg border border-rule bg-white p-4 ${mobileTab === "preview" ? "md:block" : ""}`}
+      >
+        <EditorContent editor={editor} />
       </div>
 
       <p className="mt-3 text-xs text-ink-soft">
         Images, videos, and other uploaded resources are attached separately after publishing — use
         &quot;Insert resource&quot; to place one at a specific point in the text, or &quot;Generate
-        Mermaid diagram&quot; to create and insert a new diagram directly. For calculations and
-        formulas, wrap LaTeX in single $ for inline math (e.g. $x^2$) or double $$ on its own line
-        for a full equation or worked step — use the ∑ / ∑∑ buttons to insert either.
+        Mermaid diagram&quot; to create and insert a new diagram directly. Click the ∑ / ∑∑ buttons
+        to add math, then click the equation to edit its LaTeX.
       </p>
       {error && <p className="mt-2 text-sm text-clay">{error}</p>}
     </div>
