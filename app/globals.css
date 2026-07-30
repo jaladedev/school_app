@@ -116,6 +116,33 @@ h4 {
   color: #1f2a44;
 }
 
+/* TipTap ships with zero default styling for its contentEditable div --
+   unlike the wrapper's `p-4`, this is about the editor's own inner
+   surface. Without an explicit min-height/padding here the first block's
+   top margin collapses through the wrapper padding (a normal CSS
+   margin-collapse, not a TipTap bug), and the caret can sit visually
+   flush against the left edge because `.ProseMirror` itself has no
+   inline padding of its own -- it was only ever inheriting the
+   wrapper's. Give the editable surface explicit breathing room instead
+   of relying on the wrapper alone. */
+.topic-prose .ProseMirror {
+  padding: 0.25rem 0.5rem;
+  outline: none;
+  min-height: inherit;
+}
+
+.topic-prose .ProseMirror > *:first-child {
+  margin-top: 0;
+}
+
+.topic-prose .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: #9c9384;
+}
+
 @media print {
   body {
     background: white;

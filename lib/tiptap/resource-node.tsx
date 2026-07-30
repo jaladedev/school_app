@@ -40,6 +40,17 @@ export interface ResourceChipStorage {
   onRemove?: (id: string) => void;
 }
 
+// tiptap-markdown's Markdown extension augments core Storage with a
+// `markdown` key; ResourceChip augments it with `resourceChip`. Declaring
+// this here (instead of casting at every call site) keeps
+// `editor.storage.resourceChip` type-checked the same way
+// `editor.storage.markdown` already is.
+declare module "@tiptap/core" {
+  interface Storage {
+    resourceChip: ResourceChipStorage;
+  }
+}
+
 function ResourceChipView({ node, editor }: { node: any; editor: any }) {
   const id: string = node.attrs.id;
   const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
@@ -129,14 +140,24 @@ export function resourceMarkdownPlugin(md: any) {
   };
 }
 
-// Serializer side: tiptap-markdown calls each node's toMarkdown (if
-// present) when walking the doc back to a string on save.
+// Serializer + parser side: tiptap-markdown reads `storage.markdown` off
+// each extension -- `serialize` when walking the doc back to a string on
+// save, and `parse.setup(markdownit)` once when building the editor's
+// markdown-it instance on mount. There's no separate global "markdownIt"
+// option on the Markdown extension; per-node registration is the actual
+// supported hook, so `resourceMarkdownPlugin` runs from here instead of
+// being passed into `Markdown.configure()` in NoteEditor.tsx.
 ResourceChip.config.addStorage = function () {
   return {
     resources: [] as TopicResource[],
     markdown: {
       serialize(state: any, node: any) {
         state.write(`[[resource:${node.attrs.id}]]`);
+      },
+      parse: {
+        setup(md: any) {
+          resourceMarkdownPlugin(md);
+        },
       },
     },
   };

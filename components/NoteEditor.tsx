@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
@@ -13,8 +14,8 @@ import "katex/dist/katex.min.css";
 import { saveTopicNote, createMermaidResource } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
-import { ResourceChip, resourceMarkdownPlugin } from "@/lib/tiptap/resource-node";
-import { MathInline, MathBlock, mathMarkdownPlugin } from "@/lib/tiptap/math-nodes";
+import { ResourceChip } from "@/lib/tiptap/resource-node";
+import { MathInline, MathBlock } from "@/lib/tiptap/math-nodes";
 import type { TopicResource } from "@/types/database";
 
 const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
@@ -50,6 +51,7 @@ export function NoteEditor({
   const [isSavingDiagram, setIsSavingDiagram] = useState(false);
   const [mobileTab, setMobileTab] = useState<"write" | "preview">("write");
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [bubblePos, setBubblePos] = useState<{ top: number; left: number } | null>(null);
   const pickerRef = useRef<HTMLDivElement | null>(null);
 
   // Same reasoning as the textarea version: resources is a one-time
@@ -61,7 +63,11 @@ export function NoteEditor({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      // StarterKit v3 bundles Link internally, so adding a separate
+      // Link extension instance here duplicates it.
+      StarterKit.configure({
+        link: { openOnClick: false, autolink: true },
+      }),
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
@@ -73,17 +79,16 @@ export function NoteEditor({
       ResourceChip,
       MathInline,
       MathBlock,
+      // tiptap-markdown has no top-level `markdownIt` hook -- each
+      // node registers its own markdown-it rules via
+      // `storage.markdown.parse.setup`, wired on ResourceChip/MathInline/
+      // MathBlock themselves (see resource-node.tsx / math-nodes.tsx).
+      // Keeping [[resource:ID]] and $/$$ parsing there means it fires
+      // for *every* editor instance automatically, with no risk of a
+      // call site forgetting to pass the plugin in.
       Markdown.configure({
         html: false,
         transformPastedText: true,
-        // Wire the custom markdown-it rules for [[resource:ID]] and $/$$
-        // math so existing saved notes parse correctly on load, and so
-        // saves produce byte-compatible markdown for every other reader
-        // in the app (TopicContent.tsx, notifications, etc.).
-        markdownIt: (md: any) => {
-          resourceMarkdownPlugin(md);
-          mathMarkdownPlugin(md);
-        },
       }),
     ],
     content: initialContent,
@@ -113,7 +118,9 @@ export function NoteEditor({
       setIsDirty(getMarkdown() !== lastSavedContent);
     }
     editor.on("update", onUpdate);
-    return () => editor.off("update", onUpdate);
+    return () => {
+      editor.off("update", onUpdate);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, lastSavedContent]);
 
@@ -452,7 +459,7 @@ export function NoteEditor({
       </div>
 
       {editor && (
-        <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
+        <BubbleMenu editor={editor}>
           <div className="flex items-center gap-1 rounded-lg border border-rule bg-white px-1 py-1 shadow-lg">
             <button
               type="button"

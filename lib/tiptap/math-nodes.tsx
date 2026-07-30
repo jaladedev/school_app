@@ -100,15 +100,46 @@ export const MathInline = defineMathNode("mathInline", false);
 export const MathBlock = defineMathNode("mathBlock", true);
 
 // markdown-it rules: recognize $...$ (inline) and a $$ ... $$ block that
-// sits on its own lines, matching the remarkMath conventions the preview
-// pane already used -- so existing saved notes parse into the new editor
-// without a migration script.
-export function mathMarkdownPlugin(md: any) {
+// sits on its own lines. These need to match remark-math's actual
+// grammar (the preview pane, TopicContent.tsx and QuestionText.tsx, both
+// parse saved notes with remark-math/rehype-katex) or content written in
+// one place can silently fail to render as math in the other.
+//
+// remark-math's inline rule (see micromark-extension-math) is NOT just
+// "text between the next two $ signs." In particular it requires:
+//  - the opening `$` is not immediately followed by whitespace
+//  - the closing `$` is not immediately preceded by whitespace
+//  - a `\$` is an escape, not a delimiter
+// That flanking rule is what stops ordinary currency text like
+// "It costs $5 or $10" from being swallowed as `5 or ` -- the closing
+// `$` in "$10" is preceded by a space, so it's rejected and both `$`
+// stay literal, matching what remark-math does.
+export function mathInlineMarkdownPlugin(md: any) {
   md.inline.ruler.before("escape", "math_inline", (state: any, silent: boolean) => {
-    if (state.src[state.pos] !== "$") return false;
-    const end = state.src.indexOf("$", state.pos + 1);
-    if (end === -1) return false;
-    const latex = state.src.slice(state.pos + 1, end);
+    const src = state.src;
+    const pos = state.pos;
+    if (src[pos] !== "$") return false;
+    if (src[pos + 1] === "$") return false; // "$$" is the block form, not inline
+    if (pos > 0 && src[pos - 1] === "\\") return false; // \$ is an escape
+
+    const opening = src[pos + 1];
+    if (!opening || /\s/.test(opening)) return false; // no space right after "$"
+
+    let end = pos + 1;
+    for (;;) {
+      end = src.indexOf("$", end);
+      if (end === -1) return false;
+      if (src[end - 1] === "\\") {
+        end += 1; // escaped "$" inside the span, keep searching
+        continue;
+      }
+      break;
+    }
+    if (/\s/.test(src[end - 1])) return false; // no space right before "$"
+
+    const latex = src.slice(pos + 1, end);
+    if (!latex || /\n\s*\n/.test(latex)) return false; // don't span a blank line
+
     if (!silent) {
       const token = state.push("math_inline", "", 0);
       token.attrs = [["latex", latex]];
@@ -117,6 +148,11 @@ export function mathMarkdownPlugin(md: any) {
     return true;
   });
 
+  md.renderer.rules.math_inline = (tokens: any[], idx: number) =>
+    `<span data-math="mathInline">${tokens[idx].attrs.find((a: string[]) => a[0] === "latex")[1]}</span>`;
+}
+
+export function mathBlockMarkdownPlugin(md: any) {
   md.block.ruler.before(
     "fence",
     "math_block",
@@ -150,18 +186,23 @@ export function mathMarkdownPlugin(md: any) {
     }
   );
 
-  md.renderer.rules.math_inline = (tokens: any[], idx: number) =>
-    `<span data-math="mathInline">${tokens[idx].attrs.find((a: string[]) => a[0] === "latex")[1]}</span>`;
   md.renderer.rules.math_block = (tokens: any[], idx: number) =>
     `<div data-math="mathBlock">${tokens[idx].attrs.find((a: string[]) => a[0] === "latex")[1]}</div>`;
 }
 
-// Serializers, attached the same way as ResourceChip's.
+// Serialize + parse wiring, same mechanism as ResourceChip: tiptap-markdown
+// reads `storage.markdown` off each extension directly, there's no global
+// "markdownIt" callback on the Markdown extension itself.
 MathInline.config.addStorage = function () {
   return {
     markdown: {
       serialize(state: any, node: any) {
         state.write(`$${node.attrs.latex}$`);
+      },
+      parse: {
+        setup(md: any) {
+          mathInlineMarkdownPlugin(md);
+        },
       },
     },
   };
@@ -171,6 +212,11 @@ MathBlock.config.addStorage = function () {
     markdown: {
       serialize(state: any, node: any) {
         state.write(`\n$$\n${node.attrs.latex}\n$$\n`);
+      },
+      parse: {
+        setup(md: any) {
+          mathBlockMarkdownPlugin(md);
+        },
       },
     },
   };

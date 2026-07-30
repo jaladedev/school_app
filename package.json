@@ -17,6 +17,7 @@
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.45.0",
     "@tiptap/core": "^3.29.2",
+    "@tiptap/extension-bubble-menu": "^3.29.2",
     "@tiptap/extension-link": "^3.29.2",
     "@tiptap/extension-placeholder": "^3.29.2",
     "@tiptap/extension-table": "^3.29.2",
