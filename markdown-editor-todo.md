@@ -9,7 +9,7 @@ Baseline: `components/NoteEditor.tsx` has been migrated off the old `<textarea>`
 - ✅ Toolbar rebuilt on `editor.chain().focus().toggleX().run()` calls
 - ✅ Custom TipTap Node for `[[resource:UUID]]` markers (`ResourceChip` in `lib/tiptap/resource-node.tsx`) renders as a resource chip — covers the #6 card requirement at the node level; the richer picker/reorder UX in #6 is still open
 - ✅ Math ported to hand-rolled `MathInline`/`MathBlock` nodes (`lib/tiptap/math-nodes.tsx`) with KaTeX rendering, not `@tiptap/extension-mathematics` as originally planned — parses `$...$` / `$$...$$` with flanking rules matched to `remark-math`'s grammar so notes render identically in the editor and in the published-note preview (`TopicContent.tsx`, `QuestionText.tsx`)
-- ⬜ Mermaid diagrams are still inserted via the existing side-panel + `createMermaidResource` (unchanged from the textarea version), not yet a NodeView wrapping `MermaidDiagram` directly in the doc — that part of #0 didn't ship, folded into #18 below instead
+- ✅ Mermaid diagrams now render inline as a live diagram directly in the doc, not hidden behind a click-to-preview chip — `diagram_mermaid` resources get their own rendering branch inside `ResourceChip`'s node view (`MermaidNodeView` in `resource-node.tsx`), reusing `TopicResourceItem`/`MermaidDiagram` for the actual render. Still inserted via the existing side-panel + `createMermaidResource` (unchanged), and still schema-`inline` under the hood (rendered as `as="div"` so it visually lays out full-width) — no new markdown grammar or DB round-trip needed, since it rides the same `[[resource:ID]]` marker as every other resource type. Has its own confirm-before-remove (hover-revealed) instead of the click-to-open popover other resource types use, since the diagram is already fully visible.
 - ⬜ Formal round-trip test against a corpus of existing saved notes (raw HTML, GFM edge cases) hasn't been done — worth doing before this ships to all teachers, not just the ones who found bugs so far
 
 ### Bugs hit and fixed during the migration (for context on the current implementation)
@@ -70,7 +70,7 @@ Not present today beyond separate file upload panel.
 
 Currently: `[[resource:UUID]]` renders inline as a `ResourceChip` node (📷 📄 🎥 etc., #0). Clicking a chip opens a popover (`28rem` wide, type-correct preview reusing `TopicResourceItem` from `TopicContent.tsx`) with a two-step "Remove from note" action (asks to confirm before deleting the marker — never touches the underlying resource row).
 
-- Still need: Edit, Replace (swap for a different existing resource without reopening the whole insert flow)
+- Still need: Edit (still open for non-diagram resource types — images/PDFs/etc. don't have an update path yet, only diagrams do via #18's `updateMermaidResource`), Replace (swap for a different existing resource without reopening the whole insert flow)
 - Drag to reorder
 
 ## 7. Drag & Drop Uploads
@@ -154,7 +154,7 @@ Not present as structured blocks (Mermaid exists, callouts don't).
 
 ## 18. Better Mermaid Support
 
-Currently: single free-text Mermaid code box + live preview, inserted as a resource.
+Currently: renders live inline in the doc as a real `MermaidNodeView` (#0), not just a chip — inserted via the side-panel + `createMermaidResource`, edited in place via a new `updateMermaidResource` action (hover-revealed "Edit" opens the same code+title+live-preview UI as creation, saves in place so the resource id and every `[[resource:ID]]` marker pointing at it stay valid).
 
 - Keep live preview (already built)
 - Add starter templates: Flowcharts, Mind Maps, Timelines, Cycles, Org Charts, Sequence Diagrams

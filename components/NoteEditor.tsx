@@ -127,9 +127,17 @@ export function NoteEditor({
 
   // Pass the live resource list into the ResourceChip node's storage so
   // its NodeView can resolve id -> title/icon without re-serializing the
-  // doc every time a resource is renamed elsewhere.
+  // doc every time a resource is renamed elsewhere. onResourceUpdated
+  // lets MermaidNodeView's in-place "Edit" flow (updateMermaidResource)
+  // push the freshly-saved row back into localResources without a full
+  // page refresh, the same way createMermaidResource's result already
+  // does via handleSaveDiagram below.
   useEffect(() => {
-    if (editor) editor.storage.resourceChip.resources = localResources;
+    if (!editor) return;
+    editor.storage.resourceChip.resources = localResources;
+    editor.storage.resourceChip.onResourceUpdated = (updated: TopicResource) => {
+      setLocalResources((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    };
   }, [editor, localResources]);
 
   const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;

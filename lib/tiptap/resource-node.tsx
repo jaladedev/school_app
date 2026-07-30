@@ -24,6 +24,9 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import { useState } from "react";
 import { TopicResourceItem } from "@/components/TopicContent";
+import { MermaidDiagram } from "@/components/MermaidDiagram";
+import { updateMermaidResource } from "@/lib/actions/teacher";
+import { emitToast } from "@/lib/toast";
 import type { TopicResource } from "@/types/database";
 
 export const RESOURCE_TYPE_ICON: Record<TopicResource["resource_type"], string> = {
@@ -40,6 +43,7 @@ const RESOURCE_MARKER_RE = /\[\[resource:([0-9a-fA-F-]{36})\]\]/;
 export interface ResourceChipStorage {
   resources: TopicResource[];
   onRemove?: (id: string) => void;
+  onResourceUpdated?: (resource: TopicResource) => void;
 }
 
 // tiptap-markdown's Markdown extension augments core Storage with a
@@ -65,6 +69,177 @@ function ResourceChipView({
   const id: string = node.attrs.id;
   const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
   const resource = storage.resources.find((r) => r.id === id) ?? null;
+
+  if (resource?.resource_type === "diagram_mermaid") {
+    return <MermaidNodeView resource={resource} deleteNode={deleteNode} editor={editor} />;
+  }
+
+  return <ResourceChipDefaultView id={id} resource={resource} deleteNode={deleteNode} />;
+}
+
+// Mermaid diagrams get their own inline rendering instead of hiding
+// behind a click-to-preview chip -- this is the "NodeView wrapping
+// MermaidDiagram directly in the doc" piece flagged as not-yet-shipped
+// in #0/#18 of the to-do. The node itself is still schema-`inline`
+// (see ResourceChip.group below) so no new markdown grammar or DB
+// round-trip is needed -- `as="div"` just makes it lay out visually as
+// a full-width block within its paragraph, the same trick most rich
+// text editors use for "atom" images.
+function MermaidNodeView({
+  resource,
+  deleteNode,
+  editor,
+}: {
+  resource: TopicResource;
+  deleteNode: () => void;
+  editor: any;
+}) {
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(resource.title ?? "");
+  const [code, setCode] = useState(resource.content ?? "");
+  const [isSaving, setIsSaving] = useState(false);
+
+  function startEditing() {
+    setTitle(resource.title ?? "");
+    setCode(resource.content ?? "");
+    setEditing(true);
+  }
+
+  async function handleSave() {
+    if (!code.trim()) {
+      emitToast("Write some Mermaid code before saving.", "error");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const updated = await updateMermaidResource(resource.id, title, code);
+      const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
+      storage.onResourceUpdated?.(updated);
+      emitToast("Diagram updated.");
+      setEditing(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to update the diagram.";
+      emitToast(message, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <NodeViewWrapper
+        as="div"
+        className="my-3 rounded-xl border border-marigold bg-white p-4"
+        contentEditable={false}
+      >
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Diagram title (optional)"
+          className="mb-2 w-full rounded-lg border border-rule bg-white p-2 text-sm text-ink outline-none focus-visible:border-marigold"
+        />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
+              Mermaid code
+            </p>
+            <textarea
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              rows={8}
+              className="w-full rounded-lg border border-rule bg-white p-3 font-mono text-sm text-ink outline-none focus-visible:border-marigold"
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
+              Preview
+            </p>
+            <div className="h-full min-h-[8rem] rounded-lg border border-rule bg-paper p-2">
+              <MermaidDiagram code={code} title={title || undefined} />
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            disabled={isSaving}
+            className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
+          >
+            {isSaving ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </NodeViewWrapper>
+    );
+  }
+
+  return (
+    <NodeViewWrapper as="div" className="group relative my-3" contentEditable={false}>
+      <TopicResourceItem resource={resource} />
+
+      <div className="absolute right-2 top-2 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+        {confirmingRemove ? (
+          <div className="flex items-center gap-2 rounded-md border border-clay/40 bg-white p-1.5 shadow">
+            <span className="text-xs text-clay">Remove diagram?</span>
+            <button
+              type="button"
+              onClick={() => setConfirmingRemove(false)}
+              className="text-xs text-ink-soft hover:underline"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => deleteNode()}
+              className="rounded bg-clay px-2 py-1 text-xs font-medium text-white hover:bg-clay/90"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={startEditing}
+              title="Edit this diagram's code"
+              className="rounded-full border border-rule bg-white px-2 py-1 text-xs text-ink shadow hover:border-marigold"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingRemove(true)}
+              title="Remove diagram from note"
+              className="rounded-full border border-rule bg-white px-2 py-1 text-xs text-clay shadow hover:border-clay/40"
+            >
+              Remove
+            </button>
+          </>
+        )}
+      </div>
+    </NodeViewWrapper>
+  );
+}
+
+function ResourceChipDefaultView({
+  id,
+  resource,
+  deleteNode,
+}: {
+  id: string;
+  resource: TopicResource | null;
+  deleteNode: () => void;
+}) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
 

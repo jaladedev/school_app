@@ -615,6 +615,57 @@ export async function createMermaidResource(
   return resource;
 }
 
+// Edits an existing diagram in place (same resource id), rather than
+// deleting and re-inserting a new one -- any [[resource:ID]] marker
+// already pointing at it (in this note or, in principle, another one)
+// keeps resolving correctly with no client-side marker-swapping needed.
+export async function updateMermaidResource(
+  resourceId: string,
+  title: string,
+  mermaidCode: string
+) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can edit diagrams.");
+
+  const trimmedCode = mermaidCode.trim();
+  if (!trimmedCode) {
+    throw new Error("The diagram is empty — write some Mermaid code first.");
+  }
+
+  const supabase = createClient();
+
+  const { data: existing } = await supabase
+    .from("topic_resources")
+    .select("id, topic_id, resource_type")
+    .eq("id", resourceId)
+    .single();
+
+  if (!existing) {
+    throw new Error("Diagram not found.");
+  }
+  if (existing.resource_type !== "diagram_mermaid") {
+    throw new Error("Only Mermaid diagrams can be edited this way.");
+  }
+
+  await assertTeacherOwnsTopic(supabase, teacherId, existing.topic_id);
+
+  const { data: resource, error } = await supabase
+    .from("topic_resources")
+    .update({
+      title: title.trim() || "Diagram",
+      content: trimmedCode,
+    })
+    .eq("id", resourceId)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/teacher/notes/${existing.topic_id}`);
+  revalidatePath(`/dashboard/student/topics/${existing.topic_id}`);
+
+  return resource;
+}
+
 export async function deleteTopicResource(resourceId: string) {
   const { id: teacherId } = await assertRole(["teacher"], "Only teachers can remove resources.");
 
