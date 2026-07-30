@@ -143,6 +143,52 @@ h4 {
   color: #9c9384;
 }
 
+/* Checklists (@tiptap/extension-task-list) render as a <ul data-type
+   ="taskList">, which would otherwise inherit the disc bullet + 1.25rem
+   indent from the plain `.topic-prose ul` rule above. Task items need
+   their own layout: no bullet, checkbox + content side by side, and
+   nested checklists indented under their parent item rather than the
+   list's own padding. */
+.topic-prose ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.topic-prose ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.topic-prose ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+  user-select: none;
+}
+
+.topic-prose ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+}
+
+.topic-prose ul[data-type="taskList"] ul[data-type="taskList"] {
+  margin-left: 1.25rem;
+}
+
+.topic-prose li[data-checked="true"] > div > p {
+  color: #9c9384;
+  text-decoration: line-through;
+}
+
+/* Highlight (@tiptap/extension-highlight) renders a <mark> -- give it an
+   explicit background so it isn't left to browser UA defaults, and so
+   multicolor highlights (inline style="background-color") aren't
+   overridden by anything more specific here. */
+.topic-prose mark {
+  background-color: #fef08a;
+  border-radius: 2px;
+  padding: 0 0.1em;
+}
+
 @media print {
   body {
     background: white;

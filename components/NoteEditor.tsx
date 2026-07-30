@@ -10,6 +10,16 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { Placeholder } from "@tiptap/extension-placeholder";
+import { Color } from "@tiptap/extension-color";
+import { TextAlign } from "@tiptap/extension-text-align";
+import { TaskList } from "@tiptap/extension-task-list";
+import { TaskItem } from "@tiptap/extension-task-item";
+import {
+  HighlightMarkdown,
+  SubscriptMarkdown,
+  SuperscriptMarkdown,
+  TextStyleMarkdown,
+} from "@/lib/tiptap/format-marks";
 import { Markdown } from "tiptap-markdown";
 import "katex/dist/katex.min.css";
 import { saveTopicNote, createMermaidResource } from "@/lib/actions/teacher";
@@ -102,6 +112,21 @@ export function NoteEditor({
         placeholder:
           "Write the topic explanation here. Use tables for summaries, and the ∑ button for math.",
       }),
+      // TextStyle is a prerequisite mark for Color -- Color just adds a
+      // `color` attr onto it rather than being its own mark. The
+      // *Markdown variants here (from lib/tiptap/format-marks.ts) are the
+      // same extensions with markdown serialize/parse wiring added, so
+      // these marks actually survive a save + reload instead of being
+      // silently dropped by tiptap-markdown (which has no built-in rule
+      // for them) -- see that file for the full explanation.
+      TextStyleMarkdown,
+      Color,
+      HighlightMarkdown.configure({ multicolor: true }),
+      SubscriptMarkdown,
+      SuperscriptMarkdown,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
       ResourceChip,
       MathInline,
       MathBlock,
@@ -443,14 +468,30 @@ export function NoteEditor({
         >
           I
         </button>
-        <button
-          type="button"
-          title="Heading"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm font-semibold hover:bg-white ${editor.isActive("heading", { level: 2 }) ? "bg-white" : ""}`}
+        <select
+          title="Paragraph style"
+          value={
+            editor.isActive("heading", { level: 1 })
+              ? "h1"
+              : editor.isActive("heading", { level: 2 })
+                ? "h2"
+                : editor.isActive("heading", { level: 3 })
+                  ? "h3"
+                  : "p"
+          }
+          onChange={(e) => {
+            const value = e.target.value;
+            const chain = editor.chain().focus();
+            if (value === "p") chain.setParagraph().run();
+            else chain.toggleHeading({ level: Number(value.slice(1)) as 1 | 2 | 3 }).run();
+          }}
+          className="rounded-md border-none bg-transparent px-2 py-1 text-sm hover:bg-white"
         >
-          H
-        </button>
+          <option value="p">Paragraph</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+        </select>
         <span className="mx-1 h-4 w-px bg-rule" />
         <button
           type="button"
@@ -492,6 +533,113 @@ export function NoteEditor({
         >
           S
         </button>
+        <label
+          title="Text color"
+          className="flex min-w-[2rem] cursor-pointer items-center justify-center rounded-md px-1 py-1 text-sm hover:bg-white"
+        >
+          A
+          <input
+            type="color"
+            onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+            value={editor.getAttributes("textStyle").color || "#1f2937"}
+            className="ml-0.5 h-4 w-4 cursor-pointer border-none bg-transparent p-0"
+          />
+        </label>
+        <button
+          type="button"
+          title="Highlight"
+          onClick={() => editor.chain().focus().toggleHighlight().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("highlight") ? "bg-white" : ""}`}
+        >
+          ▧
+        </button>
+        <button
+          type="button"
+          title="Superscript"
+          onClick={() => editor.chain().focus().toggleSuperscript().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("superscript") ? "bg-white" : ""}`}
+        >
+          x²
+        </button>
+        <button
+          type="button"
+          title="Subscript"
+          onClick={() => editor.chain().focus().toggleSubscript().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("subscript") ? "bg-white" : ""}`}
+        >
+          x₂
+        </button>
+        <span className="mx-1 h-4 w-px bg-rule" />
+        <button
+          type="button"
+          title="Align left"
+          onClick={() => editor.chain().focus().setTextAlign("left").run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "left" }) ? "bg-white" : ""}`}
+        >
+          ⟸
+        </button>
+        <button
+          type="button"
+          title="Align center"
+          onClick={() => editor.chain().focus().setTextAlign("center").run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "center" }) ? "bg-white" : ""}`}
+        >
+          ⟺
+        </button>
+        <button
+          type="button"
+          title="Align right"
+          onClick={() => editor.chain().focus().setTextAlign("right").run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "right" }) ? "bg-white" : ""}`}
+        >
+          ⟹
+        </button>
+        <button
+          type="button"
+          title="Justify"
+          onClick={() => editor.chain().focus().setTextAlign("justify").run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "justify" }) ? "bg-white" : ""}`}
+        >
+          ☰
+        </button>
+        <span className="mx-1 h-4 w-px bg-rule" />
+        <button
+          type="button"
+          title="Checklist"
+          onClick={() => editor.chain().focus().toggleTaskList().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("taskList") ? "bg-white" : ""}`}
+        >
+          ☑
+        </button>
+        <button
+          type="button"
+          title="Outdent (Shift+Tab)"
+          onClick={() => {
+            const itemType = editor.isActive("taskItem") ? "taskItem" : "listItem";
+            editor.chain().focus().liftListItem(itemType).run();
+          }}
+          disabled={
+            !editor.can().liftListItem("listItem") && !editor.can().liftListItem("taskItem")
+          }
+          className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white disabled:opacity-40"
+        >
+          ⇤
+        </button>
+        <button
+          type="button"
+          title="Indent (Tab)"
+          onClick={() => {
+            const itemType = editor.isActive("taskItem") ? "taskItem" : "listItem";
+            editor.chain().focus().sinkListItem(itemType).run();
+          }}
+          disabled={
+            !editor.can().sinkListItem("listItem") && !editor.can().sinkListItem("taskItem")
+          }
+          className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white disabled:opacity-40"
+        >
+          ⇥
+        </button>
+        <span className="mx-1 h-4 w-px bg-rule" />
         <button
           type="button"
           title="Horizontal rule"
@@ -550,6 +698,14 @@ export function NoteEditor({
               className="rounded px-2 py-1 text-sm underline hover:bg-paper"
             >
               U
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleHighlight().run()}
+              className={`rounded px-2 py-1 text-sm hover:bg-paper ${editor.isActive("highlight") ? "bg-paper" : ""}`}
+              title="Highlight"
+            >
+              ▧
             </button>
             <button
               type="button"

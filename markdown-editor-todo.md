@@ -28,23 +28,25 @@ Baseline: `components/NoteEditor.tsx` has been migrated off the old `<textarea>`
 
 (was: use TipTap instead of textarea — now shipped)
 
-## 2. Modern Formatting Toolbar
+## 2. Modern Formatting Toolbar — DONE (pending round-trip caveat below)
 
 Currently have: Bold, Italic, Underline, Strikethrough, Heading, Bulleted/Numbered list, Blockquote, Horizontal rule, inline/block math, table insert, Undo/Redo, link (via BubbleMenu).
-Still need:
 
-- Text color, Highlight
-- Superscript/Subscript
-- Text alignment
-- Paragraph styles dropdown
+- ✅ Text color (`@tiptap/extension-color` + `@tiptap/extension-text-style`) — swatch in toolbar
+- ✅ Highlight (`@tiptap/extension-highlight`, multicolor) — toolbar button + BubbleMenu button (#9)
+- ✅ Superscript/Subscript (`@tiptap/extension-subscript` / `-superscript`)
+- ✅ Text alignment (`@tiptap/extension-text-align`, left/center/right/justify) on paragraph + heading
+- ✅ Paragraph styles dropdown — replaces the old single "H" button; Paragraph/H1/H2/H3
 
-## 3. Lists
+**Markdown round-trip — FIXED.** Added `lib/tiptap/format-marks.ts`: wraps Highlight/Subscript/Superscript/TextStyle with markdown serialize+parse rules (same `storage.markdown` pattern as `MathInline`/`MathBlock`). Highlight/Sub/Superscript use the `markdown-it-mark` / `-sub` / `-sup` plugins (`==text==`, `~sub~`, `^sup^`); Color uses a small hand-rolled `{color=#hex}...{/color}` rule (no standard convention exists for inline color, and it's non-nesting — a bolded word inside a colored run won't survive a reload, everything else does). Underline still has the same pre-existing gap; out of scope here since it predates this pass.
+
+## 3. Lists — DONE
 
 - ✅ Bullet lists — button in toolbar
 - ✅ Numbered lists — button in toolbar
-- Checklists (`@tiptap/extension-task-list`)
-- Nested lists
-- Indentation controls
+- ✅ Checklists (`@tiptap/extension-task-list` + `-task-item`, nested) — has full markdown round-trip since `tiptap-markdown` ships built-in `- [ ]`/`- [x]` serialization for these
+- ✅ Nested lists — already worked via StarterKit's `ListItem` sink/lift keymap, now also exposed explicitly
+- ✅ Indentation controls — explicit Indent/Outdent toolbar buttons (`sinkListItem`/`liftListItem`), work for both bullet/ordered lists and task lists
 
 ## 4. Tables
 
@@ -87,11 +89,9 @@ Not present. New build.
 - `/` command menu using TipTap's suggestion utility
 - Items: Heading, Table, Image, Video, Diagram (reuse Mermaid panel), Activity, Homework, Learning Objective, Note, Callout, Divider
 
-## 9. Floating Text Formatting Menu
+## 9. Floating Text Formatting Menu — DONE
 
-Present via TipTap's `BubbleMenu` — has Bold, Italic, Underline, Link.
-
-- Still need: Highlight
+Present via TipTap's `BubbleMenu` — has Bold, Italic, Underline, Highlight, Link.
 
 ## 10. Block-Based Editing
 
