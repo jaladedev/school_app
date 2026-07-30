@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { Extension } from "@tiptap/core";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { Table } from "@tiptap/extension-table";
@@ -28,6 +29,30 @@ const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
 };
 
 const DEFAULT_MERMAID = "flowchart TD\n  A[Start] --> B[End]";
+
+// TipTap gives every extension its own separate keymap plugin rather than
+// merging them into one, and ProseMirror runs those plugins in order,
+// stopping at the first one that returns true. List items (StarterKit's
+// ListItem) and table cells (extension-table's Table) both bind Tab and
+// correctly return false when there's nothing to sink/lift or no table
+// cell to move to. But when EVERY plugin returns false, ProseMirror never
+// calls preventDefault, and the keydown falls through to the browser's
+// native focus-tabbing -- which then jumps to whatever <button> happens
+// to be next in the DOM (a toolbar button, a resource chip). Registering
+// this extension FIRST in the extensions array below puts it LAST in
+// TipTap's (reversed) plugin-priority order, so it only fires as a
+// last-resort catch-all: it absorbs Tab/Shift-Tab (no-op) instead of
+// letting focus escape the editor, without pre-empting list/table
+// handling that already works correctly.
+const TabTrap = Extension.create({
+  name: "tabTrap",
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => true,
+      "Shift-Tab": () => true,
+    };
+  },
+});
 
 export function NoteEditor({
   topicId,
@@ -63,6 +88,7 @@ export function NoteEditor({
 
   const editor = useEditor({
     extensions: [
+      TabTrap,
       // StarterKit v3 bundles Link internally, so adding a separate
       // Link extension instance here duplicates it.
       StarterKit.configure({
@@ -169,14 +195,25 @@ export function NoteEditor({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
-  // Ctrl/Cmd+S still saves a draft. Ctrl/Cmd+B and +I are now handled
-  // natively by StarterKit's keymap, so only the app-specific shortcut
-  // needs wiring here.
+  function promptForLink() {
+    if (!editor) return;
+    const url = window.prompt("Link URL (include https://)");
+    if (url) editor.chain().focus().setLink({ href: url }).run();
+  }
+
+  // Ctrl/Cmd+S still saves a draft. Ctrl/Cmd+K opens the link prompt
+  // (same logic the BubbleMenu's link button uses). Ctrl/Cmd+B and +I are
+  // handled natively by StarterKit's keymap, so only these two
+  // app-specific shortcuts need wiring here.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key === "s") {
         e.preventDefault();
         handleSave("draft");
+      } else if (e.key === "k") {
+        e.preventDefault();
+        promptForLink();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -384,7 +421,7 @@ export function NoteEditor({
         <span className="mx-1 h-4 w-px bg-rule" />
         <button
           type="button"
-          title="Bold"
+          title="Bold (Ctrl/Cmd+B)"
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={`min-w-[2rem] rounded-md px-2 py-1 text-sm font-semibold hover:bg-white ${editor.isActive("bold") ? "bg-white" : ""}`}
         >
@@ -392,7 +429,7 @@ export function NoteEditor({
         </button>
         <button
           type="button"
-          title="Italic"
+          title="Italic (Ctrl/Cmd+I)"
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={`min-w-[2rem] rounded-md px-2 py-1 text-sm italic hover:bg-white ${editor.isActive("italic") ? "bg-white" : ""}`}
         >
@@ -430,6 +467,30 @@ export function NoteEditor({
           className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("blockquote") ? "bg-white" : ""}`}
         >
           &ldquo;
+        </button>
+        <button
+          type="button"
+          title="Underline (Ctrl/Cmd+U)"
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm underline hover:bg-white ${editor.isActive("underline") ? "bg-white" : ""}`}
+        >
+          U
+        </button>
+        <button
+          type="button"
+          title="Strikethrough"
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+          className={`min-w-[2rem] rounded-md px-2 py-1 text-sm line-through hover:bg-white ${editor.isActive("strike") ? "bg-white" : ""}`}
+        >
+          S
+        </button>
+        <button
+          type="button"
+          title="Horizontal rule"
+          onClick={() => editor.chain().focus().setHorizontalRule().run()}
+          className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+        >
+          ―
         </button>
         <span className="mx-1 h-4 w-px bg-rule" />
         <button
@@ -477,11 +538,16 @@ export function NoteEditor({
             </button>
             <button
               type="button"
-              onClick={() => {
-                const url = window.prompt("Link URL (include https://)");
-                if (url) editor.chain().focus().setLink({ href: url }).run();
-              }}
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
+              className="rounded px-2 py-1 text-sm underline hover:bg-paper"
+            >
+              U
+            </button>
+            <button
+              type="button"
+              onClick={promptForLink}
               className="rounded px-2 py-1 text-sm hover:bg-paper"
+              title="Link (Ctrl/Cmd+K)"
             >
               🔗
             </button>

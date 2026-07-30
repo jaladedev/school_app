@@ -21,6 +21,8 @@ Baseline: `components/NoteEditor.tsx` has been migrated off the old `<textarea>`
 - TipTap v3 auto-detects Next.js/SSR and defaults `immediatelyRender` to `false` itself now — don't set it explicitly, it just logs a notice
 - `editor.storage.resourceChip` needed a `declare module "@tiptap/core"` augmentation to type-check
 - `.ProseMirror` has no default padding/first-child margin handling of its own — needed explicit CSS in `globals.css` beyond the wrapper's `p-4`
+- **`tailwind.config.ts`'s `content` glob only covered `./app/**` and `./components/**`, not `./lib/**`.** `ResourceChip`/math nodes live in `lib/tiptap/`, so any Tailwind class used only there (never appearing verbatim elsewhere in a scanned file) was silently purged from the build — no build error, just missing styles. Fixed by adding `"./lib/**/*.{ts,tsx}"` to `content`. Confirmed both via a real `tailwindcss` CLI build and in a teacher's actual browser after a `.next` cache clear + restart — the resource-chip popover now renders at full size (`w-[28rem]`).
+- Clicking an atom NodeView (ResourceChip, math nodes) lets ProseMirror establish its own `NodeSelection` over the node before React's `onClick` fires; combined with `BubbleMenu`'s live selection tracking this caused a `RangeError: Selection passed to setSelection must point at the current document` crash. Fixed by passing `stopEvent: () => true` to both nodes' `ReactNodeViewRenderer` so ProseMirror hands all DOM events on these atoms to React instead of managing selection itself.
 
 ## 1. Rich Text Editor — SUPERSEDED by #0
 
@@ -28,16 +30,12 @@ Baseline: `components/NoteEditor.tsx` has been migrated off the old `<textarea>`
 
 ## 2. Modern Formatting Toolbar
 
-Currently have: Bold, Italic, Heading, Bulleted/Numbered list, Blockquote, inline/block math, table insert, Undo/Redo, link (via BubbleMenu).
+Currently have: Bold, Italic, Underline, Strikethrough, Heading, Bulleted/Numbered list, Blockquote, Horizontal rule, inline/block math, table insert, Undo/Redo, link (via BubbleMenu).
 Still need:
 
-- Underline, Strikethrough
 - Text color, Highlight
 - Superscript/Subscript
 - Text alignment
-- Blockquote
-- Horizontal rule
-- Undo/Redo (TipTap has built-in history — just wire buttons)
 - Paragraph styles dropdown
 
 ## 3. Lists
@@ -70,10 +68,9 @@ Not present today beyond separate file upload panel.
 
 ## 6. Resource Improvements
 
-Currently: `[[resource:UUID]]` text markers + a picker dropdown (`TopicResourceList`/`NoteEditor` picker) — functional but not friendly.
+Currently: `[[resource:UUID]]` renders inline as a `ResourceChip` node (📷 📄 🎥 etc., #0). Clicking a chip opens a popover (`28rem` wide, type-correct preview reusing `TopicResourceItem` from `TopicContent.tsx`) with a two-step "Remove from note" action (asks to confirm before deleting the marker — never touches the underlying resource row).
 
-- Ship the custom Resource Node from #0 so markers render as cards inline (📷 📄 🎥 etc.)
-- Preview, Edit, Replace, Remove — most map to existing `deleteTopicResource` / upload actions, just need in-editor UI
+- Still need: Edit, Replace (swap for a different existing resource without reopening the whole insert flow)
 - Drag to reorder
 
 ## 7. Drag & Drop Uploads
@@ -92,9 +89,9 @@ Not present. New build.
 
 ## 9. Floating Text Formatting Menu
 
-Not present. New build via TipTap's `BubbleMenu`.
+Present via TipTap's `BubbleMenu` — has Bold, Italic, Underline, Link.
 
-- Bold, Italic, Underline, Highlight, Link
+- Still need: Highlight
 
 ## 10. Block-Based Editing
 
@@ -216,10 +213,13 @@ Not present. New build via `@tiptap/extension-character-count` + custom counts f
 
 ## 29. Keyboard Shortcuts
 
-TipTap ships common ones (Ctrl+B/I) by default — mostly free with migration.
+TipTap ships common ones (Ctrl+B/I/U) by default — mostly free with migration.
 
-- Still need: Ctrl+K (link), Ctrl+S (save), Ctrl+/ (slash menu), Tab/Shift+Tab (indent)
-- Add shortcut hints in UI
+- ✅ Ctrl+S (save draft)
+- ✅ Ctrl+K (link) — opens the same prompt as the BubbleMenu link button
+- ✅ Tab/Shift+Tab (indent) — fixed a real bug: when there's no list item to sink/lift into or table cell to move to, every extension's Tab handler correctly returns false, but nothing was calling preventDefault, so the keydown fell through to the browser's native focus-tabbing and jumped to the next toolbar/chip button. Added a catch-all `TabTrap` extension that absorbs Tab/Shift-Tab as a last resort so focus never escapes the editor.
+- Still need: Ctrl+/ (slash menu, once #8 exists)
+- Add shortcut hints in UI — done for B/I/U toolbar buttons via `title`
 
 ## 30. Focus Mode
 

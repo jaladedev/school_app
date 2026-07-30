@@ -91,7 +91,14 @@ function defineMathNode(name: "mathInline" | "mathBlock", displayMode: boolean) 
     },
 
     addNodeView() {
-      return ReactNodeViewRenderer(makeMathView(displayMode));
+      // Same fix as ResourceChip (see resource-node.tsx): without this,
+      // clicking to edit the equation makes ProseMirror establish its
+      // own NodeSelection over this atom node before our onClick runs,
+      // which can crash BubbleMenu's live position tracking when the
+      // node view swaps between rendered/editing state.
+      return ReactNodeViewRenderer(makeMathView(displayMode), {
+        stopEvent: () => true,
+      });
     },
   });
 }
