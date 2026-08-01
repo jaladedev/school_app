@@ -671,6 +671,97 @@ export async function updateMermaidResource(
   return resource;
 }
 
+// Edits a non-diagram resource in place (same resource id, same
+// [[resource:ID]] markers everywhere it's used) -- mirrors
+// updateMermaidResource's "update, don't delete+reinsert" approach, just
+// for the image/pdf/audio/video/link types that store an actual file
+// instead of inline content. `formData` can carry `title` (rename only),
+// `file` (replace only), or both in one call.
+export async function updateTopicResource(resourceId: string, formData: FormData) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can edit resources.");
+
+  const supabase = createClient();
+  const { data: existing } = await supabase
+    .from("topic_resources")
+    .select("id, topic_id, resource_type, file_url")
+    .eq("id", resourceId)
+    .single();
+
+  if (!existing) throw new Error("Resource not found.");
+  if (existing.resource_type === "diagram_mermaid") {
+    throw new Error("Diagrams are edited via updateMermaidResource, not this action.");
+  }
+
+  await assertTeacherOwnsTopic(supabase, teacherId, existing.topic_id);
+
+  const titleRaw = formData.get("title");
+  const title = typeof titleRaw === "string" ? titleRaw.trim() : undefined;
+  const file = formData.get("file");
+
+  const update: Record<string, unknown> = {};
+  if (title !== undefined) update.title = title || null;
+
+  const admin = createAdminClient();
+  let newObjectPath: string | null = null;
+
+  if (file instanceof File && file.size) {
+    if (file.size > MAX_TOPIC_RESOURCE_BYTES)
+      throw new Error("Resources must be 20 MB or smaller.");
+    const resourceType = RESOURCE_TYPES.get(file.type);
+    if (!resourceType)
+      throw new Error("Use an image, PDF, MP3/WAV/OGG audio, or MP4/WebM video file.");
+
+    const extension =
+      file.name
+        .split(".")
+        .pop()
+        ?.replace(/[^a-z0-9]/gi, "") || "file";
+    newObjectPath = `${existing.topic_id}/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await admin.storage
+      .from(TOPIC_RESOURCE_BUCKET)
+      .upload(newObjectPath, file, { contentType: file.type });
+    if (uploadError) throw new Error(uploadError.message);
+
+    update.resource_type = resourceType;
+    update.file_url = newObjectPath;
+  }
+
+  if (Object.keys(update).length === 0) {
+    throw new Error("Nothing to update — give a new title or file.");
+  }
+
+  const { data: resource, error } = await supabase
+    .from("topic_resources")
+    // Supabase's generated update() typing wants an object literal that
+    // matches TopicResource's shape exactly, not a dynamically-built
+    // Record<string, unknown> -- this is genuinely a partial update whose
+    // keys depend on which of title/file were passed in, so the cast is
+    // accurate rather than papering over a real type mismatch.
+    .update(update as any)
+    .eq("id", resourceId)
+    .select("*")
+    .single();
+
+  if (error) {
+    // Roll back the just-uploaded replacement file if the row update
+    // failed, same cleanup-on-failure pattern uploadTopicResource uses.
+    if (newObjectPath) await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([newObjectPath]);
+    throw new Error(error.message);
+  }
+
+  // Only remove the *old* file after the row update succeeds and points
+  // at the new one -- removing it earlier would leave a broken resource
+  // if the update itself failed.
+  if (newObjectPath && existing.file_url) {
+    await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([existing.file_url]);
+  }
+
+  revalidatePath(`/dashboard/teacher/notes/${existing.topic_id}`);
+  revalidatePath(`/dashboard/student/topics/${existing.topic_id}`);
+
+  return resource;
+}
+
 export async function deleteTopicResource(resourceId: string) {
   const { id: teacherId } = await assertRole(["teacher"], "Only teachers can remove resources.");
 

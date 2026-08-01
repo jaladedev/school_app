@@ -68,12 +68,12 @@ Not present today beyond separate file upload panel.
 - Image alignment
 - Replace images
 
-## 6. Resource Improvements
+## 6. Resource Improvements — DONE
 
 Currently: `[[resource:UUID]]` renders inline as a `ResourceChip` node (📷 📄 🎥 etc., #0). Clicking a chip opens a popover (`28rem` wide, type-correct preview reusing `TopicResourceItem` from `TopicContent.tsx`) with a two-step "Remove from note" action (asks to confirm before deleting the marker — never touches the underlying resource row).
 
-- Still need: Edit (still open for non-diagram resource types — images/PDFs/etc. don't have an update path yet, only diagrams do via #18's `updateMermaidResource`), Replace (swap for a different existing resource without reopening the whole insert flow)
-- Drag to reorder
+- ✅ Edit / Replace for non-diagram resource types — new `updateTopicResource` server action (lib/actions/teacher.ts), same "update in place, same resource id" approach `updateMermaidResource` already used so every `[[resource:ID]]` marker pointing at it keeps resolving. Takes a FormData with an optional `title` (rename) and/or `file` (replace the underlying object — re-validates mime type/size, uploads the new object, then removes the old one only after the row update succeeds, rolls back the new upload if the row update fails). Popover's "Edit" link opens a small inline form (title input + file input, hidden for `link` resources since those have no file) reusing the existing popover chrome rather than a new modal.
+- ✅ Drag to reorder — resourceChip is a zero-content atom node, so reordering is delete-at-source + insert-at-target in one ProseMirror transaction (`moveResourceChip` in resource-node.tsx, shared by both NodeViews). A small `⠿` drag handle sits to the left of the chip (icon chips) or top-left on hover (inline Mermaid diagrams); native HTML5 drag-and-drop, `dataTransfer` carries the source position.
 
 ## 7. Drag & Drop Uploads — DONE
 

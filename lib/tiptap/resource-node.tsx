@@ -22,10 +22,10 @@
  */
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import { TopicResourceItem } from "@/components/TopicContent";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
-import { updateMermaidResource } from "@/lib/actions/teacher";
+import { updateMermaidResource, updateTopicResource } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import type { TopicResource } from "@/types/database";
 
@@ -57,24 +57,73 @@ declare module "@tiptap/core" {
   }
 }
 
+// Drag-to-reorder (#6 of the to-do): resourceChip is a zero-content atom
+// node, so "moving" one is just delete-at-source + insert-at-target in a
+// single transaction, not a content merge. Shared by both NodeViews below
+// since both the icon-chip and the inline Mermaid rendering are the same
+// underlying node type and can be reordered the same way.
+function moveResourceChip(editor: any, sourcePos: number, targetPos: number) {
+  const { state } = editor;
+  const node = state.doc.nodeAt(sourcePos);
+  if (!node || node.type.name !== "resourceChip") return;
+  if (sourcePos === targetPos) return;
+
+  let tr = state.tr.delete(sourcePos, sourcePos + node.nodeSize);
+  // Deleting before the target shifts every position after it back by
+  // the deleted node's size, so the insert point needs the same
+  // adjustment when the drag moved the node forward in the doc.
+  const insertPos = sourcePos < targetPos ? targetPos - node.nodeSize : targetPos;
+  tr = tr.insert(insertPos, node.type.create(node.attrs));
+  editor.view.dispatch(tr);
+}
+
+// getPos() is typed as `() => number | undefined` by TipTap's NodeView
+// props (it's undefined if the node has been removed from the doc by the
+// time it's called) -- this wrapper is the one place that check lives,
+// so the drag handlers below can stay focused on the drag logic instead
+// of repeating an `if (pos === undefined) return` in each of them.
+function moveResourceChipSafe(editor: any, sourcePos: number, targetPos: number | undefined) {
+  if (targetPos === undefined) return;
+  moveResourceChip(editor, sourcePos, targetPos);
+}
+
+const RESOURCE_CHIP_DRAG_MIME = "application/x-resource-chip-pos";
+
 function ResourceChipView({
   node,
   editor,
   deleteNode,
+  getPos,
 }: {
   node: any;
   editor: any;
   deleteNode: () => void;
+  getPos: () => number | undefined;
 }) {
   const id: string = node.attrs.id;
   const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
   const resource = storage.resources.find((r) => r.id === id) ?? null;
 
   if (resource?.resource_type === "diagram_mermaid") {
-    return <MermaidNodeView resource={resource} deleteNode={deleteNode} editor={editor} />;
+    return (
+      <MermaidNodeView
+        resource={resource}
+        deleteNode={deleteNode}
+        editor={editor}
+        getPos={getPos}
+      />
+    );
   }
 
-  return <ResourceChipDefaultView id={id} resource={resource} deleteNode={deleteNode} />;
+  return (
+    <ResourceChipDefaultView
+      id={id}
+      resource={resource}
+      deleteNode={deleteNode}
+      editor={editor}
+      getPos={getPos}
+    />
+  );
 }
 
 // Mermaid diagrams get their own inline rendering instead of hiding
@@ -89,10 +138,12 @@ function MermaidNodeView({
   resource,
   deleteNode,
   editor,
+  getPos,
 }: {
   resource: TopicResource;
   deleteNode: () => void;
   editor: any;
+  getPos: () => number | undefined;
 }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -184,7 +235,33 @@ function MermaidNodeView({
   }
 
   return (
-    <NodeViewWrapper as="div" className="group relative my-3" contentEditable={false}>
+    <NodeViewWrapper
+      as="div"
+      className="group relative my-3"
+      contentEditable={false}
+      onDragOver={(e: DragEvent) => {
+        if (e.dataTransfer.types.includes(RESOURCE_CHIP_DRAG_MIME)) e.preventDefault();
+      }}
+      onDrop={(e: DragEvent) => {
+        const raw = e.dataTransfer.getData(RESOURCE_CHIP_DRAG_MIME);
+        if (!raw) return;
+        e.preventDefault();
+        moveResourceChipSafe(editor, Number(raw), getPos());
+      }}
+    >
+      <div
+        draggable
+        onDragStart={(e) => {
+          const pos = getPos();
+          if (pos === undefined) return;
+          e.dataTransfer.setData(RESOURCE_CHIP_DRAG_MIME, String(pos));
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        title="Drag to reorder"
+        className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
+      >
+        ⠿
+      </div>
       <TopicResourceItem resource={resource} />
 
       <div className="absolute right-2 top-2 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
@@ -235,26 +312,90 @@ function ResourceChipDefaultView({
   id,
   resource,
   deleteNode,
+  editor,
+  getPos,
 }: {
   id: string;
   resource: TopicResource | null;
   deleteNode: () => void;
+  editor: any;
+  getPos: () => number | undefined;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(resource?.title ?? "");
+  const [replaceFile, setReplaceFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   function closePopover() {
     setPreviewOpen(false);
     setConfirmingRemove(false);
+    setEditing(false);
+    setReplaceFile(null);
+  }
+
+  function startEditing() {
+    setEditTitle(resource?.title ?? "");
+    setReplaceFile(null);
+    setEditing(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!resource) return;
+    const formData = new FormData();
+    formData.set("title", editTitle);
+    if (replaceFile) formData.set("file", replaceFile);
+    setIsSaving(true);
+    try {
+      const updated = await updateTopicResource(resource.id, formData);
+      const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
+      storage.onResourceUpdated?.(updated);
+      emitToast(replaceFile ? "Resource replaced." : "Resource renamed.");
+      setEditing(false);
+      setReplaceFile(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to update the resource.";
+      emitToast(message, "error");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
-    <NodeViewWrapper as="span" className="relative inline-flex align-middle">
+    <NodeViewWrapper
+      as="span"
+      className="relative inline-flex items-center align-middle"
+      onDragOver={(e: DragEvent) => {
+        if (e.dataTransfer.types.includes(RESOURCE_CHIP_DRAG_MIME)) e.preventDefault();
+      }}
+      onDrop={(e: DragEvent) => {
+        const raw = e.dataTransfer.getData(RESOURCE_CHIP_DRAG_MIME);
+        if (!raw) return;
+        e.preventDefault();
+        moveResourceChipSafe(editor, Number(raw), getPos());
+      }}
+    >
+      <span
+        draggable
+        onDragStart={(e) => {
+          const pos = getPos();
+          if (pos === undefined) return;
+          e.dataTransfer.setData(RESOURCE_CHIP_DRAG_MIME, String(pos));
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        contentEditable={false}
+        title="Drag to reorder"
+        className="mr-0.5 inline-flex cursor-grab select-none items-center text-xs text-ink-soft/60 hover:text-ink-soft active:cursor-grabbing"
+      >
+        ⠿
+      </span>
       <button
         type="button"
         onClick={() => {
           setPreviewOpen((open) => !open);
           setConfirmingRemove(false);
+          setEditing(false);
         }}
         className={`mx-0.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
           resource
@@ -263,7 +404,7 @@ function ResourceChipDefaultView({
         }`}
         contentEditable={false}
         data-resource-id={id}
-        title={resource ? "Click to preview or remove" : "This resource no longer exists"}
+        title={resource ? "Click to preview, edit, or remove" : "This resource no longer exists"}
       >
         <span aria-hidden>{resource ? RESOURCE_TYPE_ICON[resource.resource_type] : "⚠️"}</span>
         <span className="max-w-[9rem] truncate">
@@ -276,7 +417,46 @@ function ResourceChipDefaultView({
           contentEditable={false}
           className="absolute left-0 top-full z-20 mt-1 w-[28rem] max-w-[90vw] rounded-lg border border-rule bg-white p-4 shadow-xl"
         >
-          {resource ? (
+          {editing && resource ? (
+            <span className="block">
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Resource title"
+                className="mb-2 block w-full rounded-lg border border-rule bg-white p-2 text-sm text-ink outline-none focus-visible:border-marigold"
+              />
+              {resource.resource_type !== "link" && (
+                <label className="mb-1 block text-xs text-ink-soft">
+                  Replace file (optional)
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf,audio/mpeg,audio/wav,audio/ogg,video/mp4,video/webm"
+                    onChange={(e) => setReplaceFile(e.target.files?.[0] ?? null)}
+                    className="mt-1 block w-full text-xs text-ink-soft"
+                  />
+                </label>
+              )}
+              <span className="mt-3 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  disabled={isSaving}
+                  className="rounded-lg border border-rule px-3 py-1.5 text-xs text-ink hover:bg-paper disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={isSaving}
+                  className="rounded-lg bg-marigold px-3 py-1.5 text-xs font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
+                >
+                  {isSaving ? "Saving…" : "Save changes"}
+                </button>
+              </span>
+            </span>
+          ) : resource ? (
             <span className="block max-h-[28rem] overflow-y-auto [&_figure]:my-0 [&_img]:max-h-96 [&_img]:w-full [&_img]:object-contain">
               <TopicResourceItem resource={resource} />
             </span>
@@ -287,44 +467,56 @@ function ResourceChipDefaultView({
             </span>
           )}
 
-          {confirmingRemove ? (
-            <span className="mt-3 flex items-center justify-between gap-2 rounded-md border border-clay/40 bg-clay/10 p-2">
-              <span className="text-xs text-clay">Remove this from the note?</span>
-              <span className="flex items-center gap-3">
+          {!editing &&
+            (confirmingRemove ? (
+              <span className="mt-3 flex items-center justify-between gap-2 rounded-md border border-clay/40 bg-clay/10 p-2">
+                <span className="text-xs text-clay">Remove this from the note?</span>
+                <span className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingRemove(false)}
+                    className="text-xs text-ink-soft hover:underline"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteNode()}
+                    className="rounded bg-clay px-2 py-1 text-xs font-medium text-white hover:bg-clay/90"
+                  >
+                    Remove
+                  </button>
+                </span>
+              </span>
+            ) : (
+              <span className="mt-3 flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  onClick={() => setConfirmingRemove(false)}
+                  onClick={closePopover}
                   className="text-xs text-ink-soft hover:underline"
                 >
-                  Cancel
+                  Close
                 </button>
-                <button
-                  type="button"
-                  onClick={() => deleteNode()}
-                  className="rounded bg-clay px-2 py-1 text-xs font-medium text-white hover:bg-clay/90"
-                >
-                  Remove
-                </button>
+                <span className="flex items-center gap-3">
+                  {resource && (
+                    <button
+                      type="button"
+                      onClick={startEditing}
+                      className="text-xs font-medium text-ink hover:underline"
+                    >
+                      Edit
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingRemove(true)}
+                    className="text-xs font-medium text-clay hover:underline"
+                  >
+                    Remove from note
+                  </button>
+                </span>
               </span>
-            </span>
-          ) : (
-            <span className="mt-3 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={closePopover}
-                className="text-xs text-ink-soft hover:underline"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmingRemove(true)}
-                className="text-xs font-medium text-clay hover:underline"
-              >
-                Remove from note
-              </button>
-            </span>
-          )}
+            ))}
         </span>
       )}
     </NodeViewWrapper>
