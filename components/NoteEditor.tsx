@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent } from "react";
+import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { Extension } from "@tiptap/core";
 import { BubbleMenu } from "@tiptap/react/menus";
@@ -86,13 +87,16 @@ export function NoteEditor({
   initialContent,
   initialStatus,
   resources = [],
+  placeholder = "Write the topic explanation here. Use tables for summaries, and the ∑ button for math.",
 }: {
   topicId: string;
   noteId?: string;
   initialContent: string;
   initialStatus: "draft" | "published" | "archived" | "unwritten";
   resources?: TopicResource[];
+  placeholder?: string;
 }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -107,6 +111,9 @@ export function NoteEditor({
   const [uploadingCount, setUploadingCount] = useState(0);
   const dragDepthRef = useRef(0);
   const pickerRef = useRef<HTMLDivElement | null>(null);
+
+  const [currentNoteId, setCurrentNoteId] = useState(noteId);
+  useEffect(() => setCurrentNoteId(noteId), [noteId]);
 
   // Same reasoning as the textarea version: resources is a one-time
   // server-component snapshot, so a diagram created via
@@ -128,8 +135,7 @@ export function NoteEditor({
       TableHeader,
       TableCell,
       Placeholder.configure({
-        placeholder:
-          "Write the topic explanation here. Use tables for summaries, and the ∑ button for math.",
+        placeholder,
       }),
       // TextStyle is a prerequisite mark for Color -- Color just adds a
       // `color` attr onto it rather than being its own mark. The
@@ -207,12 +213,25 @@ export function NoteEditor({
     setError(null);
     if (status === "draft") setIsSavingDraft(true);
     const content = getMarkdown();
+    // `page.tsx` fetches `note`/`resources` once as a Server Component
+    // and passes them down as props -- saveTopicNote's revalidatePath
+    // only invalidates the Next.js cache, it doesn't touch this already-
+    // mounted client tree. `currentNoteId` gets the real id immediately
+    // from saveTopicNote's return value (no round trip needed for
+    // resource/diagram buttons to unlock), but router.refresh() still
+    // runs once so the server-rendered resource-upload section below the
+    // editor and the "Currently: X" status catch up too. Only doing this
+    // when `currentNoteId` isn't set yet avoids refetching/remounting on
+    // every subsequent save while someone's actively editing.
+    const isFirstSave = !currentNoteId;
     startTransition(async () => {
       try {
-        await saveTopicNote(topicId, content, status);
+        const note = await saveTopicNote(topicId, content, status);
+        if (isFirstSave && note?.id) setCurrentNoteId(note.id);
         setLastSavedContent(content);
         setIsDirty(false);
         emitToast(status === "published" ? "Topic note published." : "Draft saved.");
+        if (isFirstSave) router.refresh();
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Unable to save the topic note.";
         setError(message);
@@ -221,6 +240,26 @@ export function NoteEditor({
         setIsSavingDraft(false);
       }
     });
+  }
+
+  // Resource/diagram actions need a real note id to attach to. Before
+  // this, a teacher writing a topic's very first note couldn't add
+  // resources at all until they explicitly clicked "Save draft" first --
+  // this silently creates that first draft on their behalf (using
+  // whatever's in the editor right now) the moment they try to insert a
+  // resource, so "start writing" and "start adding resources" can happen
+  // in either order. Returns the id to use immediately, and throws if
+  // the silent save itself fails (surfaced by each caller's own catch).
+  async function ensureNoteId(): Promise<string> {
+    if (currentNoteId) return currentNoteId;
+    if (!editor) throw new Error("Editor isn't ready yet.");
+    const note = await saveTopicNote(topicId, getMarkdown(), "draft");
+    if (!note?.id) throw new Error("Could not create the note.");
+    setCurrentNoteId(note.id);
+    setLastSavedContent(getMarkdown());
+    setIsDirty(false);
+    router.refresh();
+    return note.id;
   }
 
   useEffect(() => {
@@ -299,16 +338,16 @@ export function NoteEditor({
   }
 
   async function handleSaveDiagram() {
-    if (!noteId) return;
     if (!diagramCode.trim()) {
       emitToast("Write some Mermaid code before saving.", "error");
       return;
     }
     setIsSavingDiagram(true);
     try {
+      const noteIdToUse = await ensureNoteId();
       const resource = await createMermaidResource(
         topicId,
-        noteId,
+        noteIdToUse,
         diagramTitle || "Diagram",
         diagramCode
       );
@@ -331,12 +370,10 @@ export function NoteEditor({
   // panel (TopicResourceUpload.tsx) -- this isn't a second upload path,
   // just a second entry point into the existing one -- and inserts a
   // ResourceChip at the caret for each file that succeeds, the same way
-  // handleSaveDiagram does for a newly created diagram.
+  // handleSaveDiagram does for a newly created diagram. Auto-creates the
+  // note via ensureNoteId() if this is a topic's first-ever note, same
+  // as handleSaveDiagram.
   async function uploadDroppedFiles(files: File[]) {
-    if (!noteId) {
-      emitToast("Save the note once before dragging files in.", "error");
-      return;
-    }
     const accepted = files.filter((f) => ACCEPTED_RESOURCE_MIME_TYPES.has(f.type));
     const rejected = files.length - accepted.length;
     if (rejected > 0) {
@@ -347,6 +384,15 @@ export function NoteEditor({
     }
     if (accepted.length === 0) return;
 
+    let noteIdToUse: string;
+    try {
+      noteIdToUse = await ensureNoteId();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not create the note.";
+      emitToast(message, "error");
+      return;
+    }
+
     setUploadingCount(accepted.length);
     let failures = 0;
     for (const file of accepted) {
@@ -354,7 +400,7 @@ export function NoteEditor({
       formData.set("file", file);
       formData.set("title", "");
       try {
-        const resource = await uploadTopicResource(topicId, noteId, formData);
+        const resource = await uploadTopicResource(topicId, noteIdToUse, formData);
         if (resource) {
           setLocalResources((prev) => [...prev, resource]);
           insertResourceMarker(resource);
@@ -447,9 +493,8 @@ export function NoteEditor({
           <button
             type="button"
             onClick={() => setDiagramPanelOpen((open) => !open)}
-            disabled={isPending || !noteId}
+            disabled={isPending}
             className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
-            title={!noteId ? "Save the note once before generating a diagram" : undefined}
           >
             Generate Mermaid diagram
           </button>
@@ -471,7 +516,7 @@ export function NoteEditor({
         </div>
       </div>
 
-      {diagramPanelOpen && noteId && (
+      {diagramPanelOpen && (
         <section className="mb-4 rounded-xl border border-rule bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-display text-sm font-semibold text-ink">
@@ -847,7 +892,7 @@ export function NoteEditor({
         {isDraggingFile && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/80">
             <p className="rounded-lg border border-marigold bg-white px-4 py-2 text-sm font-medium text-ink shadow-sm">
-              {noteId ? "Drop to attach and insert" : "Save the note once before dragging files in"}
+              Drop to attach and insert
             </p>
           </div>
         )}

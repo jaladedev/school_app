@@ -429,19 +429,25 @@ export async function saveTopicNote(
   // Notes are append-only: publishing a revision never overwrites an
   // earlier draft or published copy, so teachers can review the full
   // topic history later and students continue seeing the latest publish.
-  const { error } = await supabase.from("topic_notes").insert({
-    topic_id: topicId,
-    author_id: teacherId,
-    content,
-    status,
-    moderation_status: moderationStatus,
-    version: (latest?.version ?? 0) + 1,
-  });
+  const { data: note, error } = await supabase
+    .from("topic_notes")
+    .insert({
+      topic_id: topicId,
+      author_id: teacherId,
+      content,
+      status,
+      moderation_status: moderationStatus,
+      version: (latest?.version ?? 0) + 1,
+    })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath("/dashboard/teacher/notes");
+
+  return note;
 }
 
 /**

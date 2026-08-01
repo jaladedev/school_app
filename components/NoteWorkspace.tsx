@@ -12,6 +12,7 @@ export function NoteWorkspace({
   initialContent,
   initialStatus,
   resources,
+  placeholder,
   todaysEntries = [],
 }: {
   topicId: string;
@@ -19,6 +20,7 @@ export function NoteWorkspace({
   initialContent: string;
   initialStatus: "draft" | "published" | "archived" | "unwritten";
   resources: TopicResource[];
+  placeholder?: string;
   todaysEntries?: BellTimerEntry[];
 }) {
   const [mode, setMode] = useState<"edit" | "present">("edit");
@@ -63,6 +65,7 @@ export function NoteWorkspace({
           initialContent={initialContent}
           initialStatus={initialStatus}
           resources={resources}
+          placeholder={placeholder}
         />
       ) : (
         <>

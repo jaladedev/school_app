@@ -128,11 +128,14 @@ export default async function TeacherNotesPage({
       <div className="space-y-2">
         {topics?.map((topic) => {
           const status = statusByTopic.get(topic.id) ?? "unwritten";
+          const isUnwritten = status === "unwritten";
           return (
             <Link
               key={topic.id}
               href={`/dashboard/teacher/notes/${topic.id}`}
-              className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 transition hover:border-leaf"
+              className={`flex items-center justify-between rounded-lg border bg-white px-4 py-3 transition hover:border-leaf ${
+                isUnwritten ? "border-dashed border-rule" : "border-rule"
+              }`}
             >
               <div>
                 <p className="text-ink">{topic.title}</p>
@@ -142,15 +145,21 @@ export default async function TeacherNotesPage({
                 </p>
               </div>
               <span
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
                   status === "published"
                     ? "bg-leaf-soft text-leaf"
                     : status === "draft"
                       ? "bg-marigold/20 text-marigold-dark"
-                      : "bg-rule text-ink-soft"
+                      : "bg-paper text-ink-soft"
                 }`}
               >
-                {status}
+                {isUnwritten ? (
+                  <>
+                    <span aria-hidden>+</span> Start writing
+                  </>
+                ) : (
+                  status
+                )}
               </span>
             </Link>
           );

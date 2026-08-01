@@ -99,9 +99,10 @@ export default async function TeacherNoteEditPage({
       <NoteWorkspace
         topicId={resolvedParams.topicId}
         noteId={note?.id}
-        initialContent={note?.content ?? `## Introduction\n\nWrite about "${topic?.title}" here.\n`}
+        initialContent={note?.content ?? ""}
         initialStatus={note?.status ?? "unwritten"}
         resources={resources ?? []}
+        placeholder={`Write about "${topic?.title}" here. Use tables for summaries, and the ∑ button for math.`}
         todaysEntries={(todaysEntries ?? []).map((entry) => ({
           id: entry.id,
           periodNumber: entry.period_number,
@@ -117,7 +118,11 @@ export default async function TeacherNoteEditPage({
           <TopicResourceList resources={resources ?? []} />
         </section>
       ) : (
-        <p className="mt-4 text-sm text-ink-soft">Save the note once before attaching resources.</p>
+        <p className="mt-4 text-sm text-ink-soft">
+          This list will appear here once you&apos;ve saved at least one draft — but you don&apos;t
+          have to save first: use &quot;Insert resource&quot; or drag a file straight into the
+          editor above, and the first draft will be created for you automatically.
+        </p>
       )}
       {!!versions?.length && (
         <section className="mt-6 rounded-xl border border-rule bg-white p-4">
