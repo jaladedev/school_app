@@ -29,13 +29,23 @@ export default async function TeacherNotesPage({
 
   const subjectIds = teacherProfile?.subjects_taught ?? [];
 
+  const { data: settings } = await supabase
+    .from("school_settings")
+    .select("current_academic_year, current_term")
+    .eq("id", 1)
+    .single();
+
+  const currentTerm = settings?.current_term ?? 1;
+  const currentAcademicYear = settings?.current_academic_year ?? "";
+
   const { data: topics, count } = await supabase
     .from("curriculum_topics")
     .select("*, subjects(name)", { count: "exact" })
     .in("subject_id", subjectIds.length ? subjectIds : ["00000000-0000-0000-0000-000000000000"])
-    .order("education_level", { ascending: true })
+    .eq("term", currentTerm)
+    .eq("academic_year", currentAcademicYear)
+    .order("name", { foreignTable: "subjects", ascending: true })
     .order("level_number", { ascending: true })
-    .order("term", { ascending: true })
     .order("week_number", { ascending: true })
     .range(from, to);
 
@@ -84,7 +94,8 @@ export default async function TeacherNotesPage({
     <div>
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Curriculum notes</h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Author or edit notes for topics in the subjects you teach.
+        Author or edit notes for topics in the subjects you teach — Term {currentTerm}
+        {currentAcademicYear ? ` · ${currentAcademicYear}` : ""}.
       </p>
 
       {isHod && (
@@ -141,7 +152,11 @@ export default async function TeacherNotesPage({
                 <p className="text-ink">{topic.title}</p>
                 <p className="text-xs text-ink-soft">
                   {topic.subjects?.name} · {formatLevel(topic.education_level, topic.level_number)}{" "}
-                  · Term {topic.term} · Week {topic.week_number}
+                  ·{" "}
+                  {topic.week_end_number > topic.week_number
+                    ? `Weeks ${topic.week_number}–${topic.week_end_number}`
+                    : `Week ${topic.week_number}`}
+                  {topic.theme ? ` · ${topic.theme}` : ""}
                 </p>
               </div>
               <span

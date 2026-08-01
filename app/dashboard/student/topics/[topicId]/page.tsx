@@ -79,8 +79,11 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
 
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">{topic.title}</h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Term {topic.term} · Week {topic.week_number} ·{" "}
-        {formatLevel(topic.education_level, topic.level_number)}
+        {topic.theme ? `${topic.theme} · ` : ""}Term {topic.term} ·{" "}
+        {topic.week_end_number > topic.week_number
+          ? `Weeks ${topic.week_number}–${topic.week_end_number}`
+          : `Week ${topic.week_number}`}{" "}
+        · {formatLevel(topic.education_level, topic.level_number)}
       </p>
 
       {note ? (

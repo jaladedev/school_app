@@ -71,7 +71,11 @@ export default async function SubjectTopicsPage({
                   className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 transition hover:border-leaf"
                 >
                   <span className="text-ink">{topic.title}</span>
-                  <span className="text-sm text-ink-soft">Week {topic.week_number}</span>
+                  <span className="text-sm text-ink-soft">
+                    {topic.week_end_number > topic.week_number
+                      ? `Weeks ${topic.week_number}–${topic.week_end_number}`
+                      : `Week ${topic.week_number}`}
+                  </span>
                 </Link>
               </li>
             ))}

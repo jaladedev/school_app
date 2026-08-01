@@ -24,10 +24,12 @@ export function TopicRow({
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(topic.title);
   const [description, setDescription] = useState(topic.description ?? "");
+  const [theme, setTheme] = useState(topic.theme ?? "");
   const [levelNumber, setLevelNumber] = useState(topic.level_number);
   const [term, setTerm] = useState(topic.term);
   const [academicYear, setAcademicYear] = useState(topic.academic_year);
   const [weekNumber, setWeekNumber] = useState(topic.week_number);
+  const [weekEndNumber, setWeekEndNumber] = useState(topic.week_end_number);
   const [sequenceOrder, setSequenceOrder] = useState(topic.sequence_order);
 
   const [isPending, startTransition] = useTransition();
@@ -44,7 +46,9 @@ export function TopicRow({
       levelNumber,
       term,
       academicYear,
+      theme,
       weekNumber,
+      weekEndNumber,
       sequenceOrder,
       title,
       description,
@@ -65,10 +69,12 @@ export function TopicRow({
         .update({
           title: title.trim(),
           description: description.trim() || null,
+          theme: theme.trim() || null,
           level_number: levelNumber,
           term,
           academic_year: academicYear,
           week_number: weekNumber,
+          week_end_number: weekEndNumber,
           sequence_order: sequenceOrder,
         })
         .eq("id", topic.id);
@@ -99,7 +105,13 @@ export function TopicRow({
   if (editing) {
     return (
       <form onSubmit={handleSave} className="space-y-2 rounded-lg border border-rule bg-paper p-3">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <input
+          value={theme}
+          onChange={(e) => setTheme(e.target.value)}
+          className="w-full rounded-lg border border-rule px-3 py-2 text-sm"
+          placeholder="Theme (optional — groups related topics)"
+        />
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           <input
             type="number"
             min={minLevel}
@@ -129,9 +141,22 @@ export function TopicRow({
             min={1}
             max={14}
             value={weekNumber}
-            onChange={(e) => setWeekNumber(Number(e.target.value))}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setWeekNumber(n);
+              if (n > weekEndNumber) setWeekEndNumber(n);
+            }}
             className="rounded-lg border border-rule px-3 py-2 text-sm"
-            placeholder="Week"
+            placeholder="Week from"
+          />
+          <input
+            type="number"
+            min={weekNumber}
+            max={14}
+            value={weekEndNumber}
+            onChange={(e) => setWeekEndNumber(Number(e.target.value))}
+            className="rounded-lg border border-rule px-3 py-2 text-sm"
+            placeholder="Week to"
           />
         </div>
         {fieldErrors.levelNumber && <p className="text-xs text-clay">{fieldErrors.levelNumber}</p>}
@@ -139,6 +164,9 @@ export function TopicRow({
           <p className="text-xs text-clay">{fieldErrors.academicYear}</p>
         )}
         {fieldErrors.weekNumber && <p className="text-xs text-clay">{fieldErrors.weekNumber}</p>}
+        {fieldErrors.weekEndNumber && (
+          <p className="text-xs text-clay">{fieldErrors.weekEndNumber}</p>
+        )}
 
         <input
           value={title}
@@ -190,14 +218,20 @@ export function TopicRow({
     );
   }
 
+  const weekLabel =
+    topic.week_end_number > topic.week_number
+      ? `Weeks ${topic.week_number}–${topic.week_end_number}`
+      : `Week ${topic.week_number}`;
+
   return (
     <div className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3">
       <div>
         <p className="text-ink">
-          Week {topic.week_number}: {topic.title}
+          {weekLabel}: {topic.title}
         </p>
         <p className="text-xs text-ink-soft">
-          Term {topic.term} · {topic.academic_year} · Order {topic.sequence_order}
+          {topic.theme ? `${topic.theme} · ` : ""}Term {topic.term} · {topic.academic_year} · Order{" "}
+          {topic.sequence_order}
           {topic.description ? ` · ${topic.description}` : ""}
         </p>
         {error && <p className="mt-1 text-xs text-clay">{error}</p>}

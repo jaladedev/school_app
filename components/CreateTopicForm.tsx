@@ -29,7 +29,7 @@ export function CreateTopicForm({
   // happen here instead of in the page.
   existingTopics: Pick<
     CurriculumTopic,
-    "subject_id" | "level_number" | "term" | "sequence_order"
+    "subject_id" | "level_number" | "term" | "sequence_order" | "theme"
   >[];
 }) {
   const router = useRouter();
@@ -42,12 +42,30 @@ export function CreateTopicForm({
   const [levelNumber, setLevelNumber] = useState(subject?.min_level_number ?? 1);
   const [term, setTerm] = useState(defaultTerm);
   const [academicYear, setAcademicYear] = useState(defaultAcademicYear);
+  const [theme, setTheme] = useState("");
   const [weekNumber, setWeekNumber] = useState(1);
+  const [weekEndNumber, setWeekEndNumber] = useState(1);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Themes already used for this subject/level/term, so an admin adding a
+  // second (or third) topic under the same theme (e.g. "Number and
+  // Numeration" covering Number Base System, then Logarithms) can pick it
+  // from a list instead of retyping it — a typo here would silently split
+  // one theme into two groups on the curriculum page.
+  const themeSuggestions = Array.from(
+    new Set(
+      existingTopics
+        .filter(
+          (t) => t.subject_id === subjectId && t.level_number === levelNumber && t.term === term
+        )
+        .map((t) => t.theme)
+        .filter((t): t is string => Boolean(t))
+    )
+  );
 
   function handleSubjectChange(id: string) {
     setSubjectId(id);
@@ -64,7 +82,9 @@ export function CreateTopicForm({
       levelNumber,
       term,
       academicYear,
+      theme,
       weekNumber,
+      weekEndNumber,
       sequenceOrder: 1, // placeholder — the real value is computed just below
       title,
       description,
@@ -99,9 +119,11 @@ export function CreateTopicForm({
         level_number: levelNumber,
         term,
         academic_year: academicYear,
+        theme: theme.trim() || null,
         title: title.trim(),
         description: description.trim() || null,
         week_number: weekNumber,
+        week_end_number: weekEndNumber,
         sequence_order: sequenceOrder,
       });
 
@@ -110,6 +132,7 @@ export function CreateTopicForm({
         return;
       }
 
+      setTheme("");
       setTitle("");
       setDescription("");
       setOpen(false);
@@ -209,22 +232,66 @@ export function CreateTopicForm({
         </div>
       </div>
 
+      <div>
+        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
+          Theme{" "}
+          <span className="normal-case text-ink-soft/70">(optional — groups related topics)</span>
+        </p>
+        <input
+          list="theme-suggestions"
+          value={theme}
+          onChange={(e) => setTheme(e.target.value)}
+          placeholder="e.g. Number and Numeration"
+          className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+        />
+        <datalist id="theme-suggestions">
+          {themeSuggestions.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+      </div>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div>
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">Week</p>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
+            Week (start)
+          </p>
           <input
             type="number"
             min={1}
             max={14}
             value={weekNumber}
-            onChange={(e) => setWeekNumber(Number(e.target.value))}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setWeekNumber(n);
+              // Keep the range valid as the start moves past the current
+              // end, rather than making the admin fix a now-invalid end
+              // week by hand every time they adjust the start.
+              if (n > weekEndNumber) setWeekEndNumber(n);
+            }}
             className="w-full rounded-lg border border-rule px-3 py-2 text-sm"
           />
           {fieldErrors.weekNumber && (
             <p className="mt-1 text-xs text-clay">{fieldErrors.weekNumber}</p>
           )}
         </div>
-        <div className="col-span-3">
+        <div>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
+            Week (end)
+          </p>
+          <input
+            type="number"
+            min={weekNumber}
+            max={14}
+            value={weekEndNumber}
+            onChange={(e) => setWeekEndNumber(Number(e.target.value))}
+            className="w-full rounded-lg border border-rule px-3 py-2 text-sm"
+          />
+          {fieldErrors.weekEndNumber && (
+            <p className="mt-1 text-xs text-clay">{fieldErrors.weekEndNumber}</p>
+          )}
+        </div>
+        <div className="col-span-2">
           <input
             required
             placeholder="Topic title"

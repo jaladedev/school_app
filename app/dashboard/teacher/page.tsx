@@ -77,7 +77,7 @@ export default async function TeacherHome() {
 
     const { data: topics } = await supabase
       .from("curriculum_topics")
-      .select("id, title, week_number")
+      .select("id, title, week_number, week_end_number")
       .eq("subject_id", subj.id)
       .eq("education_level", cls.education_level)
       .eq("level_number", cls.level_number)
@@ -92,7 +92,9 @@ export default async function TeacherHome() {
     suggestedTopicByKey.set(
       key,
       currentWeek != null
-        ? ((topics ?? []).find((t) => t.week_number === currentWeek)?.id ?? null)
+        ? ((topics ?? []).find(
+            (t) => currentWeek >= t.week_number && currentWeek <= t.week_end_number
+          )?.id ?? null)
         : null
     );
   }

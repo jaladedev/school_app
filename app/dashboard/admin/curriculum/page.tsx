@@ -99,22 +99,43 @@ export default async function AdminCurriculumPage({
           {groupKeys.map((key) => {
             const [levelNumber, term] = key.split("|").map(Number);
             const rows = grouped.get(key) ?? [];
+
+            // Sub-group by theme, preserving each topic's place in the
+            // already-sequence_order-sorted `rows` -- a theme's section
+            // appears wherever its first topic would have sorted. Untitled
+            // topics (no theme set) fall under a shared "Other topics"
+            // heading rather than being scattered with no grouping at all.
+            const themeOrder: string[] = [];
+            const byTheme = new Map<string, typeof rows>();
+            for (const topic of rows) {
+              const themeKey = topic.theme?.trim() || "Other topics";
+              if (!byTheme.has(themeKey)) themeOrder.push(themeKey);
+              byTheme.set(themeKey, [...(byTheme.get(themeKey) ?? []), topic]);
+            }
+
             return (
               <div key={key} className="mb-8">
                 <h2 className="mb-3 font-display text-lg font-semibold text-ink">
                   {formatLevel(activeSubject.education_level, levelNumber)} · Term {term}
                 </h2>
-                <div className="space-y-2">
-                  {rows.map((topic) => (
-                    <TopicRow
-                      key={topic.id}
-                      topic={topic}
-                      subjectName={activeSubject.name}
-                      minLevel={activeSubject.min_level_number}
-                      maxLevel={activeSubject.max_level_number}
-                    />
-                  ))}
-                </div>
+                {themeOrder.map((themeKey) => (
+                  <div key={themeKey} className="mb-4">
+                    <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-soft">
+                      {themeKey}
+                    </h3>
+                    <div className="space-y-2">
+                      {(byTheme.get(themeKey) ?? []).map((topic) => (
+                        <TopicRow
+                          key={topic.id}
+                          topic={topic}
+                          subjectName={activeSubject.name}
+                          minLevel={activeSubject.min_level_number}
+                          maxLevel={activeSubject.max_level_number}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             );
           })}

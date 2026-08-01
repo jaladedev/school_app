@@ -123,6 +123,8 @@ export type CurriculumTopic = {
   description: string | null;
   sequence_order: number;
   week_number: number;
+  week_end_number: number;
+  theme: string | null;
   created_by: string | null;
   created_at: string;
 };
