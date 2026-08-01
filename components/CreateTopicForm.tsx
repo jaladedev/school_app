@@ -136,12 +136,19 @@ export function CreateTopicForm({
     );
   }
 
+  // Guards against a subject whose min/max level range is reversed (bad data
+  // from before subjects could be edited) -- Array.from with a negative
+  // length throws, and would otherwise take this whole form down instead of
+  // just leaving the level dropdown with its one fallback option.
   const levelNumbers =
-    subject &&
-    Array.from(
-      { length: subject.max_level_number - subject.min_level_number + 1 },
-      (_, i) => subject.min_level_number + i
-    );
+    subject && subject.max_level_number >= subject.min_level_number
+      ? Array.from(
+          { length: subject.max_level_number - subject.min_level_number + 1 },
+          (_, i) => subject.min_level_number + i
+        )
+      : subject
+        ? [subject.min_level_number]
+        : undefined;
 
   return (
     <form

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { CreateSubjectForm } from "@/components/CreateSubjectForm";
-import { formatLevel, type EducationLevel } from "@/types/database";
+import { SubjectRow } from "@/components/SubjectRow";
+import type { EducationLevel } from "@/types/database";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -60,19 +61,7 @@ export default async function AdminSubjectsPage({
             </h2>
             <div className="space-y-2">
               {stageSubjects.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3"
-                >
-                  <div>
-                    <p className="text-ink">{s.name}</p>
-                    {s.description && <p className="text-xs text-ink-soft">{s.description}</p>}
-                  </div>
-                  <span className="text-sm text-ink-soft">
-                    {formatLevel(s.education_level, s.min_level_number)} –{" "}
-                    {formatLevel(s.education_level, s.max_level_number)}
-                  </span>
-                </div>
+                <SubjectRow key={s.id} subject={s} />
               ))}
             </div>
           </div>

@@ -29,7 +29,6 @@ import { Highlight } from "@tiptap/extension-highlight";
 import { Subscript } from "@tiptap/extension-subscript";
 import { Superscript } from "@tiptap/extension-superscript";
 import { TextStyle } from "@tiptap/extension-text-style";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error -- no published types for this package
 import markdownItMark from "markdown-it-mark";
 // @ts-expect-error -- no published types for this package
