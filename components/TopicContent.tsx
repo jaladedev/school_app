@@ -7,6 +7,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
+import type { ImageAlign, ImageSize } from "@/lib/tiptap/resource-node";
 import type { TopicResource } from "@/types/database";
 
 // Defers loading a resource's actual media until it scrolls near the
@@ -49,10 +50,18 @@ function MediaError({ label }: { label: string }) {
 // appears in the flow of the text — e.g. right after the sentence that
 // references it — instead of every resource always landing at the end
 // of the note regardless of what the prose actually says about it.
-const RESOURCE_MARKER = /\[\[resource:([0-9a-fA-F-]{36})\]\]/g;
+//
+// The optional `#size-align` suffix (e.g. `#full`, `#small-right`) is
+// written by the image resize/alignment controls in the TipTap editor
+// (see lib/tiptap/resource-node.tsx) -- this regex has to stay in sync
+// with the one there, or a note saved with an image size/alignment set
+// would render as broken literal "[[resource:...#full]]" text here
+// instead of the image.
+const RESOURCE_MARKER = /\[\[resource:([0-9a-fA-F-]{36})(?:#([a-z]+)(?:-([a-z]+))?)?\]\]/g;
 
 export type ContentPart =
-  { type: "text"; value: string } | { type: "resource"; resource: TopicResource };
+  | { type: "text"; value: string }
+  | { type: "resource"; resource: TopicResource; size?: ImageSize; align?: ImageAlign };
 
 export function splitContentByMarkers(
   content: string,
@@ -72,7 +81,9 @@ export function splitContentByMarkers(
 
     const resource = byId.get(match[1]);
     if (resource) {
-      parts.push({ type: "resource", resource });
+      const size = (match[2] as ImageSize | undefined) || undefined;
+      const align = (match[3] as ImageAlign | undefined) || undefined;
+      parts.push({ type: "resource", resource, size, align });
       usedIds.add(resource.id);
     }
     // An unmatched marker (resource deleted, or id typo) is silently
@@ -113,7 +124,12 @@ export function TopicContent({
             </ReactMarkdown>
           </div>
         ) : (
-          <TopicResourceItem key={part.resource.id} resource={part.resource} />
+          <TopicResourceItem
+            key={part.resource.id}
+            resource={part.resource}
+            size={part.size}
+            align={part.align}
+          />
         )
       )}
 
@@ -124,7 +140,26 @@ export function TopicContent({
   );
 }
 
-export function TopicResourceItem({ resource }: { resource: TopicResource }) {
+const IMAGE_SIZE_CLASS: Record<ImageSize, string> = {
+  small: "max-w-xs",
+  medium: "max-w-xl",
+  full: "w-full",
+};
+const IMAGE_ALIGN_CLASS: Record<ImageAlign, string> = {
+  left: "mr-auto",
+  center: "mx-auto",
+  right: "ml-auto",
+};
+
+export function TopicResourceItem({
+  resource,
+  size,
+  align,
+}: {
+  resource: TopicResource;
+  size?: ImageSize;
+  align?: ImageAlign;
+}) {
   const { ref, inView } = useInView<HTMLDivElement>();
   const [failed, setFailed] = useState(false);
 
@@ -134,7 +169,10 @@ export function TopicResourceItem({ resource }: { resource: TopicResource }) {
 
     case "image":
       return (
-        <figure ref={ref} className="my-4">
+        <figure
+          ref={ref}
+          className={`my-4 ${size ? IMAGE_SIZE_CLASS[size] : ""} ${align ? IMAGE_ALIGN_CLASS[align] : ""}`}
+        >
           {failed ? (
             <MediaError label="Image" />
           ) : inView ? (
@@ -144,7 +182,7 @@ export function TopicResourceItem({ resource }: { resource: TopicResource }) {
               alt={resource.title ?? "Diagram"}
               loading="lazy"
               onError={() => setFailed(true)}
-              className="rounded-xl border border-rule"
+              className="w-full rounded-xl border border-rule"
             />
           ) : (
             <div className="h-48 w-full animate-pulse rounded-xl border border-rule bg-paper" />

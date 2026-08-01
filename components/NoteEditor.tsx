@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import { Extension } from "@tiptap/core";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
@@ -173,6 +173,47 @@ export function NoteEditor({
     // above on mount.
     // @ts-expect-error -- provided by the Markdown extension
     contentType: "markdown",
+    editorProps: {
+      // Paste-image support (#5 of the to-do): a screenshot or copied
+      // image lands in the clipboard as a `File`-bearing `image/*` item,
+      // not as text, so this never reaches Markdown's paste handling at
+      // all -- it has to be intercepted here, before TipTap tries to
+      // treat the paste as text/HTML. Reuses uploadDroppedFiles (the
+      // same function drag-and-drop already calls), so pasted images go
+      // through the identical upload -> ResourceChip insert path rather
+      // than a second, parallel one.
+      handlePaste(_view, event) {
+        const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
+          f.type.startsWith("image/")
+        );
+        if (files.length === 0) return false; // let normal paste handling run
+        event.preventDefault();
+        void uploadDroppedFiles(files);
+        return true;
+      },
+    },
+  });
+
+  // Every `editor.isActive(...)`/`editor.can()` check sprinkled through
+  // the toolbar JSX below reads live editor state correctly -- the bug
+  // wasn't stale data, it's that nothing told React to re-render when
+  // that state changed. The component only listened for content
+  // ("update") events; moving the caret into/out of a table, or between
+  // marks, is a selection-only transaction that fires neither "update"
+  // nor a React re-render on its own. That's invisible for buttons that
+  // are always in the DOM (Bold/Italic just silently kept a stale
+  // highlight until the next keystroke), but fatal for anything
+  // conditionally rendered on `isActive()` -- like the "Table:" toolbar,
+  // which never appeared at all no matter where the caret was, because
+  // the check that would reveal it never got a chance to re-run.
+  // `useEditorState` is Tiptap's own hook for this: it subscribes to
+  // every transaction and re-renders when the selector's result changes
+  // reference, so returning `editor.state` itself (a new object every
+  // transaction, selection-only or not) forces exactly the re-render
+  // that was missing, without touching any of the isActive call sites.
+  useEditorState({
+    editor,
+    selector: ({ editor }) => editor?.state,
   });
 
   // Pass the live resource list into the ResourceChip node's storage so
@@ -313,6 +354,22 @@ export function NoteEditor({
   }, [editor]);
 
   function insertResourceMarker(resource: TopicResource) {
+    // `editor.storage.resourceChip.resources` is normally kept in sync
+    // by the useEffect below that watches `localResources` -- but that
+    // effect only runs after React commits the `setLocalResources` call
+    // each caller makes right before this one, and React state updates
+    // are asynchronous. `.insertContent().run()` below dispatches a
+    // ProseMirror transaction synchronously, which synchronously mounts
+    // the new node's NodeView and does its first `storage.resources.find`
+    // lookup -- before that effect has had a chance to run. Without this,
+    // a freshly uploaded/created resource would render as "Missing
+    // resource" for a moment (or, if the doc were saved in that exact
+    // window, indefinitely) purely because of ordering, not because
+    // anything was actually wrong.
+    const storage = editor?.storage.resourceChip;
+    if (storage && !storage.resources.some((r) => r.id === resource.id)) {
+      storage.resources = [...storage.resources, resource];
+    }
     editor
       ?.chain()
       .focus()
@@ -344,6 +401,15 @@ export function NoteEditor({
     }
     setIsSavingDiagram(true);
     try {
+      // Capture this *before* awaiting -- ensureNoteId's own save call
+      // happens synchronously relative to this check (no other await
+      // separates them), and its snapshot is taken from whatever's in
+      // the editor at that moment, which is *before* insertResourceMarker
+      // below adds anything. If this is a brand-new note, that snapshot
+      // save doesn't include the diagram marker we're about to insert --
+      // it only exists in the live in-memory editor until something
+      // saves again. See the follow-up save below.
+      const neededNoteCreation = !currentNoteId;
       const noteIdToUse = await ensureNoteId();
       const resource = await createMermaidResource(
         topicId,
@@ -353,6 +419,17 @@ export function NoteEditor({
       );
       setLocalResources((prev) => [...prev, resource]);
       insertResourceMarker(resource);
+      if (neededNoteCreation) {
+        // Without this, the diagram marker exists only in this browser
+        // tab's live editor state: refreshing the page reloads the note
+        // from the DB row ensureNoteId created (pre-insertion content),
+        // silently dropping the marker even though the diagram resource
+        // itself was saved fine and still shows up in Topic Resources.
+        const content = getMarkdown();
+        await saveTopicNote(topicId, content, "draft");
+        setLastSavedContent(content);
+        setIsDirty(false);
+      }
       emitToast("Diagram added to the note.");
       setDiagramPanelOpen(false);
       setDiagramTitle("");
@@ -384,6 +461,13 @@ export function NoteEditor({
     }
     if (accepted.length === 0) return;
 
+    // Same reasoning as handleSaveDiagram's neededNoteCreation: if
+    // ensureNoteId has to create the note, its own save call snapshots
+    // the editor *before* any of this function's insertResourceMarker
+    // calls run, so those markers only exist in this tab's live editor
+    // state until something saves again. Captured before the await so it
+    // reflects "did we have a note already" rather than the state after.
+    const neededNoteCreation = !currentNoteId;
     let noteIdToUse: string;
     try {
       noteIdToUse = await ensureNoteId();
@@ -395,6 +479,7 @@ export function NoteEditor({
 
     setUploadingCount(accepted.length);
     let failures = 0;
+    let insertedAny = false;
     for (const file of accepted) {
       const formData = new FormData();
       formData.set("file", file);
@@ -404,6 +489,7 @@ export function NoteEditor({
         if (resource) {
           setLocalResources((prev) => [...prev, resource]);
           insertResourceMarker(resource);
+          insertedAny = true;
         }
       } catch (err: unknown) {
         failures += 1;
@@ -412,6 +498,15 @@ export function NoteEditor({
       } finally {
         setUploadingCount((count) => Math.max(0, count - 1));
       }
+    }
+    if (neededNoteCreation && insertedAny) {
+      // One save for the whole batch, not one per file -- saveTopicNote
+      // is append-only (each call is a new version row), so saving per
+      // file here would flood version history for a multi-file drop.
+      const content = getMarkdown();
+      await saveTopicNote(topicId, content, "draft");
+      setLastSavedContent(content);
+      setIsDirty(false);
     }
     if (accepted.length - failures > 0) {
       emitToast(
@@ -815,6 +910,97 @@ export function NoteEditor({
           Table
         </button>
       </div>
+
+      {editor?.isActive("table") && (
+        <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-rule bg-marigold/10 p-1">
+          <span className="px-1 text-xs font-medium text-ink-soft">Table:</span>
+          <button
+            type="button"
+            title="Add row above"
+            onClick={() => editor.chain().focus().addRowBefore().run()}
+            className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white"
+          >
+            ↑ Row
+          </button>
+          <button
+            type="button"
+            title="Add row below"
+            onClick={() => editor.chain().focus().addRowAfter().run()}
+            className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white"
+          >
+            ↓ Row
+          </button>
+          <button
+            type="button"
+            title="Delete row"
+            onClick={() => editor.chain().focus().deleteRow().run()}
+            className="min-w-[2rem] rounded-md px-2 py-1 text-xs text-red-700 hover:bg-white"
+          >
+            Delete row
+          </button>
+          <span className="mx-1 h-4 w-px bg-rule" />
+          <button
+            type="button"
+            title="Add column left"
+            onClick={() => editor.chain().focus().addColumnBefore().run()}
+            className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white"
+          >
+            ← Col
+          </button>
+          <button
+            type="button"
+            title="Add column right"
+            onClick={() => editor.chain().focus().addColumnAfter().run()}
+            className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white"
+          >
+            → Col
+          </button>
+          <button
+            type="button"
+            title="Delete column"
+            onClick={() => editor.chain().focus().deleteColumn().run()}
+            className="min-w-[2rem] rounded-md px-2 py-1 text-xs text-red-700 hover:bg-white"
+          >
+            Delete col
+          </button>
+          <span className="mx-1 h-4 w-px bg-rule" />
+          <button
+            type="button"
+            title="Merge cells"
+            disabled={!editor.can().mergeCells()}
+            onClick={() => editor.chain().focus().mergeCells().run()}
+            className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white disabled:opacity-40"
+          >
+            Merge
+          </button>
+          <button
+            type="button"
+            title="Split cell"
+            disabled={!editor.can().splitCell()}
+            onClick={() => editor.chain().focus().splitCell().run()}
+            className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white disabled:opacity-40"
+          >
+            Split
+          </button>
+          <button
+            type="button"
+            title="Toggle header row"
+            onClick={() => editor.chain().focus().toggleHeaderRow().run()}
+            className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white"
+          >
+            Header row
+          </button>
+          <span className="mx-1 h-4 w-px bg-rule" />
+          <button
+            type="button"
+            title="Delete table"
+            onClick={() => editor.chain().focus().deleteTable().run()}
+            className="min-w-[2rem] rounded-md px-2 py-1 text-xs text-red-700 hover:bg-white"
+          >
+            Delete table
+          </button>
+        </div>
+      )}
 
       {editor && (
         <BubbleMenu editor={editor}>

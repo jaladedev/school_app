@@ -53,14 +53,16 @@ Currently have: Bold, Italic, Underline, Strikethrough, Heading, Bulleted/Number
 - ✅ Nested lists — already worked via StarterKit's `ListItem` sink/lift keymap, now also exposed explicitly
 - ✅ Indentation controls — explicit Indent/Outdent toolbar buttons (`sinkListItem`/`liftListItem`), work for both bullet/ordered lists and task lists
 
-## 4. Tables
+## 4. Tables — DONE
 
-Currently: inserts a static markdown snippet only.
+Currently: real visual table editing via `@tiptap/extension-table` (resizable), inserted via a toolbar button (2x2 with header row). A contextual "Table:" toolbar appears whenever the caret is inside a table (`editor.isActive("table")`).
 
-- Swap to `@tiptap/extension-table` for a real visual editor
-- Add/Delete rows, Add/Delete columns
-- Merge cells
-- Resize columns
+- ✅ Add/Delete rows (`addRowBefore`/`addRowAfter`/`deleteRow`)
+- ✅ Add/Delete columns (`addColumnBefore`/`addColumnAfter`/`deleteColumn`)
+- ✅ Merge/Split cells (`mergeCells`/`splitCell`, both disabled via `editor.can()` when the current selection doesn't support them rather than erroring)
+- ✅ Toggle header row
+- ✅ Delete table
+- ✅ Resize columns (already had this via `Table.configure({ resizable: true })`, just wasn't checked off)
 
 ## 5. Image Handling
 
@@ -269,9 +271,9 @@ Not present as a checked-off set.
 ## Suggested build order
 
 1. ~~#0 Core TipTap migration~~ — DONE (see status above; round-trip testing and the Mermaid NodeView are the two loose ends)
-2. #2/#3 toolbar + lists, #9 floating menu, #29 shortcuts (cheap wins, low remaining scope now that #0 landed)
-3. #6/#7 resource cards + drag-drop upload
-4. #4 tables, #5 images, #25 code blocks (official extensions, mostly config)
+2. ~~#2/#3 toolbar + lists, #9 floating menu, #29 shortcuts~~ — DONE
+3. ~~#6/#7 resource cards + drag-drop upload~~ — DONE
+4. ~~#4 tables~~ — DONE. #5 images, #25 code blocks still open (official extensions, mostly config)
 5. #8 slash commands, #17 callouts, #15 learning objectives (custom nodes, same pattern)
 6. #13 autosave, #12 resizable panes, #28 word stats
 7. #10 block-based editing (structural — do after the above stabilize)

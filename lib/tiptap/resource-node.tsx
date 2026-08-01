@@ -38,7 +38,16 @@ export const RESOURCE_TYPE_ICON: Record<TopicResource["resource_type"], string> 
   audio: "🎧",
 };
 
-const RESOURCE_MARKER_RE = /\[\[resource:([0-9a-fA-F-]{36})\]\]/;
+// Markers are `[[resource:UUID]]` by default, same as before. Images can
+// optionally carry a `#size-align` suffix -- e.g. `[[resource:UUID#full]]`
+// or `[[resource:UUID#small-right]]` -- added by the resize/alignment
+// controls below. The suffix is optional and ignored for non-image
+// resource types, so every marker written before this feature existed
+// still parses exactly as it did.
+const RESOURCE_MARKER_RE = /\[\[resource:([0-9a-fA-F-]{36})(?:#([a-z]+)(?:-([a-z]+))?)?\]\]/;
+
+export type ImageSize = "small" | "medium" | "full";
+export type ImageAlign = "left" | "center" | "right";
 
 export interface ResourceChipStorage {
   resources: TopicResource[];
@@ -107,6 +116,18 @@ function ResourceChipView({
   if (resource?.resource_type === "diagram_mermaid") {
     return (
       <MermaidNodeView
+        resource={resource}
+        deleteNode={deleteNode}
+        editor={editor}
+        getPos={getPos}
+      />
+    );
+  }
+
+  if (resource?.resource_type === "image") {
+    return (
+      <ImageNodeView
+        node={node}
         resource={resource}
         deleteNode={deleteNode}
         editor={editor}
@@ -304,6 +325,150 @@ function MermaidNodeView({
           </>
         )}
       </div>
+    </NodeViewWrapper>
+  );
+}
+
+function setResourceChipAttrs(
+  editor: any,
+  pos: number | undefined,
+  attrs: Partial<{ size: ImageSize; align: ImageAlign }>
+) {
+  if (pos === undefined) return;
+  const node = editor.state.doc.nodeAt(pos);
+  if (!node || node.type.name !== "resourceChip") return;
+  const tr = editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs });
+  editor.view.dispatch(tr);
+}
+
+const IMAGE_SIZES: { value: ImageSize; label: string }[] = [
+  { value: "small", label: "S" },
+  { value: "medium", label: "M" },
+  { value: "full", label: "Full" },
+];
+const IMAGE_ALIGNS: { value: ImageAlign; label: string }[] = [
+  { value: "left", label: "⇤" },
+  { value: "center", label: "↔" },
+  { value: "right", label: "⇥" },
+];
+
+// Images get their own inline rendering too (same reasoning as
+// MermaidNodeView above) instead of the generic click-to-preview pill --
+// that's the core of #5 on the to-do (an image dropped into a note
+// should be visible immediately, not hidden behind a click). Reuses
+// TopicResourceItem, the same component the published/student-facing
+// view (TopicContent.tsx) renders images with, so what a teacher sees
+// while editing is pixel-for-pixel what a student later sees reading it
+// -- including the size/align choice made here, since both this node's
+// markdown serializer and TopicContent's marker regex understand the
+// same `#size-align` suffix (see resourceMarkdownPlugin below and
+// components/TopicContent.tsx).
+function ImageNodeView({
+  node,
+  resource,
+  deleteNode,
+  editor,
+  getPos,
+}: {
+  node: any;
+  resource: TopicResource;
+  deleteNode: () => void;
+  editor: any;
+  getPos: () => number | undefined;
+}) {
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const size: ImageSize = node.attrs.size ?? "medium";
+  const align: ImageAlign = node.attrs.align ?? "left";
+
+  return (
+    <NodeViewWrapper
+      as="div"
+      className="group relative my-2"
+      onDragOver={(e: DragEvent) => {
+        if (e.dataTransfer.types.includes(RESOURCE_CHIP_DRAG_MIME)) e.preventDefault();
+      }}
+      onDrop={(e: DragEvent) => {
+        const raw = e.dataTransfer.getData(RESOURCE_CHIP_DRAG_MIME);
+        if (!raw) return;
+        e.preventDefault();
+        moveResourceChipSafe(editor, Number(raw), getPos());
+      }}
+    >
+      <div
+        contentEditable={false}
+        className="pointer-events-none absolute -top-3 left-0 right-0 z-10 flex items-center justify-between gap-2 opacity-0 transition-opacity group-hover:opacity-100"
+      >
+        <span
+          draggable
+          onDragStart={(e) => {
+            const pos = getPos();
+            if (pos === undefined) return;
+            e.dataTransfer.setData(RESOURCE_CHIP_DRAG_MIME, String(pos));
+            e.dataTransfer.effectAllowed = "move";
+          }}
+          title="Drag to reorder"
+          className="pointer-events-auto ml-1 inline-flex cursor-grab select-none items-center rounded-full border border-rule bg-white px-1.5 py-0.5 text-xs text-ink-soft shadow active:cursor-grabbing"
+        >
+          ⠿
+        </span>
+        <span className="pointer-events-auto flex items-center gap-1 rounded-full border border-rule bg-white px-1 py-0.5 text-xs shadow">
+          {IMAGE_SIZES.map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              title={`Size: ${s.value}`}
+              onClick={() => setResourceChipAttrs(editor, getPos(), { size: s.value })}
+              className={`rounded px-1.5 py-0.5 ${size === s.value ? "bg-marigold/40 font-semibold" : "hover:bg-paper"}`}
+            >
+              {s.label}
+            </button>
+          ))}
+          <span className="mx-0.5 h-3 w-px bg-rule" />
+          {IMAGE_ALIGNS.map((a) => (
+            <button
+              key={a.value}
+              type="button"
+              title={`Align: ${a.value}`}
+              onClick={() => setResourceChipAttrs(editor, getPos(), { align: a.value })}
+              className={`rounded px-1.5 py-0.5 ${align === a.value ? "bg-marigold/40 font-semibold" : "hover:bg-paper"}`}
+            >
+              {a.label}
+            </button>
+          ))}
+          {confirmingRemove ? (
+            <>
+              <span className="mx-0.5 h-3 w-px bg-rule" />
+              <button
+                type="button"
+                onClick={() => deleteNode()}
+                className="rounded px-1.5 py-0.5 font-medium text-clay hover:bg-clay/10"
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingRemove(false)}
+                className="rounded px-1.5 py-0.5 text-ink-soft hover:bg-paper"
+              >
+                ✕
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="mx-0.5 h-3 w-px bg-rule" />
+              <button
+                type="button"
+                title="Remove from note"
+                onClick={() => setConfirmingRemove(true)}
+                className="rounded px-1.5 py-0.5 text-clay hover:bg-clay/10"
+              >
+                🗑
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+      <TopicResourceItem resource={resource} size={size} align={align} />
     </NodeViewWrapper>
   );
 }
@@ -532,6 +697,8 @@ export const ResourceChip = Node.create({
   addAttributes() {
     return {
       id: { default: null },
+      size: { default: null },
+      align: { default: null },
     };
   },
 
@@ -539,13 +706,24 @@ export const ResourceChip = Node.create({
     return [
       {
         tag: "span[data-resource-id]",
-        getAttrs: (el) => ({ id: (el as HTMLElement).getAttribute("data-resource-id") }),
+        getAttrs: (el) => ({
+          id: (el as HTMLElement).getAttribute("data-resource-id"),
+          size: (el as HTMLElement).getAttribute("data-size") || null,
+          align: (el as HTMLElement).getAttribute("data-align") || null,
+        }),
       },
     ];
   },
 
   renderHTML({ node }) {
-    return ["span", mergeAttributes({ "data-resource-id": node.attrs.id })];
+    return [
+      "span",
+      mergeAttributes({
+        "data-resource-id": node.attrs.id,
+        ...(node.attrs.size ? { "data-size": node.attrs.size } : {}),
+        ...(node.attrs.align ? { "data-align": node.attrs.align } : {}),
+      }),
+    ];
   },
 
   addNodeView() {
@@ -588,15 +766,24 @@ export function resourceMarkdownPlugin(md: any) {
     if (!match || match.index !== 0) return false;
     if (!silent) {
       const token = state.push("resource_chip", "", 0);
-      token.attrs = [["id", match[1]]];
+      token.attrs = [
+        ["id", match[1]],
+        ["size", match[2] ?? ""],
+        ["align", match[3] ?? ""],
+      ];
     }
     state.pos += match[0].length;
     return true;
   });
 
   md.renderer.rules.resource_chip = (tokens: any[], idx: number) => {
-    const id = tokens[idx].attrs.find((a: string[]) => a[0] === "id")[1];
-    return `<span data-resource-id="${id}"></span>`;
+    const attrs = tokens[idx].attrs;
+    const id = attrs.find((a: string[]) => a[0] === "id")[1];
+    const size = attrs.find((a: string[]) => a[0] === "size")?.[1];
+    const align = attrs.find((a: string[]) => a[0] === "align")?.[1];
+    const sizeAttr = size ? ` data-size="${size}"` : "";
+    const alignAttr = align ? ` data-align="${align}"` : "";
+    return `<span data-resource-id="${id}"${sizeAttr}${alignAttr}></span>`;
   };
 }
 
@@ -612,7 +799,10 @@ ResourceChip.config.addStorage = function () {
     resources: [] as TopicResource[],
     markdown: {
       serialize(state: any, node: any) {
-        state.write(`[[resource:${node.attrs.id}]]`);
+        const suffix = node.attrs.size
+          ? `#${node.attrs.size}${node.attrs.align ? `-${node.attrs.align}` : ""}`
+          : "";
+        state.write(`[[resource:${node.attrs.id}${suffix}]]`);
       },
       parse: {
         setup(md: any) {
