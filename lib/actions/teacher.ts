@@ -572,7 +572,18 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
 
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath(`/dashboard/student/topics/${topicId}`);
-  return inserted;
+
+  // `inserted.file_url` is the private bucket's object path, not a
+  // fetchable URL -- fine for the DB row, but this return value gets
+  // dropped straight into NoteEditor's localResources and rendered
+  // immediately (ImageNodeView -> TopicResourceItem -> <img src=...>),
+  // so an unsigned path here shows as a broken image the instant the
+  // upload finishes. Sign it before handing it back, same as every
+  // read path (student topic page, id-card printing) already does.
+  const { data: signed } = await admin.storage
+    .from(TOPIC_RESOURCE_BUCKET)
+    .createSignedUrl(objectPath, 6 * 60 * 60);
+  return { ...inserted, file_url: signed?.signedUrl ?? inserted.file_url };
 }
 
 // A Mermaid diagram has no binary file to store — its "content" is the
@@ -764,6 +775,17 @@ export async function updateTopicResource(resourceId: string, formData: FormData
 
   revalidatePath(`/dashboard/teacher/notes/${existing.topic_id}`);
   revalidatePath(`/dashboard/student/topics/${existing.topic_id}`);
+
+  // Same reasoning as uploadTopicResource's return: this goes straight
+  // back into the client's live resource list and re-renders the node
+  // view immediately, so a replaced file needs a fetchable URL, not the
+  // raw private-bucket object path.
+  if (newObjectPath) {
+    const { data: signed } = await admin.storage
+      .from(TOPIC_RESOURCE_BUCKET)
+      .createSignedUrl(newObjectPath, 6 * 60 * 60);
+    return { ...resource, file_url: signed?.signedUrl ?? resource.file_url };
+  }
 
   return resource;
 }

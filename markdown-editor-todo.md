@@ -64,16 +64,25 @@ Currently: real visual table editing via `@tiptap/extension-table` (resizable), 
 - ✅ Delete table
 - ✅ Resize columns (already had this via `Table.configure({ resizable: true })`, just wasn't checked off)
 
-## 5. Image Handling
+## 5. Image Handling — DONE
 
-Not present today beyond separate file upload panel.
+Was: not present beyond a separate file upload panel. Now covered by #6/#7's drag-drop + resource-node work:
 
-- Drag-and-drop image upload into the editor
-- Paste images directly
-- Resize images
-- Image captions
-- Image alignment
-- Replace images
+- ✅ Drag-and-drop image upload into the editor (#7)
+- ✅ Paste images directly — clipboard `File`-bearing `image/*` items intercepted in `editorProps.handlePaste`, reuses the same `uploadDroppedFiles` path as drag-and-drop
+- ✅ Resize images — S/M/Full size control on hover (`ImageNodeView` in `resource-node.tsx`), stored as a `#size-align` suffix on the `[[resource:UUID#size-align]]` marker
+- ✅ Image captions — resource `title` doubles as the caption (shown as `alt`), same as everywhere else images render
+- ✅ Image alignment — left/center/right control alongside size, same node view
+- ✅ Replace images — "Edit" on the popover / hover controls calls `updateTopicResource` with a new file, same resource id so every marker pointing at it stays valid (see #6)
+
+**Bugs hit and fixed after initial ship:**
+
+- **Freshly uploaded images showed "Image couldn't be loaded" immediately.** `uploadTopicResource`/`updateTopicResource` returned the DB row's `file_url` as-is — the private bucket's raw object path, not a fetchable URL — straight into the client's live resource list, which renders it right away. Every _read_ path (student topic page, id-card printing) already signed the URL first; these two write actions didn't. Fixed by signing the URL before returning it. Turned out the teacher note page's initial server-side load wasn't signing at all either (unlike the student page) — fixed there too, so a page refresh doesn't re-break images that display fine after upload.
+- **A dropped-in image vanished from the note on refresh but still showed under "Topic resources."** `uploadDroppedFiles` only saved note content when `ensureNoteId` had to create a brand-new note — dropping a file into an _existing_ note inserted the marker into the live editor only, never persisted it. The underlying resource row was created fine (hence still visible in the sidebar list), just never referenced from saved note content.
+  - First fix attempt made it save unconditionally on every drop — overcorrected: since `saveTopicNote` is append-only, this created a new throwaway draft _version_ on every single image drop, which is what surfaced as an extra stray draft needing manual deletion.
+  - Correct fix: only auto-save when `ensureNoteId` bootstrapped a brand-new note (unavoidable — a resource needs a `note_id` to attach to). Dropping into an existing note now behaves exactly like typed text: the marker sits as an unsaved edit ("Unsaved changes" indicator already covers it) until the teacher clicks Save draft / Publish. Matches `handleSaveDiagram`'s existing (correct) behavior for Mermaid diagrams, which never had this bug.
+- **Hydration mismatch on every note-editor page load** (`NoteEditor` rendered `null` until the editor was ready, then swapped in the entire toolbar+content subtree in one commit — React's dev hydration check flagged the appearing subtree as a mismatch). Fixed by keeping one stable outer `<div>` present in both the loading and ready states (a pulse placeholder swapped for real content inside it), so only children change post-mount instead of the whole subtree appearing from nothing.
+- **Resource sidebar/list could go blank if signing one resource's URL failed** — the signing `Promise.all` in the note page had no per-item error handling, so one bad `createSignedUrl` call (stale key, deleted object) rejected the whole page's data fetch. Now each resource signs independently and falls back to its unsigned `file_url` on error instead of taking the rest of the list down with it.
 
 ## 6. Resource Improvements — DONE
 

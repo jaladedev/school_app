@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteTopicResource } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
@@ -18,6 +18,13 @@ const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
 export function TopicResourceList({ resources }: { resources: TopicResource[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  // Deleting here removes the resource everywhere it's referenced --
+  // including any note marker pointing at it, which falls back to "This
+  // resource was deleted elsewhere" -- not just from this list, so a
+  // stray click shouldn't be able to remove it unconfirmed. Same
+  // click-again-to-confirm pattern the in-editor resource node views
+  // already use, rather than a browser confirm() dialog.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   if (!resources.length) {
     return <p className="mt-3 text-sm text-ink-soft">No resources attached to this note yet.</p>;
@@ -31,6 +38,8 @@ export function TopicResourceList({ resources }: { resources: TopicResource[] })
         router.refresh();
       } catch (err: any) {
         emitToast(err.message ?? "Could not remove the resource.", "error");
+      } finally {
+        setConfirmingId(null);
       }
     });
   }
@@ -48,14 +57,36 @@ export function TopicResourceList({ resources }: { resources: TopicResource[] })
             </span>
             <span className="truncate text-ink">{resource.title ?? "Untitled"}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => handleDelete(resource.id)}
-            disabled={isPending}
-            className="shrink-0 text-sm font-medium text-clay hover:underline disabled:opacity-60"
-          >
-            Remove
-          </button>
+          {confirmingId === resource.id ? (
+            <span className="flex shrink-0 items-center gap-2">
+              <span className="text-xs text-clay">Remove?</span>
+              <button
+                type="button"
+                onClick={() => setConfirmingId(null)}
+                disabled={isPending}
+                className="text-xs text-ink-soft hover:underline disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(resource.id)}
+                disabled={isPending}
+                className="rounded bg-clay px-2 py-1 text-xs font-medium text-white hover:bg-clay/90 disabled:opacity-60"
+              >
+                {isPending ? "Removing…" : "Remove"}
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingId(resource.id)}
+              disabled={isPending}
+              className="shrink-0 text-sm font-medium text-clay hover:underline disabled:opacity-60"
+            >
+              Remove
+            </button>
+          )}
         </li>
       ))}
     </ul>

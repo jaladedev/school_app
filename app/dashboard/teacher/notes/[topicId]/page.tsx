@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NoteWorkspace } from "@/components/NoteWorkspace";
 import { TopicResourceUpload } from "@/components/TopicResourceUpload";
 import { TopicResourceList } from "@/components/TopicResourceList";
@@ -48,6 +49,37 @@ export default async function TeacherNoteEditPage({
         .eq("note_id", note.id)
         .order("sequence_order", { ascending: true })
     : { data: [] };
+
+  // `file_url` on the row is a private-bucket object path, not a
+  // fetchable URL -- same signing the student-facing topic page already
+  // does. Without this, every image/video/audio/PDF resource in the
+  // note editor renders as a broken-media placeholder on every load,
+  // not just right after upload.
+  //
+  // Each resource is signed independently and never throws out of this
+  // map -- an admin/storage error for one resource (bad bucket name,
+  // expired service role key, a since-deleted object) used to reject
+  // the whole Promise.all, which fails this entire Server Component
+  // and takes the rest of the page -- including the resource list that
+  // *doesn't* need signing -- down with it. Falling back to the
+  // resource's original (unsigned) file_url on error keeps that one
+  // item merely broken-looking, exactly like before this signing step
+  // existed, instead of blanking out every resource on the page.
+  const admin = createAdminClient();
+  const signedResources = await Promise.all(
+    (resources ?? []).map(async (resource) => {
+      if (!resource.file_url || resource.file_url.startsWith("http")) return resource;
+      try {
+        const { data: signed, error } = await admin.storage
+          .from("topic-resources")
+          .createSignedUrl(resource.file_url, 6 * 60 * 60);
+        if (error || !signed?.signedUrl) return resource;
+        return { ...resource, file_url: signed.signedUrl };
+      } catch {
+        return resource;
+      }
+    })
+  );
 
   // For the bell timer shown in Present mode — today's schedule for this
   // teacher, same query/shape the teacher dashboard already uses.
@@ -101,7 +133,7 @@ export default async function TeacherNoteEditPage({
         noteId={note?.id}
         initialContent={note?.content ?? ""}
         initialStatus={note?.status ?? "unwritten"}
-        resources={resources ?? []}
+        resources={signedResources}
         placeholder={`Write about "${topic?.title}" here. Use tables for summaries, and the ∑ button for math.`}
         todaysEntries={(todaysEntries ?? []).map((entry) => ({
           id: entry.id,
