@@ -22,7 +22,7 @@
  */
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
-import { useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { TopicResourceItem } from "@/components/TopicContent";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { updateMermaidResource, updateTopicResource } from "@/lib/actions/teacher";
@@ -492,6 +492,24 @@ function ResourceChipDefaultView({
   const [editTitle, setEditTitle] = useState(resource?.title ?? "");
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const wrapperRef = useRef<HTMLSpanElement | null>(null);
+
+  // Closes the popover on an outside click, matching the "Insert resource"
+  // dropdown's behavior. Previously this only closed via the toggle button
+  // or the explicit "Close" link, so a teacher clicking elsewhere in the
+  // note left it open indefinitely -- easy to miss with several resource
+  // chips in one note, each tracking its own open/close state.
+  useEffect(() => {
+    if (!previewOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as globalThis.Node)) {
+        closePopover();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewOpen]);
 
   function closePopover() {
     setPreviewOpen(false);
@@ -530,6 +548,7 @@ function ResourceChipDefaultView({
   return (
     <NodeViewWrapper
       as="span"
+      ref={wrapperRef}
       className="relative inline-flex items-center align-middle"
       onDragOver={(e: DragEvent) => {
         if (e.dataTransfer.types.includes(RESOURCE_CHIP_DRAG_MIME)) e.preventDefault();

@@ -5,7 +5,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import rehypeHighlight from "rehype-highlight";
 import "katex/dist/katex.min.css";
+import "highlight.js/styles/github-dark.css";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import type { ImageAlign, ImageSize } from "@/lib/tiptap/resource-node";
 import type { TopicResource } from "@/types/database";
@@ -119,7 +121,10 @@ export function TopicContent({
       {parts.map((part, i) =>
         part.type === "text" ? (
           <div className="topic-prose" key={i}>
-            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeKatex, rehypeHighlight]}
+            >
               {part.value}
             </ReactMarkdown>
           </div>

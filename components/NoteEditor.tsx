@@ -15,6 +15,8 @@ import { Color } from "@tiptap/extension-color";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
+import { CodeBlock } from "@/lib/tiptap/code-block";
+import "highlight.js/styles/github-dark.css";
 import {
   HighlightMarkdown,
   SubscriptMarkdown,
@@ -139,7 +141,13 @@ export function NoteEditor({
       // Link extension instance here duplicates it.
       StarterKit.configure({
         link: { openOnClick: false, autolink: true },
+        // Replaced by the lowlight-backed CodeBlock below (syntax
+        // highlighting + copy button + language selector) -- keeping
+        // StarterKit's plain version registered alongside it would
+        // double-register the "codeBlock" node name.
+        codeBlock: false,
       }),
+      CodeBlock,
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
@@ -923,6 +931,15 @@ export function NoteEditor({
               className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
             >
               ―
+            </button>
+            <span className="mx-1 h-4 w-px bg-rule" />
+            <button
+              type="button"
+              title="Code block"
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              className={`min-w-[2rem] rounded-md px-2 py-1 font-mono text-sm hover:bg-white ${editor.isActive("codeBlock") ? "bg-white" : ""}`}
+            >
+              {"</>"}
             </button>
             <span className="mx-1 h-4 w-px bg-rule" />
             <button

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github-dark.css";
 import { splitContentByMarkers, TopicResourceItem } from "@/components/TopicContent";
 import type { TopicResource } from "@/types/database";
 
@@ -216,7 +218,11 @@ export function NoteSlideView({
           >
             {parts.map((part, i) =>
               part.type === "text" ? (
-                <ReactMarkdown key={i} remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown
+                  key={i}
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHighlight]}
+                >
                   {part.value}
                 </ReactMarkdown>
               ) : (
@@ -233,7 +239,7 @@ export function NoteSlideView({
         <div className="topic-prose min-h-[20rem] flex-1 overflow-y-auto">
           {parts.map((part, i) =>
             part.type === "text" ? (
-              <ReactMarkdown key={i} remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
                 {part.value}
               </ReactMarkdown>
             ) : (

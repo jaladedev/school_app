@@ -189,6 +189,37 @@ h4 {
   padding: 0 0.1em;
 }
 
+/* Code blocks: matches the editor's CodeBlockLowlight node view
+   (lib/tiptap/code-block.tsx) 1:1 -- same background, radius, and
+   padding -- so a published note's code blocks look identical to what
+   the teacher saw while writing it, instead of falling back to the
+   browser's plain monospace-on-white default. rehype-highlight (wired
+   in TopicContent.tsx / NoteSlideView.tsx) adds the `hljs` + per-token
+   classes; the github-dark theme stylesheet imported alongside it
+   supplies the token colors, this block supplies the surrounding chrome. */
+.topic-prose pre {
+  background-color: #0d1117;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.topic-prose pre code.hljs {
+  background: transparent;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1.625;
+}
+/* Inline `code` (not inside a pre) keeps a lighter, in-line-with-text
+   treatment -- the dark card styling above is only for fenced blocks. */
+.topic-prose :not(pre) > code {
+  background-color: #f1f5f9;
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  font-size: 0.875em;
+}
+
 @media print {
   body {
     background: white;

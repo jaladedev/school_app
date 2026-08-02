@@ -208,11 +208,13 @@ Currently: audio files upload as a resource type already (voice notes, lessons, 
 
 - Mostly done — confirm playback UI is adequate, otherwise no major new work
 
-## 25. Code Blocks
+## 25. Code Blocks — DONE
 
-Not present. New build via `@tiptap/extension-code-block-lowlight`.
+Built via `@tiptap/extension-code-block-lowlight` (`lib/tiptap/code-block.tsx`), extended with a React node view: language selector (19 common languages via `lowlight`'s `common` bundle), Copy button with a brief "Copied!" confirmation, `github-dark` highlight.js theme. No custom markdown serializer needed — `CodeBlockLowlight` keeps the same `codeBlock` node name/attrs StarterKit's plain version used, and tiptap-markdown already serializes fenced blocks with a language info string by default.
 
-- Syntax highlighting, Copy button, Language selector
+Registered by disabling StarterKit's built-in `codeBlock: false` and adding the new extension alongside it (avoids double-registering the node name).
+
+**Published-view parity, done as a follow-up:** the published note (`TopicContent.tsx`) and Presentation Mode (`NoteSlideView.tsx`, both render paths) previously fell back to `react-markdown`'s unstyled default `<pre><code>` for fenced blocks — a teacher's code block looked different once published than it did while writing. Fixed by wiring `rehype-highlight` + the same `github-dark` theme into both, and adding matching `.topic-prose pre`/`code` CSS (same dark background/radius/padding as the editor's node view) in `globals.css` so editing, presenting, and the published/student view all render identically.
 
 ## 26. Search & Replace
 
@@ -282,8 +284,8 @@ Not present as a checked-off set.
 1. ~~#0 Core TipTap migration~~ — DONE (see status above; round-trip testing and the Mermaid NodeView are the two loose ends)
 2. ~~#2/#3 toolbar + lists, #9 floating menu, #29 shortcuts~~ — DONE
 3. ~~#6/#7 resource cards + drag-drop upload~~ — DONE
-4. ~~#4 tables~~ — DONE. #5 images, #25 code blocks still open (official extensions, mostly config)
-5. #8 slash commands, #17 callouts, #15 learning objectives (custom nodes, same pattern)
+4. ~~#4 tables~~ — DONE. ~~#5 images~~ — DONE. ~~#25 code blocks~~ — DONE (editor + published-view parity)
+5. #8 slash commands, #17 callouts, #15 learning objectives (custom nodes, same pattern) — NEXT
 6. #13 autosave, #12 resizable panes, #28 word stats
 7. #10 block-based editing (structural — do after the above stabilize)
 8. Everything else (#20–24, #26, #27, #30–37) — lower priority, mostly additive
