@@ -139,6 +139,21 @@ export function NoteEditor({
   const [uploadingCount, setUploadingCount] = useState(0);
   const dragDepthRef = useRef(0);
   const pickerRef = useRef<HTMLDivElement | null>(null);
+  const diagramSectionRef = useRef<HTMLDivElement | null>(null);
+
+  // Scroll these into view whenever they open -- both can be triggered by
+  // the slash command from anywhere in a long note, and without this the
+  // popover/panel opens near the toolbar while the user is still looking
+  // at their cursor further down, making it seem like nothing happened.
+  useEffect(() => {
+    if (pickerOpen) pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [pickerOpen]);
+
+  useEffect(() => {
+    if (diagramPanelOpen) {
+      diagramSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [diagramPanelOpen]);
 
   const [currentNoteId, setCurrentNoteId] = useState(noteId);
   useEffect(() => setCurrentNoteId(noteId), [noteId]);
@@ -740,7 +755,7 @@ export function NoteEditor({
           </div>
 
           {diagramPanelOpen && (
-            <section className="mb-4 rounded-xl border border-rule bg-white p-4">
+            <section ref={diagramSectionRef} className="mb-4 rounded-xl border border-rule bg-white p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-display text-sm font-semibold text-ink">
                   Generate Mermaid diagram

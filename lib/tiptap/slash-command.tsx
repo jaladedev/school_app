@@ -21,6 +21,7 @@ import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import { ReactRenderer } from "@tiptap/react";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { Editor, Range } from "@tiptap/core";
+import { clampPopoverToEditor } from "./popover-position";
 
 export type SlashCommandItem = {
   title: string;
@@ -228,7 +229,10 @@ const suggestionRender: SuggestionOptions<SlashCommandItem>["render"] = () => {
     null;
   let popupEl: HTMLDivElement | null = null;
 
-  function positionPopup(clientRect: (() => DOMRect | null) | null | undefined) {
+  function positionPopup(
+    clientRect: (() => DOMRect | null) | null | undefined,
+    editorEl: HTMLElement | null
+  ) {
     const rect = clientRect?.();
     if (!rect || !popupEl) return;
     // Fixed positioning off the caret's own rect (not a parent container)
@@ -236,6 +240,10 @@ const suggestionRender: SuggestionOptions<SlashCommandItem>["render"] = () => {
     // note the "/" was typed, including inside a table cell or callout.
     popupEl.style.left = `${rect.left}px`;
     popupEl.style.top = `${rect.bottom + 6}px`;
+    // Then pull it back inside the editor's own bounds -- typing "/" near
+    // a table's right edge would otherwise open the menu overlapping the
+    // sidebar instead of staying within the note.
+    clampPopoverToEditor(popupEl, editorEl);
   }
 
   return {
@@ -253,14 +261,14 @@ const suggestionRender: SuggestionOptions<SlashCommandItem>["render"] = () => {
       popupEl.style.zIndex = "50";
       popupEl.appendChild(component.element);
       document.body.appendChild(popupEl);
-      positionPopup(props.clientRect);
+      positionPopup(props.clientRect, props.editor.view.dom as HTMLElement);
     },
     onUpdate(props) {
       component?.updateProps({
         items: props.items,
         onPick: (item: SlashCommandItem) => props.command(item),
       });
-      positionPopup(props.clientRect);
+      positionPopup(props.clientRect, props.editor.view.dom as HTMLElement);
     },
     onKeyDown(props) {
       if (props.event.key === "Escape") {

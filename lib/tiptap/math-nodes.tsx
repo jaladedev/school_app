@@ -1,8 +1,9 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import katex from "katex";
 import { dragAwareStopEvent } from "./drag-utils";
+import { clampPopoverToEditor } from "./popover-position";
 
 function renderKatex(latex: string, displayMode: boolean) {
   try {
@@ -45,13 +46,28 @@ function makeMathView(displayMode: boolean) {
   return function MathView({
     node,
     updateAttributes,
+    editor,
   }: {
     node: any;
     updateAttributes: (attrs: any) => void;
+    editor: any;
   }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(node.attrs.latex ?? "");
     const inputRef = useRef<HTMLInputElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+
+    // Inline math's popup floats out of the text flow (absolute-positioned,
+    // see comment below), which means it can render past the editor's own
+    // right/bottom edge -- e.g. an equation near a table's right edge would
+    // otherwise overlap the sidebar instead of staying inside the note.
+    // Re-clamp on every keystroke since the popup's width/height changes as
+    // the LaTeX preview grows or shrinks.
+    useLayoutEffect(() => {
+      if (editing && !displayMode && popupRef.current) {
+        clampPopoverToEditor(popupRef.current, editor?.view?.dom ?? null);
+      }
+    }, [editing, draft, editor]);
     // Only block-level math ($$...$$) gets a drag handle -- same
     // reasoning as Section/Callout/ResourceChip (native PM node
     // dragging via `draggable: true` + arm-on-mousedown, reset on
@@ -110,6 +126,7 @@ function makeMathView(displayMode: boolean) {
             </span>
           )}
           <div
+            ref={popupRef}
             className={
               displayMode
                 ? "rounded-md border border-marigold bg-white p-2 shadow-sm"
@@ -169,13 +186,26 @@ function makeMathView(displayMode: boolean) {
     }
 
     if (!displayMode) {
+      const isEmpty = !node.attrs.latex?.trim();
+      if (isEmpty) {
+        return (
+          <NodeViewWrapper
+            as="span"
+            className="cursor-pointer rounded bg-marigold/20 px-1 font-mono text-sm text-ink-soft hover:bg-marigold/30"
+            onClick={() => setEditing(true)}
+            contentEditable={false}
+          >
+            $…$
+          </NodeViewWrapper>
+        );
+      }
       return (
         <NodeViewWrapper
           as="span"
           className="cursor-pointer rounded px-0.5 hover:bg-paper"
           onClick={() => setEditing(true)}
           contentEditable={false}
-          dangerouslySetInnerHTML={{ __html: renderKatex(node.attrs.latex || "\\,", displayMode) }}
+          dangerouslySetInnerHTML={{ __html: renderKatex(node.attrs.latex, displayMode) }}
         />
       );
     }
@@ -197,12 +227,22 @@ function makeMathView(displayMode: boolean) {
         >
           ⠿
         </button>
-        <div
-          onClick={() => setEditing(true)}
-          contentEditable={false}
-          className="cursor-pointer"
-          dangerouslySetInnerHTML={{ __html: renderKatex(node.attrs.latex || "\\,", displayMode) }}
-        />
+        {node.attrs.latex?.trim() ? (
+          <div
+            onClick={() => setEditing(true)}
+            contentEditable={false}
+            className="cursor-pointer"
+            dangerouslySetInnerHTML={{ __html: renderKatex(node.attrs.latex, displayMode) }}
+          />
+        ) : (
+          <div
+            onClick={() => setEditing(true)}
+            contentEditable={false}
+            className="cursor-pointer rounded bg-marigold/20 px-2 py-1 font-mono text-sm text-ink-soft"
+          >
+            $$…$$
+          </div>
+        )}
       </NodeViewWrapper>
     );
   };
