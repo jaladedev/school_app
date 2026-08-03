@@ -6,6 +6,7 @@ import { TopicResourceUpload } from "@/components/TopicResourceUpload";
 import { TopicResourceList } from "@/components/TopicResourceList";
 import { NoteVersionDiff } from "@/components/NoteVersionDiff";
 import { RestoreVersionButton } from "@/components/RestoreVersionButton";
+import { DeleteVersionButton } from "@/components/DeleteVersionButton";
 import { formatLevel } from "@/types/database";
 
 export default async function TeacherNoteEditPage({
@@ -183,6 +184,12 @@ export default async function TeacherNoteEditPage({
                     versionNoteId={version.id}
                     versionNumber={version.version}
                     isLatest={i === 0}
+                  />
+                  <DeleteVersionButton
+                    topicId={resolvedParams.topicId}
+                    versionNoteId={version.id}
+                    versionNumber={version.version}
+                    disabled={versions.length <= 1}
                   />
                 </div>
               </div>

@@ -616,6 +616,128 @@ export async function restoreTopicNoteVersion(topicId: string, versionNoteId: st
   return restored;
 }
 
+/**
+ * Deletes a single version from a note's history. Guardrails beyond RLS
+ * (which is scoped the same as edit access -- author, admin, or a
+ * teacher on that subject):
+ *
+ * 1. Refuses to delete the last remaining version -- a note's history
+ *    can shrink, but it can never go to zero rows out from under
+ *    whatever page is currently rendering "the note".
+ * 2. Resources (`topic_resources.note_id`) attached to the version being
+ *    deleted: `note_id` only records which version a resource was
+ *    uploaded *under*, not every version whose content still references
+ *    it (a save carries forward whatever `[[resource:UUID]]` markers
+ *    were already in the content). Each attached resource is checked
+ *    against every surviving version's content -- if still referenced
+ *    elsewhere, it's reassigned to that version instead of deleted;
+ *    only truly-unreferenced resources are hard-deleted (storage
+ *    object + row). This applies the same way whether the version
+ *    being deleted is the current one or an older one -- deleting the
+ *    current version is allowed and simply falls back to whatever is
+ *    now the highest remaining `version` number, same as if that
+ *    version had never been saved.
+ */
+export async function deleteTopicNoteVersion(topicId: string, versionNoteId: string) {
+  await assertRole(["teacher", "admin"], "Only teaching staff can manage lesson plan versions.");
+  const supabase = createClient();
+
+  const { data: target, error: targetError } = await supabase
+    .from("topic_notes")
+    .select("topic_id")
+    .eq("id", versionNoteId)
+    .single();
+
+  if (targetError || !target) {
+    throw new Error(
+      "That version isn't available (it may have already been removed, or you don't have access to it)."
+    );
+  }
+  if (target.topic_id !== topicId) {
+    throw new Error("That version doesn't belong to this topic.");
+  }
+
+  const { data: allVersions } = await supabase
+    .from("topic_notes")
+    .select("id, version")
+    .eq("topic_id", topicId)
+    .order("version", { ascending: false });
+
+  if ((allVersions?.length ?? 0) <= 1) {
+    throw new Error("Can't delete the only version of this note.");
+  }
+
+  const { data: attachedResources } = await supabase
+    .from("topic_resources")
+    .select("id, file_url")
+    .eq("note_id", versionNoteId);
+
+  if (attachedResources && attachedResources.length > 0) {    // `note_id` on a resource records whichever version was *current at
+    // upload time* and is never updated afterward -- it does NOT track
+    // every version whose content actually renders that resource. A
+    // save carries the editor's full content (including any
+    // `[[resource:UUID]]` markers already in it) forward into a brand
+    // new version row, so the same resource can still be referenced by
+    // the *current* version's content, or any other surviving version's
+    // content, even though `note_id` points here. Hard-deleting by
+    // `note_id` alone would silently break that other version's
+    // rendering (a marker with no backing row) the next time anyone
+    // views or restores it.
+    //
+    // So: only hard-delete a resource if its UUID marker doesn't appear
+    // in any version that will still exist after this delete. If it
+    // does still appear somewhere, reassign `note_id` to one of those
+    // surviving versions instead (the newest one that references it) --
+    // that keeps the FK satisfied and the resource reachable from
+    // wherever it's actually still in use, rather than losing it.
+    const { data: survivingVersions } = await supabase
+      .from("topic_notes")
+      .select("id, version, content")
+      .eq("topic_id", topicId)
+      .neq("id", versionNoteId)
+      .order("version", { ascending: false });
+
+    const admin = createAdminClient();
+    const toHardDelete: typeof attachedResources = [];
+
+    for (const resource of attachedResources) {
+      const marker = `[[resource:${resource.id}`;
+      const stillReferencedIn = survivingVersions?.find((v) => v.content?.includes(marker));
+
+      if (stillReferencedIn) {
+        const { error: reassignError } = await admin
+          .from("topic_resources")
+          .update({ note_id: stillReferencedIn.id })
+          .eq("id", resource.id);
+        if (reassignError) throw new Error(reassignError.message);
+      } else {
+        toHardDelete.push(resource);
+      }
+    }
+
+    if (toHardDelete.length > 0) {
+      const filePaths = toHardDelete.map((r) => r.file_url).filter((p): p is string => !!p);
+      if (filePaths.length) {
+        await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove(filePaths);
+      }
+      const { error: cleanupError } = await admin
+        .from("topic_resources")
+        .delete()
+        .in(
+          "id",
+          toHardDelete.map((r) => r.id)
+        );
+      if (cleanupError) throw new Error(cleanupError.message);
+    }
+  }
+
+  const { error } = await supabase.from("topic_notes").delete().eq("id", versionNoteId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/teacher/notes/${topicId}`);
+  revalidatePath("/dashboard/teacher/notes");
+}
+
 const TOPIC_RESOURCE_BUCKET = "topic-resources";
 const MAX_TOPIC_RESOURCE_BYTES = 20 * 1024 * 1024;
 const RESOURCE_TYPES = new Map<string, Extract<ResourceType, "image" | "pdf" | "audio" | "video">>([
