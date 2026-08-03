@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import katex from "katex";
 import { dragAwareStopEvent } from "./drag-utils";
 
@@ -12,6 +12,35 @@ function renderKatex(latex: string, displayMode: boolean) {
   }
 }
 
+// Quick-insert buttons shown above the LaTeX input while editing a math
+// node. `insert` is the literal snippet spliced in at the cursor;
+// `caret` is how far from the start of that snippet the cursor should
+// land afterward -- for templates like `\frac{}{}` that's *inside* the
+// first pair of braces (so the next keystroke fills the numerator, not
+// the empty space after the whole snippet), for bare symbols like
+// `\pi` it's just the snippet's full length (cursor right after it).
+const MATH_SYMBOLS: { label: string; insert: string; caret: number; title: string }[] = [
+  { label: "x²", insert: "^{}", caret: 2, title: "Superscript" },
+  { label: "x₂", insert: "_{}", caret: 2, title: "Subscript" },
+  { label: "√", insert: "\\sqrt{}", caret: 6, title: "Square root" },
+  { label: "a/b", insert: "\\frac{}{}", caret: 6, title: "Fraction" },
+  { label: "∑", insert: "\\sum_{}^{}", caret: 6, title: "Summation" },
+  { label: "∫", insert: "\\int_{}^{}", caret: 6, title: "Integral" },
+  { label: "π", insert: "\\pi", caret: 3, title: "Pi" },
+  { label: "θ", insert: "\\theta", caret: 6, title: "Theta" },
+  { label: "α", insert: "\\alpha", caret: 6, title: "Alpha" },
+  { label: "β", insert: "\\beta", caret: 5, title: "Beta" },
+  { label: "Δ", insert: "\\Delta", caret: 6, title: "Delta" },
+  { label: "∞", insert: "\\infty", caret: 6, title: "Infinity" },
+  { label: "±", insert: "\\pm", caret: 3, title: "Plus-minus" },
+  { label: "×", insert: "\\times", caret: 6, title: "Times" },
+  { label: "÷", insert: "\\div", caret: 4, title: "Divide" },
+  { label: "≤", insert: "\\leq", caret: 4, title: "Less than or equal" },
+  { label: "≥", insert: "\\geq", caret: 4, title: "Greater than or equal" },
+  { label: "≠", insert: "\\neq", caret: 4, title: "Not equal" },
+  { label: "≈", insert: "\\approx", caret: 7, title: "Approximately" },
+];
+
 function makeMathView(displayMode: boolean) {
   return function MathView({
     node,
@@ -22,6 +51,7 @@ function makeMathView(displayMode: boolean) {
   }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(node.attrs.latex ?? "");
+    const inputRef = useRef<HTMLInputElement>(null);
     // Only block-level math ($$...$$) gets a drag handle -- same
     // reasoning as Section/Callout/ResourceChip (native PM node
     // dragging via `draggable: true` + arm-on-mousedown, reset on
@@ -31,31 +61,77 @@ function makeMathView(displayMode: boolean) {
     // is for a whole equation block, so it's left out.
     const [dragArmed, setDragArmed] = useState(false);
 
+    // Splices a symbol snippet in at the input's current cursor/selection
+    // (replacing any selected text), then re-lands the cursor inside the
+    // snippet per that symbol's `caret` offset. Runs the reposition on
+    // the next frame because `setDraft` re-renders the input with new
+    // text first -- setting selectionRange before that commit would be
+    // clobbered by React re-applying the (still-stale-looking) value.
+    function insertSymbol(insert: string, caret: number) {
+      const el = inputRef.current;
+      const start = el?.selectionStart ?? draft.length;
+      const end = el?.selectionEnd ?? draft.length;
+      const next = draft.slice(0, start) + insert + draft.slice(end);
+      setDraft(next);
+      const cursor = start + caret;
+      requestAnimationFrame(() => {
+        el?.focus();
+        el?.setSelectionRange(cursor, cursor);
+      });
+    }
+
     if (editing) {
       return (
-        <NodeViewWrapper as={displayMode ? "div" : "span"}>
-          <input
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={() => {
-              updateAttributes({ latex: draft });
-              setEditing(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
+        <NodeViewWrapper as={displayMode ? "div" : "span"} className="inline-block align-middle">
+          <div className="rounded-md border border-marigold bg-white p-2 shadow-sm">
+            <div className="mb-1.5 flex flex-wrap gap-0.5" contentEditable={false}>
+              {MATH_SYMBOLS.map((sym) => (
+                <button
+                  key={sym.label}
+                  type="button"
+                  title={sym.title}
+                  // Keep focus on the input instead of the button -- a
+                  // normal click blurs the input first, which would
+                  // fire the input's onBlur and close editing before
+                  // the click handler ever ran.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => insertSymbol(sym.insert, sym.caret)}
+                  className="min-w-[1.75rem] rounded px-1 py-0.5 font-serif text-sm text-ink hover:bg-paper"
+                >
+                  {sym.label}
+                </button>
+              ))}
+            </div>
+            <input
+              ref={inputRef}
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => {
                 updateAttributes({ latex: draft });
                 setEditing(false);
-              }
-              if (e.key === "Escape") {
-                setDraft(node.attrs.latex ?? "");
-                setEditing(false);
-              }
-            }}
-            className="rounded border border-marigold px-2 py-1 font-mono text-sm outline-none"
-            placeholder={displayMode ? "\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}" : "x^2 + 3x - 4 = 0"}
-          />
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  updateAttributes({ latex: draft });
+                  setEditing(false);
+                }
+                if (e.key === "Escape") {
+                  setDraft(node.attrs.latex ?? "");
+                  setEditing(false);
+                }
+              }}
+              className="w-full min-w-[16rem] rounded border border-rule px-2 py-1 font-mono text-sm outline-none focus:border-marigold"
+              placeholder={displayMode ? "\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}" : "x^2 + 3x - 4 = 0"}
+            />
+            {draft.trim() && (
+              <div
+                className="mt-1.5 border-t border-rule pt-1.5 text-sm"
+                dangerouslySetInnerHTML={{ __html: renderKatex(draft, displayMode) }}
+              />
+            )}
+          </div>
         </NodeViewWrapper>
       );
     }
@@ -79,16 +155,16 @@ function makeMathView(displayMode: boolean) {
         draggable={dragArmed}
         onDragEnd={() => setDragArmed(false)}
       >
-        <span
+        <button
+          type="button"
           onMouseDown={() => setDragArmed(true)}
           onMouseUp={() => setDragArmed(false)}
           title="Drag to reorder"
           data-drag-handle
-          contentEditable={false}
-          className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
+          className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab select-none items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
         >
           ⠿
-        </span>
+        </button>
         <div
           onClick={() => setEditing(true)}
           contentEditable={false}
@@ -113,7 +189,19 @@ function defineMathNode(name: "mathInline" | "mathBlock", displayMode: boolean) 
     },
 
     parseHTML() {
-      return [{ tag: `${displayMode ? "div" : "span"}[data-math="${name}"]` }];
+      // The rendered markdown puts the LaTeX source as the element's
+      // *text content* (`<span data-math="mathInline">x^2+1</span>`),
+      // not as an attribute -- without this `getAttrs`, ProseMirror
+      // matches the tag but has no rule telling it where `latex` comes
+      // from, so it silently falls back to the attribute's default
+      // (""), and every equation loaded from saved markdown renders as
+      // a blank placeholder instead of the real formula.
+      return [
+        {
+          tag: `${displayMode ? "div" : "span"}[data-math="${name}"]`,
+          getAttrs: (el) => ({ latex: (el as HTMLElement).textContent ?? "" }),
+        },
+      ];
     },
 
     renderHTML({ node }) {

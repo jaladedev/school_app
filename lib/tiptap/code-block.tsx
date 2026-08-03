@@ -92,15 +92,16 @@ function CodeBlockView({
         className="flex items-center justify-between border-b border-white/10 bg-white/5 px-3 py-1.5"
       >
         <span className="flex items-center gap-1.5">
-          <span
+          <button
+            type="button"
             onMouseDown={() => setDragArmed(true)}
             onMouseUp={() => setDragArmed(false)}
             title="Drag to reorder"
             data-drag-handle
-            className="cursor-grab rounded px-0.5 text-sm text-white/50 hover:text-white/80 active:cursor-grabbing"
+            className="cursor-grab select-none rounded px-0.5 text-sm text-white/50 hover:text-white/80 active:cursor-grabbing"
           >
             ⠿
-          </span>
+          </button>
           <select
             value={language}
             onChange={(e) => updateAttributes({ language: e.target.value })}

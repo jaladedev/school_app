@@ -120,15 +120,16 @@ function CalloutView({
       onDragEnd={() => setDragArmed(false)}
     >
       <div contentEditable={false} className="mb-1 flex items-center gap-1.5">
-        <span
+        <button
+          type="button"
           onMouseDown={() => setDragArmed(true)}
           onMouseUp={() => setDragArmed(false)}
           title="Drag to reorder"
           data-drag-handle
-          className="cursor-grab rounded px-0.5 text-sm text-ink-soft/60 hover:text-ink-soft active:cursor-grabbing"
+          className="cursor-grab select-none rounded px-0.5 text-sm text-ink-soft/60 hover:text-ink-soft active:cursor-grabbing"
         >
           ⠿
-        </span>
+        </button>
         <span aria-hidden>{config.icon}</span>
         <select
           value={calloutType}
