@@ -79,10 +79,7 @@ const ALL_ITEMS: SlashCommandItem[] = [
         .deleteRange(range)
         .insertContent({
           type: "section",
-          content: [
-            { type: "heading", attrs: { level: 2 } },
-            { type: "paragraph" },
-          ],
+          content: [{ type: "heading", attrs: { level: 2 } }, { type: "paragraph" }],
         })
         .run(),
   },
@@ -148,8 +145,7 @@ const ALL_ITEMS: SlashCommandItem[] = [
   {
     title: "Divider",
     icon: "—",
-    run: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
+    run: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
   },
 ];
 
@@ -157,8 +153,7 @@ function getItems({ query }: { query: string }): SlashCommandItem[] {
   if (!query) return ALL_ITEMS;
   const q = query.toLowerCase();
   return ALL_ITEMS.filter(
-    (item) =>
-      item.title.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q)
+    (item) => item.title.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q)
   );
 }
 

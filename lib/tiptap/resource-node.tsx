@@ -22,7 +22,7 @@
  */
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TopicResourceItem } from "@/components/TopicContent";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { updateMermaidResource, updateTopicResource } from "@/lib/actions/teacher";
@@ -66,37 +66,32 @@ declare module "@tiptap/core" {
   }
 }
 
-// Drag-to-reorder (#6 of the to-do): resourceChip is a zero-content atom
-// node, so "moving" one is just delete-at-source + insert-at-target in a
-// single transaction, not a content merge. Shared by both NodeViews below
-// since both the icon-chip and the inline Mermaid rendering are the same
-// underlying node type and can be reordered the same way.
-function moveResourceChip(editor: any, sourcePos: number, targetPos: number) {
-  const { state } = editor;
-  const node = state.doc.nodeAt(sourcePos);
-  if (!node || node.type.name !== "resourceChip") return;
-  if (sourcePos === targetPos) return;
-
-  let tr = state.tr.delete(sourcePos, sourcePos + node.nodeSize);
-  // Deleting before the target shifts every position after it back by
-  // the deleted node's size, so the insert point needs the same
-  // adjustment when the drag moved the node forward in the doc.
-  const insertPos = sourcePos < targetPos ? targetPos - node.nodeSize : targetPos;
-  tr = tr.insert(insertPos, node.type.create(node.attrs));
-  editor.view.dispatch(tr);
-}
-
-// getPos() is typed as `() => number | undefined` by TipTap's NodeView
-// props (it's undefined if the node has been removed from the doc by the
-// time it's called) -- this wrapper is the one place that check lives,
-// so the drag handlers below can stay focused on the drag logic instead
-// of repeating an `if (pos === undefined) return` in each of them.
-function moveResourceChipSafe(editor: any, sourcePos: number, targetPos: number | undefined) {
-  if (targetPos === undefined) return;
-  moveResourceChip(editor, sourcePos, targetPos);
-}
-
-const RESOURCE_CHIP_DRAG_MIME = "application/x-resource-chip-pos";
+// Drag-to-reorder (#6 of the to-do) used to be a custom, resourceChip-
+// specific system: a bespoke `RESOURCE_CHIP_DRAG_MIME` dataTransfer type,
+// with matching onDragStart/onDragOver/onDrop pairs hand-wired onto every
+// chip NodeView, and `moveResourceChip` doing the delete-at-source +
+// insert-at-target math by hand. It worked reliably in isolation --
+// tests/resource-chip-reorder.test.ts still passes, since that math was
+// never wrong -- but it only worked as a drop target when dropped
+// directly onto *another* resource chip, because that pairing was the
+// only place the matching onDragOver/onDrop existed. Once Section (#10)
+// started occupying most of the document with its own, unrelated native
+// `draggable: true` node dragging, that became a real dead zone: dragging
+// a resource chip toward/into a section, or a section past a resource
+// a real dead zone: dragging a resource chip toward/into a section, or a
+// section past a resource chip, had no shared drop-target logic between
+// the two systems, so nothing happened.
+//
+// Fixed by dropping the custom system entirely and using the exact same
+// mechanism Section already uses -- ProseMirror's own native node
+// dragging (`draggable: true` on the node spec + arming native HTML5
+// drag only while the handle is held, the same `dragArmed` pattern seen
+// in section-node.tsx). Native PM dragging computes valid drop positions
+// anywhere in the document on its own, so it needs no per-node-type
+// onDragOver/onDrop pairing at all -- and because Section, ResourceChip,
+// and Callout (see callout-node.tsx) all now go through that one
+// mechanism, dragging any of them near/into/past any of the others just
+// works, with no cross-system gaps.
 
 function ResourceChipView({
   node,
@@ -171,6 +166,11 @@ function MermaidNodeView({
   const [title, setTitle] = useState(resource.title ?? "");
   const [code, setCode] = useState(resource.content ?? "");
   const [isSaving, setIsSaving] = useState(false);
+  // Armed only while the drag handle is held down -- keeps native HTML5
+  // drag scoped to the handle instead of the whole node (clicking a
+  // button or selecting the diagram title must not start a drag). Same
+  // pattern as section-node.tsx's SectionView.
+  const [dragArmed, setDragArmed] = useState(false);
 
   function startEditing() {
     setTitle(resource.title ?? "");
@@ -260,25 +260,13 @@ function MermaidNodeView({
       as="div"
       className="group relative my-3"
       contentEditable={false}
-      onDragOver={(e: DragEvent) => {
-        if (e.dataTransfer.types.includes(RESOURCE_CHIP_DRAG_MIME)) e.preventDefault();
-      }}
-      onDrop={(e: DragEvent) => {
-        const raw = e.dataTransfer.getData(RESOURCE_CHIP_DRAG_MIME);
-        if (!raw) return;
-        e.preventDefault();
-        moveResourceChipSafe(editor, Number(raw), getPos());
-      }}
+      draggable={dragArmed}
+      onDragEnd={() => setDragArmed(false)}
     >
       <div
-        draggable
-        onDragStart={(e) => {
-          const pos = getPos();
-          if (pos === undefined) return;
-          e.dataTransfer.setData(RESOURCE_CHIP_DRAG_MIME, String(pos));
-          e.dataTransfer.effectAllowed = "move";
-        }}
+        onMouseDown={() => setDragArmed(true)}
         title="Drag to reorder"
+        data-drag-handle
         className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
       >
         ⠿
@@ -377,6 +365,7 @@ function ImageNodeView({
   getPos: () => number | undefined;
 }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [dragArmed, setDragArmed] = useState(false);
   const size: ImageSize = node.attrs.size ?? "medium";
   const align: ImageAlign = node.attrs.align ?? "left";
 
@@ -384,29 +373,18 @@ function ImageNodeView({
     <NodeViewWrapper
       as="div"
       className="group relative my-2"
-      onDragOver={(e: DragEvent) => {
-        if (e.dataTransfer.types.includes(RESOURCE_CHIP_DRAG_MIME)) e.preventDefault();
-      }}
-      onDrop={(e: DragEvent) => {
-        const raw = e.dataTransfer.getData(RESOURCE_CHIP_DRAG_MIME);
-        if (!raw) return;
-        e.preventDefault();
-        moveResourceChipSafe(editor, Number(raw), getPos());
-      }}
+      contentEditable={false}
+      draggable={dragArmed}
+      onDragEnd={() => setDragArmed(false)}
     >
       <div
         contentEditable={false}
         className="pointer-events-none absolute -top-3 left-0 right-0 z-10 flex items-center justify-between gap-2 opacity-0 transition-opacity group-hover:opacity-100"
       >
         <span
-          draggable
-          onDragStart={(e) => {
-            const pos = getPos();
-            if (pos === undefined) return;
-            e.dataTransfer.setData(RESOURCE_CHIP_DRAG_MIME, String(pos));
-            e.dataTransfer.effectAllowed = "move";
-          }}
+          onMouseDown={() => setDragArmed(true)}
           title="Drag to reorder"
+          data-drag-handle
           className="pointer-events-auto ml-1 inline-flex cursor-grab select-none items-center rounded-full border border-rule bg-white px-1.5 py-0.5 text-xs text-ink-soft shadow active:cursor-grabbing"
         >
           ⠿
@@ -492,6 +470,7 @@ function ResourceChipDefaultView({
   const [editTitle, setEditTitle] = useState(resource?.title ?? "");
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [dragArmed, setDragArmed] = useState(false);
   const wrapperRef = useRef<HTMLSpanElement | null>(null);
 
   // Closes the popover on an outside click, matching the "Insert resource"
@@ -550,26 +529,15 @@ function ResourceChipDefaultView({
       as="span"
       ref={wrapperRef}
       className="relative inline-flex items-center align-middle"
-      onDragOver={(e: DragEvent) => {
-        if (e.dataTransfer.types.includes(RESOURCE_CHIP_DRAG_MIME)) e.preventDefault();
-      }}
-      onDrop={(e: DragEvent) => {
-        const raw = e.dataTransfer.getData(RESOURCE_CHIP_DRAG_MIME);
-        if (!raw) return;
-        e.preventDefault();
-        moveResourceChipSafe(editor, Number(raw), getPos());
-      }}
+      contentEditable={false}
+      draggable={dragArmed}
+      onDragEnd={() => setDragArmed(false)}
     >
       <span
-        draggable
-        onDragStart={(e) => {
-          const pos = getPos();
-          if (pos === undefined) return;
-          e.dataTransfer.setData(RESOURCE_CHIP_DRAG_MIME, String(pos));
-          e.dataTransfer.effectAllowed = "move";
-        }}
+        onMouseDown={() => setDragArmed(true)}
         contentEditable={false}
         title="Drag to reorder"
+        data-drag-handle
         className="mr-0.5 inline-flex cursor-grab select-none items-center text-xs text-ink-soft/60 hover:text-ink-soft active:cursor-grabbing"
       >
         ⠿
@@ -712,6 +680,7 @@ export const ResourceChip = Node.create({
   group: "inline",
   inline: true,
   atom: true,
+  draggable: true,
 
   addAttributes() {
     return {
@@ -755,8 +724,24 @@ export const ResourceChip = Node.create({
     // wrapper. Returning true from stopEvent for anything originating
     // inside this node view tells ProseMirror to leave the DOM event
     // alone entirely and let React handle it instead.
+    //
+    // BUT: this can't be a blanket `() => true`. ProseMirror's native
+    // node dragging (the same mechanism Section/Callout rely on, added
+    // once ResourceChip got `draggable: true` -- see the big comment
+    // above ResourceChipView) works by listening for drag/drop-family
+    // events bubbling up through the view's DOM and reacting to them
+    // itself. `stopEvent() === true` tells PM "this NodeView already
+    // handled it, don't run your own logic" for whatever event just
+    // fired -- which, for a blanket `true`, includes dragstart/
+    // dragover/drop. That silently disabled the exact machinery that
+    // performs the move: the chip visibly "dragged" (native HTML5 drag
+    // affordances worked, TipTap's own onDragStart still fired via
+    // React's synthetic events, which are unrelated to PM's stopEvent),
+    // but the actual position never changed on drop, because PM's own
+    // drag handling for this node's events was being told to stand down
+    // by this override before it ever got the chance to run.
     return ReactNodeViewRenderer(ResourceChipView, {
-      stopEvent: () => true,
+      stopEvent: ({ event }) => !event.type.startsWith("drag") && event.type !== "drop",
     });
   },
 

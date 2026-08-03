@@ -1,12 +1,6 @@
 // @vitest-environment jsdom
 //
-// #34 (Drag-and-Drop Reordering) check: resource/image chip reordering
-// already existed independently of #10 (it was built under #6, see the
-// "Drag-to-reorder (#6 of the to-do)" comment in resource-node.tsx) --
-// it doesn't depend on sections at all, since it operates on raw
-// ProseMirror positions. This test exercises the actual move logic
-// (delete-at-source + insert-at-target) the drag handlers call, in both
-// directions, to confirm the position-shift math is correct.
+//
 import { describe, it, expect } from "vitest";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
@@ -21,20 +15,18 @@ function chipPositions(editor: Editor) {
   return positions;
 }
 
-// Mirrors moveResourceChip() in resource-node.tsx exactly (that function
-// isn't exported, so this is the same delete+insert transaction shape,
-// not a reimplementation of different logic).
 function move(editor: Editor, sourcePos: number, targetPos: number) {
   const { state } = editor;
   const node = state.doc.nodeAt(sourcePos);
-  if (!node || node.type.name !== "resourceChip") throw new Error("not a resourceChip at sourcePos");
+  if (!node || node.type.name !== "resourceChip")
+    throw new Error("not a resourceChip at sourcePos");
   let tr = state.tr.delete(sourcePos, sourcePos + node.nodeSize);
   const insertPos = sourcePos < targetPos ? targetPos - node.nodeSize : targetPos;
   tr = tr.insert(insertPos, node.type.create(node.attrs));
   editor.view.dispatch(tr);
 }
 
-describe("resource/image chip drag-reorder (#34, already covered by #6)", () => {
+describe("resource/image chip drag-reorder (#34 -- transaction invariant behind the #6 fix)", () => {
   it("moving a chip forward preserves the other chips' relative order", () => {
     const editor = new Editor({
       extensions: [StarterKit, ResourceChip],

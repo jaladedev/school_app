@@ -76,7 +76,11 @@ describe("section grouping (#10)", () => {
       onCreate({ editor: created }) {
         requestAnimationFrame(() => {
           const grouped = groupIntoSections(created.schema, created.state.doc);
-          const tr = created.state.tr.replaceWith(0, created.state.doc.content.size, grouped.content);
+          const tr = created.state.tr.replaceWith(
+            0,
+            created.state.doc.content.size,
+            grouped.content
+          );
           tr.setMeta("addToHistory", false);
           created.view.dispatch(tr);
         });

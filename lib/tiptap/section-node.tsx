@@ -84,8 +84,9 @@ function SectionView({
         <button
           type="button"
           title="Drag to reorder section"
+          data-drag-handle
           onMouseDown={() => setDragArmed(true)}
-          className="cursor-grab min-w-[1.5rem] rounded px-1 py-0.5 text-sm text-ink-soft hover:bg-white active:cursor-grabbing"
+          className="min-w-[1.5rem] cursor-grab rounded px-1 py-0.5 text-sm text-ink-soft hover:bg-white active:cursor-grabbing"
         >
           ⠿
         </button>
@@ -149,7 +150,11 @@ export const Section = Node.create({
   },
 
   renderHTML({ node }) {
-    return ["div", mergeAttributes({ "data-section": "" }, { "data-collapsed": String(node.attrs.collapsed) }), 0];
+    return [
+      "div",
+      mergeAttributes({ "data-section": "" }, { "data-collapsed": String(node.attrs.collapsed) }),
+      0,
+    ];
   },
 
   addNodeView() {

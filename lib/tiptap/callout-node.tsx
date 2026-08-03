@@ -18,29 +18,71 @@
  */
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from "@tiptap/react";
+import { useState } from "react";
 
 export type CalloutType =
-  | "tip"
-  | "important"
-  | "warning"
-  | "remember"
-  | "definition"
-  | "example"
-  | "activity"
-  | "homework";
+  "tip" | "important" | "warning" | "remember" | "definition" | "example" | "activity" | "homework";
 
 export const CALLOUT_CONFIG: Record<
   CalloutType,
   { label: string; icon: string; border: string; bg: string; text: string }
 > = {
-  tip: { label: "Tip", icon: "💡", border: "border-amber-300", bg: "bg-amber-50", text: "text-amber-900" },
-  important: { label: "Important", icon: "❗", border: "border-blue-300", bg: "bg-blue-50", text: "text-blue-900" },
-  warning: { label: "Warning", icon: "⚠️", border: "border-clay/50", bg: "bg-clay/10", text: "text-clay" },
-  remember: { label: "Remember", icon: "🧠", border: "border-purple-300", bg: "bg-purple-50", text: "text-purple-900" },
-  definition: { label: "Definition", icon: "📖", border: "border-teal-300", bg: "bg-teal-50", text: "text-teal-900" },
-  example: { label: "Example", icon: "✏️", border: "border-green-300", bg: "bg-green-50", text: "text-green-900" },
-  activity: { label: "Activity", icon: "🙋", border: "border-marigold", bg: "bg-marigold/10", text: "text-ink" },
-  homework: { label: "Homework", icon: "📝", border: "border-rose-300", bg: "bg-rose-50", text: "text-rose-900" },
+  tip: {
+    label: "Tip",
+    icon: "💡",
+    border: "border-amber-300",
+    bg: "bg-amber-50",
+    text: "text-amber-900",
+  },
+  important: {
+    label: "Important",
+    icon: "❗",
+    border: "border-blue-300",
+    bg: "bg-blue-50",
+    text: "text-blue-900",
+  },
+  warning: {
+    label: "Warning",
+    icon: "⚠️",
+    border: "border-clay/50",
+    bg: "bg-clay/10",
+    text: "text-clay",
+  },
+  remember: {
+    label: "Remember",
+    icon: "🧠",
+    border: "border-purple-300",
+    bg: "bg-purple-50",
+    text: "text-purple-900",
+  },
+  definition: {
+    label: "Definition",
+    icon: "📖",
+    border: "border-teal-300",
+    bg: "bg-teal-50",
+    text: "text-teal-900",
+  },
+  example: {
+    label: "Example",
+    icon: "✏️",
+    border: "border-green-300",
+    bg: "bg-green-50",
+    text: "text-green-900",
+  },
+  activity: {
+    label: "Activity",
+    icon: "🙋",
+    border: "border-marigold",
+    bg: "bg-marigold/10",
+    text: "text-ink",
+  },
+  homework: {
+    label: "Homework",
+    icon: "📝",
+    border: "border-rose-300",
+    bg: "bg-rose-50",
+    text: "text-rose-900",
+  },
 };
 
 const CALLOUT_TYPES = Object.keys(CALLOUT_CONFIG) as CalloutType[];
@@ -60,13 +102,28 @@ function CalloutView({
     ? node.attrs.calloutType
     : "tip";
   const config = CALLOUT_CONFIG[calloutType];
+  // Same pattern as SectionView: armed only while the drag handle itself
+  // is held down, so native HTML5 drag stays scoped to the handle
+  // instead of the whole callout (clicking the type dropdown or
+  // selecting text in the body must not start a drag).
+  const [dragArmed, setDragArmed] = useState(false);
 
   return (
     <NodeViewWrapper
       className={`my-3 rounded-lg border-l-4 ${config.border} ${config.bg} p-3`}
       data-callout={calloutType}
+      draggable={dragArmed}
+      onDragEnd={() => setDragArmed(false)}
     >
       <div contentEditable={false} className="mb-1 flex items-center gap-1.5">
+        <span
+          onMouseDown={() => setDragArmed(true)}
+          title="Drag to reorder"
+          data-drag-handle
+          className="cursor-grab rounded px-0.5 text-sm text-ink-soft/60 hover:text-ink-soft active:cursor-grabbing"
+        >
+          ⠿
+        </span>
         <span aria-hidden>{config.icon}</span>
         <select
           value={calloutType}
@@ -90,12 +147,14 @@ export const Callout = Node.create({
   group: "block",
   content: "block+",
   defining: true,
+  draggable: true,
 
   addAttributes() {
     return {
       calloutType: {
         default: "tip",
-        parseHTML: (el) => (isCalloutType(el.getAttribute("data-callout")) ? el.getAttribute("data-callout") : "tip"),
+        parseHTML: (el) =>
+          isCalloutType(el.getAttribute("data-callout")) ? el.getAttribute("data-callout") : "tip",
         renderHTML: (attrs) => ({ "data-callout": attrs.calloutType }),
       },
     };

@@ -119,6 +119,7 @@ New `section` node (`lib/tiptap/section-node.tsx`) wraps a heading + every follo
 Sections carry no markdown fence syntax — boundaries are fully recoverable from heading positions, so `serialize()` just flattens a section back to plain child content. That means the persisted markdown is byte-identical to an unsectioned doc: `saveTopicNote`, version history (#14), the published view, and Presentation Mode (#35) all need zero changes. Grouping happens once client-side, right after initial parse (`groupIntoSections()` in an `onCreate` transaction with `addToHistory: false`), not via a markdown-it block rule.
 
 Known v1 limitations (deliberately deferred, not just missed):
+
 - Every heading level starts a new flat section — an h3 doesn't nest inside its parent h2's section. Revisit only if sub-section dragging turns out to matter.
 - Typing a new heading inside an existing section's body does **not** auto-split it — no input rule watches for that yet. Use the Section slash command to start a new one explicitly. Auto-split is a plausible v2 but needs care around mid-typing undo steps.
 - Content before the first heading in a doc is left ungrouped at the top level.
@@ -270,7 +271,7 @@ This entry was stale — it said "not present, depends on #10" for all four (sec
 - **Sections** — done now via #10 (see its entry above).
 - **Activities** — still not present. "Activity"/"Homework" are the Callout node (#17) pre-set to those `calloutType`s, and `callout-node.tsx` has no drag handle or reorder logic at all — reordering one today means cut/paste. This is the one real gap left in #34's original scope.
 
-Remaining: add the same handle + move-transaction pattern from `resource-node.tsx` to `callout-node.tsx` (or promote Callout to a child of the new `section` node's drag mechanism, since a section already carries its whole content as a unit — reordering a callout *within* a section body is the more precise ask here).
+Remaining: add the same handle + move-transaction pattern from `resource-node.tsx` to `callout-node.tsx` (or promote Callout to a child of the new `section` node's drag mechanism, since a section already carries its whole content as a unit — reordering a callout _within_ a section body is the more precise ask here).
 
 ## 35. Presentation Mode
 
