@@ -192,7 +192,25 @@ export function NoteEditor({
   useEffect(() => setCurrentNoteId(noteId), [noteId]);
 
   const [localResources, setLocalResources] = useState(resources);
-  useEffect(() => setLocalResources(resources), [resources]);
+  // NOT a plain `setLocalResources(resources)` -- ensureNoteId() calls
+  // router.refresh() when it creates the note (e.g. the first thing
+  // saved in a fresh note is a Diagram), and that refresh's server
+  // snapshot is taken *before* the resource that triggered it exists.
+  // If it lands after createMermaidResource()/insertResourceMarker()
+  // have already added the resource locally, a blind overwrite here
+  // erases it again -- the chip's NodeView then finds no match on its
+  // next render and falls back to "Missing resource", which also makes
+  // its edit-title UI unreachable (ResourceChipDefaultView only renders
+  // the rename form when `resource` is non-null). Merging keeps any
+  // local-only resource until a later, genuinely up-to-date refresh
+  // includes it from the server.
+  useEffect(() => {
+    setLocalResources((prev) => {
+      const incomingIds = new Set(resources.map((r) => r.id));
+      const localOnly = prev.filter((r) => !incomingIds.has(r.id));
+      return [...resources, ...localOnly];
+    });
+  }, [resources]);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -460,7 +478,23 @@ export function NoteEditor({
     startTransition(async () => {
       try {
         const note = await saveTopicNote(topicId, content, status);
-        if (isFirstSave && note?.id) setCurrentNoteId(note.id);
+        // Not `if (isFirstSave)` -- notes are append-only (see
+        // saveTopicNote's own comment: "publishing a revision never
+        // overwrites an earlier draft or published copy"), so *every*
+        // save inserts a brand-new row with a brand-new id, not just the
+        // first. Any resource created after this point goes through
+        // ensureNoteId(), which returns currentNoteId as-is if it's
+        // already set -- so a stale id here silently attaches every
+        // subsequent diagram/upload to a superseded note version. The
+        // page always queries the *latest* version's resources
+        // (`.eq("note_id", note.id)` in page.tsx, intentionally scoped
+        // per note version, not per topic), so a resource attached to a
+        // stale id becomes permanently invisible the moment a newer
+        // version exists -- not just "not refreshed yet", genuinely
+        // orphaned in the database. This was the real cause of
+        // resources -- including ones from well before this session --
+        // silently disappearing after any second save.
+        if (note?.id) setCurrentNoteId(note.id);
         setLastSavedContent(content);
         setLastSavedAt(new Date());
         setIsDirty(false);
@@ -617,6 +651,18 @@ export function NoteEditor({
         setLastSavedContent(content);
         setIsDirty(false);
       }
+      // ensureNoteId() already refreshes when it creates the note, but
+      // that's a different case (note didn't exist) from this one (note
+      // exists, a new resource was just added to it) -- without this,
+      // the sidebar TopicResourceList (page.tsx, fed from the Server
+      // Component's own `resources` prop, with zero connection to this
+      // component's client state) never learns the diagram exists until
+      // an unrelated navigation happens to reload the page. The earlier
+      // merge-not-overwrite fix on the `resources` prop-sync effect
+      // above is what makes calling this safe every time: a stale
+      // snapshot arriving mid-flight can no longer erase what was just
+      // added locally.
+      router.refresh();
       emitToast("Diagram added to the note.");
       setDiagramPanelOpen(false);
       setDiagramTitle("");
@@ -679,6 +725,12 @@ export function NoteEditor({
       setLastSavedContent(content);
       setIsDirty(false);
     }
+    // Same reasoning as handleSaveDiagram's router.refresh() -- the
+    // sidebar TopicResourceList only ever updates via a server
+    // round-trip, and ensureNoteId()'s refresh only covers the
+    // note-didn't-exist case, not "note exists, files were just
+    // uploaded to it".
+    if (insertedAny) router.refresh();
     if (accepted.length - failures > 0) {
       emitToast(
         accepted.length - failures === 1

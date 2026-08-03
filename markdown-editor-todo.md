@@ -153,6 +153,7 @@ Audited: view, compare, restore, and author/timestamp all present, split across 
 - View previous versions + author/timestamp — the "Version history" list in `page.tsx`, pulling `full_name` off the `profiles` join (falls back to "Unknown author" if the join comes back empty) and `updated_at` via `toLocaleString()`
 - Compare — `NoteVersionDiff.tsx`, word-level diff (`lib/diff.ts`) between any two versions, defaulting to the latest two so the most common comparison needs zero clicks
 - Restore — `RestoreVersionButton.tsx`, one per version row, restores as a new draft (doesn't overwrite history) via `restoreTopicNoteVersion`
+- Delete — `DeleteVersionButton.tsx`, one per version row (including the current version — deleting it just falls back to the next-highest remaining version, same as if it had never been saved). `deleteTopicNoteVersion` required its own migration (`2026_08_03b_topic_notes_delete_version.sql`) since `topic_notes` had no DELETE RLS policy at all before this. Refuses to delete the only remaining version. For resources attached to the version being deleted: `note_id` only records which version a resource was *uploaded under*, not every version whose content still references it (a save carries forward whatever `[[resource:UUID]]` markers were already in the content) — so each attached resource is checked against every surviving version's content and reassigned to one that still references it rather than deleted; only genuinely-unreferenced resources are hard-deleted (storage object + row)
 
 ## 15. Learning Objective Block — SUSPENDED
 
@@ -312,6 +313,7 @@ Not present. New build — Polls, Quick questions, Reflection prompts, Classroom
 
 ## Before building, verify these already exist
 
-- #14 Version History → `NoteVersionDiff.tsx` — audited; view/compare were done, restore + author display were missing and have now been added
+- #14 Version History → `NoteVersionDiff.tsx` — audited; view/compare were done, restore + author display + delete have now been added
 - #35 Presentation Mode → `NoteSlideView.tsx` — audited; already fully covers this, nothing built
 - #24 Audio embedding → existing upload resource type may already cover this
+- Popover containment audit → `clampPopoverToEditor()` (`lib/tiptap/popover-position.ts`) was already wired into inline math, the slash-command menu, and the emoji picker; the table/format `BubbleMenu`s already had their own `flip`/`shift` boundary options set to `noteContainerRef`. The resource chip preview popover (`resource-node.tsx`, `max-w-[90vw]` — measures the browser viewport, not the editor's own narrower column) was the one gap, now wired to the same `clampPopoverToEditor()` util, re-clamping on `editing`/`confirmingRemove` since its content height changes. The "Insert resource" toolbar dropdown was checked and left alone — it lives above `.topic-prose`, not nested in arbitrary inline content, so it's a different, lower-risk case than the others.

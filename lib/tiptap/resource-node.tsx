@@ -22,7 +22,8 @@
  */
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { clampPopoverToEditor } from "./popover-position";
 import { TopicResourceItem } from "@/components/TopicContent";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { updateMermaidResource, updateTopicResource } from "@/lib/actions/teacher";
@@ -475,6 +476,7 @@ function ResourceChipDefaultView({
   const [isSaving, setIsSaving] = useState(false);
   const [dragArmed, setDragArmed] = useState(false);
   const wrapperRef = useRef<HTMLSpanElement | null>(null);
+  const popoverRef = useRef<HTMLSpanElement | null>(null);
 
   // Closes the popover on an outside click, matching the "Insert resource"
   // dropdown's behavior. Previously this only closed via the toggle button
@@ -492,6 +494,19 @@ function ResourceChipDefaultView({
     return () => document.removeEventListener("mousedown", handleClickOutside);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewOpen]);
+
+  // This popover floats out of the text flow (absolute-positioned, fixed
+  // 28rem width) -- a chip near the editor's right edge would otherwise
+  // render the popover past that edge (max-w-[90vw] alone doesn't help:
+  // it measures the browser viewport, not the usually-narrower editor
+  // column). Re-clamp whenever the popover's own content/size changes
+  // (editing vs. viewing, remove-confirmation), same reasoning as math's
+  // per-keystroke re-clamp in math-nodes.tsx.
+  useLayoutEffect(() => {
+    if (previewOpen && popoverRef.current) {
+      clampPopoverToEditor(popoverRef.current, editor?.view?.dom ?? null);
+    }
+  }, [previewOpen, editing, confirmingRemove, editor]);
 
   function closePopover() {
     setPreviewOpen(false);
@@ -570,6 +585,7 @@ function ResourceChipDefaultView({
 
       {previewOpen && (
         <span
+          ref={popoverRef}
           contentEditable={false}
           className="absolute left-0 top-full z-20 mt-1 w-[28rem] max-w-[90vw] rounded-lg border border-rule bg-white p-4 shadow-xl"
         >
