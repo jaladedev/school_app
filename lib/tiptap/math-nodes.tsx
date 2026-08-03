@@ -81,9 +81,41 @@ function makeMathView(displayMode: boolean) {
     }
 
     if (editing) {
+      // Always render this wrapper as a div, even for inline math: its child
+      // is a bordered block containing the toolbar/input/preview, and a
+      // <div> can't legally nest inside the <span> we'd otherwise use for
+      // inline mode. Browsers "fix" that invalid nesting by closing the
+      // span early and hoisting the div out, which happens outside React's
+      // reconciliation and is what made the inline toolbar unreliable.
+      //
+      // Inline math additionally floats its popup out of the text flow
+      // (absolute, anchored below the equation) instead of rendering
+      // in-place like block math does. In-flow was the earlier behavior,
+      // but for a token sitting mid-sentence that meant the popup's width
+      // fought with surrounding text -- it could get squeezed onto its own
+      // wrapped line, or shove the rest of the paragraph down while open.
+      // Floating it keeps the paragraph's layout stable and gives the
+      // toolbar/input/preview a fixed, predictable width to render at.
       return (
-        <NodeViewWrapper as={displayMode ? "div" : "span"} className="inline-block align-middle">
-          <div className="rounded-md border border-marigold bg-white p-2 shadow-sm">
+        <NodeViewWrapper
+          as="div"
+          className={displayMode ? "inline-block align-middle" : "relative inline-block align-middle"}
+        >
+          {!displayMode && (
+            <span
+              className="rounded bg-marigold/20 px-1 font-mono text-sm text-ink"
+              contentEditable={false}
+            >
+              {draft.trim() ? "∑" : "$…$"}
+            </span>
+          )}
+          <div
+            className={
+              displayMode
+                ? "rounded-md border border-marigold bg-white p-2 shadow-sm"
+                : "absolute left-0 top-full z-20 mt-1 w-max max-w-[24rem] rounded-md border border-marigold bg-white p-2 shadow-lg"
+            }
+          >
             <div className="mb-1.5 flex flex-wrap gap-0.5" contentEditable={false}>
               {MATH_SYMBOLS.map((sym) => (
                 <button
