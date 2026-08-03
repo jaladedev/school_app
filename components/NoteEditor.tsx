@@ -43,10 +43,34 @@ const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
 
 const DEFAULT_MERMAID = "flowchart TD\n  A[Start] --> B[End]";
 
-// Kept in sync with TopicResourceUpload.tsx's <input accept> and
-// uploadTopicResource's RESOURCE_TYPES map -- checked client-side purely
-// so a drag of an unsupported file gets an immediate toast instead of a
-// round-trip to the server action just to find out.
+// Starter templates for the "Generate Mermaid diagram" panel
+const DIAGRAM_TEMPLATES: { label: string; code: string }[] = [
+  {
+    label: "Flowchart",
+    code: "flowchart TD\n  A[Start] --> B{Decision}\n  B -->|Yes| C[Do this]\n  B -->|No| D[Do that]",
+  },
+  {
+    label: "Mind map",
+    code: "mindmap\n  root((Topic))\n    Idea 1\n      Detail A\n      Detail B\n    Idea 2\n    Idea 3",
+  },
+  {
+    label: "Timeline",
+    code: "timeline\n  title A Sequence of Events\n  Step 1 : First thing happens\n  Step 2 : Then this\n  Step 3 : Finally this",
+  },
+  {
+    label: "Cycle",
+    code: "flowchart LR\n  A[Stage 1] --> B[Stage 2]\n  B --> C[Stage 3]\n  C --> D[Stage 4]\n  D --> A",
+  },
+  {
+    label: "Org chart",
+    code: "flowchart TD\n  Head[Head Teacher]\n  Head --> A[Deputy A]\n  Head --> B[Deputy B]\n  A --> A1[Teacher]\n  B --> B1[Teacher]",
+  },
+  {
+    label: "Sequence diagram",
+    code: "sequenceDiagram\n  participant Teacher\n  participant Student\n  Teacher->>Student: Asks a question\n  Student-->>Teacher: Gives an answer",
+  },
+];
+
 const ACCEPTED_RESOURCE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -59,20 +83,6 @@ const ACCEPTED_RESOURCE_MIME_TYPES = new Set([
   "video/webm",
 ]);
 
-// TipTap gives every extension its own separate keymap plugin rather than
-// merging them into one, and ProseMirror runs those plugins in order,
-// stopping at the first one that returns true. List items (StarterKit's
-// ListItem) and table cells (extension-table's Table) both bind Tab and
-// correctly return false when there's nothing to sink/lift or no table
-// cell to move to. But when EVERY plugin returns false, ProseMirror never
-// calls preventDefault, and the keydown falls through to the browser's
-// native focus-tabbing -- which then jumps to whatever <button> happens
-// to be next in the DOM (a toolbar button, a resource chip). Registering
-// this extension FIRST in the extensions array below puts it LAST in
-// TipTap's (reversed) plugin-priority order, so it only fires as a
-// last-resort catch-all: it absorbs Tab/Shift-Tab (no-op) instead of
-// letting focus escape the editor, without pre-empting list/table
-// handling that already works correctly.
 const TabTrap = Extension.create({
   name: "tabTrap",
   addKeyboardShortcuts() {
@@ -117,34 +127,15 @@ export function NoteEditor({
   const [currentNoteId, setCurrentNoteId] = useState(noteId);
   useEffect(() => setCurrentNoteId(noteId), [noteId]);
 
-  // Same reasoning as the textarea version: resources is a one-time
-  // server-component snapshot, so a diagram created via
-  // createMermaidResource wouldn't show up in the picker/chip resolution
-  // until a full refresh unless we keep a local copy.
   const [localResources, setLocalResources] = useState(resources);
   useEffect(() => setLocalResources(resources), [resources]);
 
   const editor = useEditor({
-    // Tiptap defaults to rendering the editor's DOM synchronously on
-    // mount, before React's hydration pass has reconciled against the
-    // server-rendered markup. The server has no editor instance at all
-    // (this only runs client-side), so that first client render adds a
-    // whole extra subtree SSR never produced -> hydration mismatch on
-    // every note page load. Deferring the first render to an effect
-    // (Tiptap's documented fix for SSR frameworks) lets hydration finish
-    // against the same empty markup the server sent before the editor
-    // DOM gets mounted.
     immediatelyRender: false,
     extensions: [
       TabTrap,
-      // StarterKit v3 bundles Link internally, so adding a separate
-      // Link extension instance here duplicates it.
       StarterKit.configure({
         link: { openOnClick: false, autolink: true },
-        // Replaced by the lowlight-backed CodeBlock below (syntax
-        // highlighting + copy button + language selector) -- keeping
-        // StarterKit's plain version registered alongside it would
-        // double-register the "codeBlock" node name.
         codeBlock: false,
       }),
       CodeBlock,
@@ -155,13 +146,6 @@ export function NoteEditor({
       Placeholder.configure({
         placeholder,
       }),
-      // TextStyle is a prerequisite mark for Color -- Color just adds a
-      // `color` attr onto it rather than being its own mark. The
-      // *Markdown variants here (from lib/tiptap/format-marks.ts) are the
-      // same extensions with markdown serialize/parse wiring added, so
-      // these marks actually survive a save + reload instead of being
-      // silently dropped by tiptap-markdown (which has no built-in rule
-      // for them) -- see that file for the full explanation.
       TextStyleMarkdown,
       Color,
       HighlightMarkdown.configure({ multicolor: true }),
@@ -173,13 +157,6 @@ export function NoteEditor({
       ResourceChip,
       MathInline,
       MathBlock,
-      // tiptap-markdown has no top-level `markdownIt` hook -- each
-      // node registers its own markdown-it rules via
-      // `storage.markdown.parse.setup`, wired on ResourceChip/MathInline/
-      // MathBlock themselves (see resource-node.tsx / math-nodes.tsx).
-      // Keeping [[resource:ID]] and $/$$ parsing there means it fires
-      // for *every* editor instance automatically, with no risk of a
-      // call site forgetting to pass the plugin in.
       Markdown.configure({
         html: false,
         transformPastedText: true,
@@ -192,14 +169,6 @@ export function NoteEditor({
     // @ts-expect-error -- provided by the Markdown extension
     contentType: "markdown",
     editorProps: {
-      // Paste-image support (#5 of the to-do): a screenshot or copied
-      // image lands in the clipboard as a `File`-bearing `image/*` item,
-      // not as text, so this never reaches Markdown's paste handling at
-      // all -- it has to be intercepted here, before TipTap tries to
-      // treat the paste as text/HTML. Reuses uploadDroppedFiles (the
-      // same function drag-and-drop already calls), so pasted images go
-      // through the identical upload -> ResourceChip insert path rather
-      // than a second, parallel one.
       handlePaste(_view, event) {
         const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
           f.type.startsWith("image/")
@@ -212,23 +181,6 @@ export function NoteEditor({
     },
   });
 
-  // Every `editor.isActive(...)`/`editor.can()` check sprinkled through
-  // the toolbar JSX below reads live editor state correctly -- the bug
-  // wasn't stale data, it's that nothing told React to re-render when
-  // that state changed. The component only listened for content
-  // ("update") events; moving the caret into/out of a table, or between
-  // marks, is a selection-only transaction that fires neither "update"
-  // nor a React re-render on its own. That's invisible for buttons that
-  // are always in the DOM (Bold/Italic just silently kept a stale
-  // highlight until the next keystroke), but fatal for anything
-  // conditionally rendered on `isActive()` -- like the "Table:" toolbar,
-  // which never appeared at all no matter where the caret was, because
-  // the check that would reveal it never got a chance to re-run.
-  // `useEditorState` is Tiptap's own hook for this: it subscribes to
-  // every transaction and re-renders when the selector's result changes
-  // reference, so returning `editor.state` itself (a new object every
-  // transaction, selection-only or not) forces exactly the re-render
-  // that was missing, without touching any of the isActive call sites.
   useEditorState({
     editor,
     selector: ({ editor }) => editor?.state,
@@ -272,16 +224,6 @@ export function NoteEditor({
     setError(null);
     if (status === "draft") setIsSavingDraft(true);
     const content = getMarkdown();
-    // `page.tsx` fetches `note`/`resources` once as a Server Component
-    // and passes them down as props -- saveTopicNote's revalidatePath
-    // only invalidates the Next.js cache, it doesn't touch this already-
-    // mounted client tree. `currentNoteId` gets the real id immediately
-    // from saveTopicNote's return value (no round trip needed for
-    // resource/diagram buttons to unlock), but router.refresh() still
-    // runs once so the server-rendered resource-upload section below the
-    // editor and the "Currently: X" status catch up too. Only doing this
-    // when `currentNoteId` isn't set yet avoids refetching/remounting on
-    // every subsequent save while someone's actively editing.
     const isFirstSave = !currentNoteId;
     startTransition(async () => {
       try {
@@ -301,14 +243,6 @@ export function NoteEditor({
     });
   }
 
-  // Resource/diagram actions need a real note id to attach to. Before
-  // this, a teacher writing a topic's very first note couldn't add
-  // resources at all until they explicitly clicked "Save draft" first --
-  // this silently creates that first draft on their behalf (using
-  // whatever's in the editor right now) the moment they try to insert a
-  // resource, so "start writing" and "start adding resources" can happen
-  // in either order. Returns the id to use immediately, and throws if
-  // the silent save itself fails (surfaced by each caller's own catch).
   async function ensureNoteId(): Promise<string> {
     if (currentNoteId) return currentNoteId;
     if (!editor) throw new Error("Editor isn't ready yet.");
@@ -332,9 +266,6 @@ export function NoteEditor({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [pickerOpen]);
 
-  // Same deliberate choice as before: warn on close, don't autosave --
-  // saveTopicNote is append-only (each save is a new version row), so
-  // autosaving on every navigation attempt would flood version history.
   useEffect(() => {
     if (!isDirty) return;
     function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -372,18 +303,6 @@ export function NoteEditor({
   }, [editor]);
 
   function insertResourceMarker(resource: TopicResource) {
-    // `editor.storage.resourceChip.resources` is normally kept in sync
-    // by the useEffect below that watches `localResources` -- but that
-    // effect only runs after React commits the `setLocalResources` call
-    // each caller makes right before this one, and React state updates
-    // are asynchronous. `.insertContent().run()` below dispatches a
-    // ProseMirror transaction synchronously, which synchronously mounts
-    // the new node's NodeView and does its first `storage.resources.find`
-    // lookup -- before that effect has had a chance to run. Without this,
-    // a freshly uploaded/created resource would render as "Missing
-    // resource" for a moment (or, if the doc were saved in that exact
-    // window, indefinitely) purely because of ordering, not because
-    // anything was actually wrong.
     const storage = editor?.storage.resourceChip;
     if (storage && !storage.resources.some((r) => r.id === resource.id)) {
       storage.resources = [...storage.resources, resource];
@@ -419,14 +338,6 @@ export function NoteEditor({
     }
     setIsSavingDiagram(true);
     try {
-      // Capture this *before* awaiting -- ensureNoteId's own save call
-      // happens synchronously relative to this check (no other await
-      // separates them), and its snapshot is taken from whatever's in
-      // the editor at that moment, which is *before* insertResourceMarker
-      // below adds anything. If this is a brand-new note, that snapshot
-      // save doesn't include the diagram marker we're about to insert --
-      // it only exists in the live in-memory editor until something
-      // saves again. See the follow-up save below.
       const neededNoteCreation = !currentNoteId;
       const noteIdToUse = await ensureNoteId();
       const resource = await createMermaidResource(
@@ -438,11 +349,6 @@ export function NoteEditor({
       setLocalResources((prev) => [...prev, resource]);
       insertResourceMarker(resource);
       if (neededNoteCreation) {
-        // Without this, the diagram marker exists only in this browser
-        // tab's live editor state: refreshing the page reloads the note
-        // from the DB row ensureNoteId created (pre-insertion content),
-        // silently dropping the marker even though the diagram resource
-        // itself was saved fine and still shows up in Topic Resources.
         const content = getMarkdown();
         await saveTopicNote(topicId, content, "draft");
         setLastSavedContent(content);
@@ -460,14 +366,6 @@ export function NoteEditor({
     }
   }
 
-  // Drag-and-drop straight onto the editor surface (#7 of the to-do).
-  // Reuses the same uploadTopicResource server action as the file-picker
-  // panel (TopicResourceUpload.tsx) -- this isn't a second upload path,
-  // just a second entry point into the existing one -- and inserts a
-  // ResourceChip at the caret for each file that succeeds, the same way
-  // handleSaveDiagram does for a newly created diagram. Auto-creates the
-  // note via ensureNoteId() if this is a topic's first-ever note, same
-  // as handleSaveDiagram.
   async function uploadDroppedFiles(files: File[]) {
     const accepted = files.filter((f) => ACCEPTED_RESOURCE_MIME_TYPES.has(f.type));
     const rejected = files.length - accepted.length;
@@ -479,23 +377,6 @@ export function NoteEditor({
     }
     if (accepted.length === 0) return;
 
-    // Capture this *before* ensureNoteId runs, same reasoning as
-    // handleSaveDiagram: if this is a brand-new note, ensureNoteId's own
-    // bootstrap save snapshots the editor *before* any of this
-    // function's insertResourceMarker calls run, so the dropped file's
-    // marker would otherwise only exist in this tab's live editor state.
-    // That bootstrap save is unavoidable -- a resource row needs a
-    // note_id to attach to, and there's no note yet to attach it to
-    // otherwise -- but it's the ONLY case that should trigger a save
-    // here. Dropping a file into a note that already exists must NOT
-    // auto-save: saveTopicNote is append-only (each call mints a new
-    // version row), and unconditionally saving here previously flooded
-    // version history with a throwaway draft on every single drop --
-    // the same unwanted extra draft a teacher would then have to notice
-    // and delete. A dropped-in marker on an existing note is meant to
-    // behave exactly like typed text: it sits as an unsaved edit (the
-    // existing "Unsaved changes" indicator already covers it) until the
-    // teacher explicitly clicks Save draft / Publish.
     const neededNoteCreation = !currentNoteId;
     let noteIdToUse: string;
     try {
@@ -573,20 +454,6 @@ export function NoteEditor({
   }
 
   return (
-    // The old `if (!editor) return null` guard meant NoteEditor rendered
-    // *nothing at all* on the server and on the client's first paint
-    // (editor is null in both, per Tiptap's own Next.js SSR handling --
-    // this was never actually about immediatelyRender), then swapped in
-    // this entire subtree the instant the editor's layout effect fired.
-    // That effect can resolve synchronously enough that React's dev
-    // hydration check sees it as part of the same commit as hydration
-    // itself, flagging a false-positive mismatch on a node that never
-    // existed in the server HTML to begin with. Keeping this outer
-    // `<div>` always present (so server and first-client-paint both
-    // render it, just with a loading placeholder inside) means the
-    // node hydration diffs against already exists on both sides --
-    // only its *children* change once the editor becomes ready, which
-    // is an ordinary post-hydration update, not a mismatch.
     <div suppressHydrationWarning>
       {!editor ? (
         <div className="min-h-[24rem] animate-pulse rounded-lg border border-rule bg-white p-4" />
@@ -680,6 +547,23 @@ export function NoteEditor({
                 placeholder="Diagram title (optional)"
                 className="mb-2 w-full rounded-lg border border-rule bg-white p-2 text-sm text-ink outline-none focus-visible:border-marigold"
               />
+              <div className="mb-3">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  Start from a template
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {DIAGRAM_TEMPLATES.map((template) => (
+                    <button
+                      key={template.label}
+                      type="button"
+                      onClick={() => setDiagramCode(template.code)}
+                      className="rounded-full border border-rule px-2.5 py-1 text-xs text-ink hover:border-marigold hover:bg-paper"
+                    >
+                      {template.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
@@ -714,10 +598,7 @@ export function NoteEditor({
             </section>
           )}
 
-          {/* Toolbar — same button set as before, now driving TipTap commands
-          instead of string manipulation. Undo/redo, underline, strike,
-          blockquote, and hr are "free" wins from StarterKit's default
-          keymap/commands and just need buttons wired, per the to-do's #2. */}
+          {/* Toolbar */}
           <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper p-1">
             <button
               type="button"
@@ -1110,9 +991,7 @@ export function NoteEditor({
           )}
 
           {/* Mobile: tabbed write/preview so the two panes aren't squeezed
-          side-by-side on a phone/tablet. Note: with TipTap the "editor"
-          IS the rendered view now, so "Preview" here is a read-only
-          render of the same doc rather than a second, separate pane. */}
+          side-by-side on a phone/tablet.*/}
           <div className="mb-2 flex gap-1 rounded-lg border border-rule bg-paper p-1 md:hidden">
             <button
               type="button"

@@ -170,12 +170,12 @@ Not present as structured blocks (Mermaid exists, callouts don't).
 
 - Tip, Important, Warning, Remember, Definition, Example, Activity — build as TipTap custom Nodes, expose via slash command
 
-## 18. Better Mermaid Support
+## 18. Better Mermaid Support — DONE
 
-Currently: renders live inline in the doc as a real `MermaidNodeView` (#0), not just a chip — inserted via the side-panel + `createMermaidResource`, edited in place via a new `updateMermaidResource` action (hover-revealed "Edit" opens the same code+title+live-preview UI as creation, saves in place so the resource id and every `[[resource:ID]]` marker pointing at it stay valid).
+Renders live inline in the doc as a real `MermaidNodeView` (#0), not just a chip — inserted via the side-panel + `createMermaidResource`, edited in place via `updateMermaidResource` (hover-revealed "Edit" opens the same code+title+live-preview UI as creation, saves in place so the resource id and every `[[resource:ID]]` marker pointing at it stay valid).
 
-- Keep live preview (already built)
-- Add starter templates: Flowcharts, Mind Maps, Timelines, Cycles, Org Charts, Sequence Diagrams
+- ✅ Live preview (already built)
+- ✅ Starter templates: Flowchart, Mind Map, Timeline, Cycle, Org Chart, Sequence Diagram — a row of buttons above the code editor in the diagram panel (`DIAGRAM_TEMPLATES` in `NoteEditor.tsx`), each swapping in a short 2-4 node example a teacher can edit from rather than starting from a blank textarea or Mermaid's syntax quirks. "Cycle" isn't a real Mermaid diagram type — built as a `flowchart LR` that loops back to its first node, which is the standard way to express one.
 
 ## 19. Math Editor — MOSTLY DONE, re-scope
 
