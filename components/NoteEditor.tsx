@@ -17,6 +17,8 @@ import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { CodeBlock } from "@/lib/tiptap/code-block";
 import "highlight.js/styles/github-dark.css";
+import { Callout } from "@/lib/tiptap/callout-node";
+import { SlashCommand, slashCommandBridge } from "@/lib/tiptap/slash-command";
 import {
   HighlightMarkdown,
   SubscriptMarkdown,
@@ -113,6 +115,11 @@ export function NoteEditor({
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [diagramPanelOpen, setDiagramPanelOpen] = useState(false);
+
+  useEffect(() => {
+    slashCommandBridge.openResourcePicker = () => setPickerOpen(true);
+    slashCommandBridge.openDiagramPanel = () => setDiagramPanelOpen(true);
+  });
   const [diagramTitle, setDiagramTitle] = useState("");
   const [diagramCode, setDiagramCode] = useState(DEFAULT_MERMAID);
   const [isSavingDiagram, setIsSavingDiagram] = useState(false);
@@ -139,6 +146,8 @@ export function NoteEditor({
         codeBlock: false,
       }),
       CodeBlock,
+      Callout,
+      SlashCommand,
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
@@ -186,13 +195,6 @@ export function NoteEditor({
     selector: ({ editor }) => editor?.state,
   });
 
-  // Pass the live resource list into the ResourceChip node's storage so
-  // its NodeView can resolve id -> title/icon without re-serializing the
-  // doc every time a resource is renamed elsewhere. onResourceUpdated
-  // lets MermaidNodeView's in-place "Edit" flow (updateMermaidResource)
-  // push the freshly-saved row back into localResources without a full
-  // page refresh, the same way createMermaidResource's result already
-  // does via handleSaveDiagram below.
   useEffect(() => {
     if (!editor) return;
     editor.storage.resourceChip.resources = localResources;
@@ -410,8 +412,7 @@ export function NoteEditor({
       }
     }
     if (neededNoteCreation && insertedAny) {
-      // One save for the whole batch, not one per file -- see the
-      // append-only note above.
+      // One save for the whole batch
       const content = getMarkdown();
       await saveTopicNote(topicId, content, "draft");
       setLastSavedContent(content);
@@ -825,6 +826,25 @@ export function NoteEditor({
             <span className="mx-1 h-4 w-px bg-rule" />
             <button
               type="button"
+              title="Callout (Tip/Warning/etc. — type '/' for more options)"
+              onClick={() =>
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent({
+                    type: "callout",
+                    attrs: { calloutType: "tip" },
+                    content: [{ type: "paragraph" }],
+                  })
+                  .run()
+              }
+              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("callout") ? "bg-white" : ""}`}
+            >
+              💡
+            </button>
+            <span className="mx-1 h-4 w-px bg-rule" />
+            <button
+              type="button"
               title="Inline math (LaTeX)"
               onClick={() => insertMath(false)}
               className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
@@ -990,8 +1010,7 @@ export function NoteEditor({
             </BubbleMenu>
           )}
 
-          {/* Mobile: tabbed write/preview so the two panes aren't squeezed
-          side-by-side on a phone/tablet.*/}
+          {/* Mobile*/}
           <div className="mb-2 flex gap-1 rounded-lg border border-rule bg-paper p-1 md:hidden">
             <button
               type="button"

@@ -100,12 +100,13 @@ Currently: separate `TopicResourceUpload` panel (file picker, not drag-and-drop)
 - `uploadTopicResource` (lib/actions/teacher.ts) now returns the inserted row instead of void, so callers can insert a chip immediately without a full page refresh — the file-picker panel (`TopicResourceUpload.tsx`) still works unchanged since it never used the return value
 - Client-side mime-type filtering before the upload call (rejects with a toast) using the same accepted-type list as `TopicResourceUpload`'s `<input accept>`; the server action is still the source of truth and re-validates
 
-## 8. Slash Commands
+## 8. Slash Commands — DONE
 
-Not present. New build.
+Built on `@tiptap/suggestion` (`lib/tiptap/slash-command.tsx`), no tippy.js dependency — positioning done manually off the `clientRect()` the utility already provides. Arrow keys + Enter or click, filters as you type.
 
-- `/` command menu using TipTap's suggestion utility
-- Items: Heading, Table, Image, Video, Diagram (reuse Mermaid panel), Activity, Homework, Learning Objective, Note, Callout, Divider
+- Items: Heading, Table, Image, Video, Diagram (reuse Mermaid panel), Activity, Homework, Note, Callout, Divider (Learning Objective omitted — #15 suspended)
+- "Activity"/"Homework" aren't separate block types — they insert the Callout node (#17) pre-set to those `calloutType`s
+- "Image"/"Video" reuse the existing resource picker, "Diagram" reuses the existing Mermaid panel — both are React state in `NoteEditor`, reached via a small bridge object (`slashCommandBridge`) rather than duplicating that UI
 
 ## 9. Floating Text Formatting Menu — DONE
 
@@ -135,11 +136,12 @@ Currently fixed-width grid columns.
 
 - Add drag-to-resize between edit/preview panes
 
-## 13. Auto Save
+## 13. Auto Save — PARTIALLY DONE
 
-Not present — explicit Save Draft / Publish buttons only.
+Explicit Save Draft / Publish buttons remain the only way to persist a note. However, the "did I lose anything" half of this already exists as a side effect of earlier UX work: `NoteEditor.tsx` tracks `isDirty` against `lastSavedContent` and shows an "Unsaved changes" label + a `beforeunload` warning — deliberately not autosave, since `saveTopicNote` is append-only (every save inserts a new version row) and silently saving on every navigation attempt would flood version history with junk rows.
 
-- Periodic auto-save
+Remaining:
+- Periodic auto-save (would need a debounced/interval save distinct from the append-only version-save path above — e.g. a separate draft-only upsert column, not another `saveTopicNote` row, to avoid the version-flooding problem)
 - Saving indicator
 - Last saved timestamp
 - Offline detection
@@ -151,11 +153,13 @@ Not present — explicit Save Draft / Publish buttons only.
 - Confirm it already covers: view previous versions, compare, restore, author/timestamp
 - Only build what's missing
 
-## 15. Learning Objective Block
+## 15. Learning Objective Block — SUSPENDED
 
 New — build as a TipTap custom Node (or slash-command insert):
 
 - Learning objectives, Success criteria, Expected outcomes
+
+**Suspended for now** (per request) — skip in the build order below until re-prioritized. Slash Commands (#8) should not list "Learning Objective" as a menu item while this is suspended, to avoid pointing at a block that doesn't exist.
 
 ## 16. Assessment Block
 
@@ -164,11 +168,11 @@ Currently: assessments are a separate system (`CreateAssessmentForm`, `GradeEntr
 - Decide: embed a lightweight reference/preview block in the note, or keep fully separate — needs a product decision before building
 - If embedding: Multiple Choice, True/False, Fill in the Blank, Matching, Essay
 
-## 17. Callout Components
+## 17. Callout Components — DONE
 
-Not present as structured blocks (Mermaid exists, callouts don't).
+Built as a TipTap custom Node (`lib/tiptap/callout-node.tsx`), exposed via slash command (#8) and a toolbar button. 8 types: Tip, Important, Warning, Remember, Definition, Example, Activity, Homework — each a colored card with an icon + type-switcher dropdown, real editable block content inside (`content: "block+"`, so paragraphs/lists/etc. all work, not just plain text).
 
-- Tip, Important, Warning, Remember, Definition, Example, Activity — build as TipTap custom Nodes, expose via slash command
+Markdown round-trip via a `:::type ... :::` fence (Docusaurus/Obsidian-style admonition syntax) — a teacher who already knows that convention can type it by hand instead of going through the UI. Verified directly against markdown-it: nested formatting/lists parse correctly inside, surrounding content is untouched, and an unrecognized type falls through to plain text rather than producing a broken callout.
 
 ## 18. Better Mermaid Support — DONE
 
@@ -285,8 +289,8 @@ Not present as a checked-off set.
 2. ~~#2/#3 toolbar + lists, #9 floating menu, #29 shortcuts~~ — DONE
 3. ~~#6/#7 resource cards + drag-drop upload~~ — DONE
 4. ~~#4 tables~~ — DONE. ~~#5 images~~ — DONE. ~~#25 code blocks~~ — DONE (editor + published-view parity)
-5. #8 slash commands, #17 callouts, #15 learning objectives (custom nodes, same pattern) — NEXT
-6. #13 autosave, #12 resizable panes, #28 word stats
+5. ~~#8 slash commands, #17 callouts~~ — DONE. #15 learning objectives SUSPENDED, skip
+6. #13 autosave, #12 resizable panes, #28 word stats — NEXT (note: #13's unsaved-changes warning/indicator is already done as a side effect of earlier work — see its section; periodic autosave, saved timestamp, and offline detection are the remaining pieces)
 7. #10 block-based editing (structural — do after the above stabilize)
 8. Everything else (#20–24, #26, #27, #30–37) — lower priority, mostly additive
 
