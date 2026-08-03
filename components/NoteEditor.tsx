@@ -19,6 +19,7 @@ import { CodeBlock } from "@/lib/tiptap/code-block";
 import "highlight.js/styles/github-dark.css";
 import { Callout } from "@/lib/tiptap/callout-node";
 import { SlashCommand, slashCommandBridge } from "@/lib/tiptap/slash-command";
+import { CharacterCount } from "@tiptap/extension-character-count";
 import {
   HighlightMarkdown,
   SubscriptMarkdown,
@@ -27,7 +28,14 @@ import {
 } from "@/lib/tiptap/format-marks";
 import { Markdown } from "tiptap-markdown";
 import "katex/dist/katex.min.css";
-import { saveTopicNote, createMermaidResource, uploadTopicResource } from "@/lib/actions/teacher";
+import {
+  saveTopicNote,
+  createMermaidResource,
+  uploadTopicResource,
+  saveTopicNoteDraft,
+  getTopicNoteDraft,
+  clearTopicNoteDraft,
+} from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { ResourceChip } from "@/lib/tiptap/resource-node";
@@ -123,7 +131,6 @@ export function NoteEditor({
   const [diagramTitle, setDiagramTitle] = useState("");
   const [diagramCode, setDiagramCode] = useState(DEFAULT_MERMAID);
   const [isSavingDiagram, setIsSavingDiagram] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"write" | "preview">("write");
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [bubblePos, setBubblePos] = useState<{ top: number; left: number } | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -148,6 +155,7 @@ export function NoteEditor({
       CodeBlock,
       Callout,
       SlashCommand,
+      CharacterCount,
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
@@ -172,9 +180,6 @@ export function NoteEditor({
       }),
     ],
     content: initialContent,
-    // contentType lets tiptap-markdown know `initialContent` is markdown
-    // text, not HTML -- it parses it through the markdown-it pipeline
-    // above on mount.
     // @ts-expect-error -- provided by the Markdown extension
     contentType: "markdown",
     editorProps: {
@@ -205,9 +210,34 @@ export function NoteEditor({
 
   const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;
 
+  function computeNoteStats(ed: NonNullable<typeof editor>) {
+    let headings = 0;
+    let tables = 0;
+    let images = 0;
+    let resources = 0;
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === "heading") headings++;
+      else if (node.type.name === "table") tables++;
+      else if (node.type.name === "resourceChip") {
+        resources++;
+        const resource = localResources.find((r) => r.id === node.attrs.id);
+        if (resource?.resource_type === "image") images++;
+      }
+      return true;
+    });
+    const words: number = ed.storage.characterCount.words();
+    const characters: number = ed.storage.characterCount.characters();
+    // 200 wpm is the commonly-cited average adult silent-reading speed --
+    // good enough for a rough "how long will this take a student to
+    // read" estimate, not meant to be precise.
+    const readingMinutes = Math.max(1, Math.round(words / 200));
+    return { words, characters, readingMinutes, headings, tables, images, resources };
+  }
+
   const initialMarkdown = useMemo(() => initialContent, [initialContent]);
   const [lastSavedContent, setLastSavedContent] = useState(initialMarkdown);
   const [isDirty, setIsDirty] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!editor) return;
@@ -221,8 +251,106 @@ export function NoteEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, lastSavedContent]);
 
+  // --- Offline detection --------------------------------------
+  // Autosave and the explicit Save/Publish buttons both need to know
+  // this: there's no point firing a save attempt (autosave) or letting
+  // someone click Publish (explicit) when the request can't possibly
+  // reach the server, and either would otherwise surface as a confusing
+  // generic network-error toast rather than the clearer "you're offline"
+  // state this drives instead.
+  const [isOnline, setIsOnline] = useState(true);
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    function handleOnline() {
+      setIsOnline(true);
+    }
+    function handleOffline() {
+      setIsOnline(false);
+    }
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // --- Periodic autosave ---------------------------------------
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle"
+  );
+  const [lastAutosaveAt, setLastAutosaveAt] = useState<Date | null>(null);
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+  const isOnlineRef = useRef(isOnline);
+  isOnlineRef.current = isOnline;
+
+  useEffect(() => {
+    if (!editor) return;
+    const interval = setInterval(() => {
+      if (!isDirtyRef.current || !isOnlineRef.current) return;
+      const content = getMarkdown();
+      setAutosaveStatus("saving");
+      saveTopicNoteDraft(topicId, content)
+        .then(() => {
+          setAutosaveStatus("saved");
+          setLastAutosaveAt(new Date());
+        })
+        .catch(() => {
+          setAutosaveStatus("error");
+        });
+    }, 20_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, topicId]);
+
+  // --- Draft recovery banner -----------------------------------
+  // Checked once on mount. The existing `beforeunload` warning only
+  // catches a clean in-app navigation attempt -- it can't do anything
+  // about a crashed tab, a dead battery, or a network drop right as
+  // someone closed the laptop lid. If an autosave tick from one of those
+  // situations is sitting in `topic_note_drafts` and differs from what
+  // this page loaded with, offer to restore it instead of silently
+  // discarding a teacher's unsaved work.
+  const [draftBanner, setDraftBanner] = useState<{ content: string; updatedAt: string } | null>(
+    null
+  );
+  useEffect(() => {
+    let cancelled = false;
+    getTopicNoteDraft(topicId)
+      .then((draft) => {
+        if (!cancelled && draft && draft.content !== initialMarkdown) {
+          setDraftBanner(draft);
+        }
+      })
+      .catch(() => {
+        // No draft, or couldn't check -- fine either way, nothing to recover.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicId]);
+
+  function restoreDraft() {
+    if (!editor || !draftBanner) return;
+    editor.commands.setContent(draftBanner.content);
+    setDraftBanner(null);
+  }
+
+  function discardDraft() {
+    setDraftBanner(null);
+    clearTopicNoteDraft(topicId).catch(() => {
+      // Non-critical -- worst case the banner reappears next load.
+    });
+  }
+
   function handleSave(status: "draft" | "published") {
     if (!editor) return;
+    if (!isOnline) {
+      emitToast("You're offline — reconnect before saving.", "error");
+      return;
+    }
     setError(null);
     if (status === "draft") setIsSavingDraft(true);
     const content = getMarkdown();
@@ -232,6 +360,7 @@ export function NoteEditor({
         const note = await saveTopicNote(topicId, content, status);
         if (isFirstSave && note?.id) setCurrentNoteId(note.id);
         setLastSavedContent(content);
+        setLastSavedAt(new Date());
         setIsDirty(false);
         emitToast(status === "published" ? "Topic note published." : "Draft saved.");
         if (isFirstSave) router.refresh();
@@ -252,6 +381,7 @@ export function NoteEditor({
     if (!note?.id) throw new Error("Could not create the note.");
     setCurrentNoteId(note.id);
     setLastSavedContent(getMarkdown());
+    setLastSavedAt(new Date());
     setIsDirty(false);
     router.refresh();
     return note.id;
@@ -460,11 +590,68 @@ export function NoteEditor({
         <div className="min-h-[24rem] animate-pulse rounded-lg border border-rule bg-white p-4" />
       ) : (
         <>
+          {!isOnline && (
+            <div className="mb-3 rounded-lg border border-clay/40 bg-clay/10 px-3 py-2 text-sm text-clay">
+              You're offline — changes aren't being saved. Reconnect to save or publish.
+            </div>
+          )}
+
+          {draftBanner && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-marigold/50 bg-marigold/10 px-3 py-2 text-sm text-ink">
+              <span>
+                Found unsaved changes from{" "}
+                {new Date(draftBanner.updatedAt).toLocaleString(undefined, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  month: "short",
+                  day: "numeric",
+                })}{" "}
+                — probably from a tab that closed before you could save.
+              </span>
+              <span className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={restoreDraft}
+                  className="rounded-lg bg-marigold px-3 py-1 text-xs font-medium text-ink hover:bg-marigold-dark"
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  onClick={discardDraft}
+                  className="rounded-lg border border-rule px-3 py-1 text-xs text-ink-soft hover:bg-white"
+                >
+                  Discard
+                </button>
+              </span>
+            </div>
+          )}
+
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs uppercase tracking-wide text-ink-soft">
               Currently: {initialStatus}
               {isDirty && (
                 <span className="ml-2 normal-case text-marigold-dark">Unsaved changes</span>
+              )}
+              {isSavingDraft && <span className="ml-2 normal-case">Saving…</span>}
+              {!isSavingDraft && lastSavedAt && (
+                <span className="ml-2 normal-case">
+                  Last saved{" "}
+                  {lastSavedAt.toLocaleTimeString(undefined, {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+              {isDirty && autosaveStatus === "saved" && lastAutosaveAt && (
+                <span className="ml-2 normal-case text-ink-soft/70">
+                  (autosaved{" "}
+                  {lastAutosaveAt.toLocaleTimeString(undefined, {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                  )
+                </span>
               )}
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -512,14 +699,16 @@ export function NoteEditor({
 
               <button
                 onClick={() => handleSave("draft")}
-                disabled={isPending}
+                disabled={isPending || !isOnline}
+                title={!isOnline ? "You're offline" : undefined}
                 className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
               >
                 {isSavingDraft ? "Saving…" : "Save draft"}
               </button>
               <button
                 onClick={() => handleSave("published")}
-                disabled={isPending}
+                disabled={isPending || !isOnline}
+                title={!isOnline ? "You're offline" : undefined}
                 className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
               >
                 Publish
@@ -1009,31 +1198,12 @@ export function NoteEditor({
               </div>
             </BubbleMenu>
           )}
-
-          {/* Mobile*/}
-          <div className="mb-2 flex gap-1 rounded-lg border border-rule bg-paper p-1 md:hidden">
-            <button
-              type="button"
-              onClick={() => setMobileTab("write")}
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "write" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
-            >
-              Write
-            </button>
-            <button
-              type="button"
-              onClick={() => setMobileTab("preview")}
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "preview" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
-            >
-              Preview
-            </button>
-          </div>
-
           <div
             onDragEnter={handleDragEnter}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`topic-prose relative min-h-[24rem] rounded-lg border bg-white p-4 ${mobileTab === "preview" ? "md:block" : ""} ${isDraggingFile ? "border-2 border-dashed border-marigold bg-marigold/10" : "border-rule"}`}
+            className={`topic-prose relative min-h-[24rem] rounded-lg border bg-white p-4 ${isDraggingFile ? "border-2 border-dashed border-marigold bg-marigold/10" : "border-rule"}`}
           >
             <EditorContent editor={editor} />
             {isDraggingFile && (
@@ -1049,6 +1219,45 @@ export function NoteEditor({
               </div>
             )}
           </div>
+
+          {editor && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-soft">
+              {(() => {
+                const stats = computeNoteStats(editor);
+                return (
+                  <>
+                    <span>
+                      {stats.words} word{stats.words === 1 ? "" : "s"}
+                    </span>
+                    <span>
+                      {stats.characters} character{stats.characters === 1 ? "" : "s"}
+                    </span>
+                    <span>~{stats.readingMinutes} min read</span>
+                    {stats.headings > 0 && (
+                      <span>
+                        {stats.headings} heading{stats.headings === 1 ? "" : "s"}
+                      </span>
+                    )}
+                    {stats.tables > 0 && (
+                      <span>
+                        {stats.tables} table{stats.tables === 1 ? "" : "s"}
+                      </span>
+                    )}
+                    {stats.images > 0 && (
+                      <span>
+                        {stats.images} image{stats.images === 1 ? "" : "s"}
+                      </span>
+                    )}
+                    {stats.resources > 0 && (
+                      <span>
+                        {stats.resources} resource{stats.resources === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
 
           <p className="mt-3 text-xs text-ink-soft">
             Images, videos, and other uploaded resources are attached separately after publishing —

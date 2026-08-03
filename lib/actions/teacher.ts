@@ -444,10 +444,76 @@ export async function saveTopicNote(
 
   if (error) throw new Error(error.message);
 
+  // The autosave scratch row (if any) is now superseded by this real,
+  // version-tracked save -- delete it so a stale autosave never lingers
+  // as "recoverable" content the teacher already explicitly saved past.
+  // Best-effort: a failure here shouldn't fail the save itself.
+  try {
+    await supabase
+      .from("topic_note_drafts")
+      .delete()
+      .eq("topic_id", topicId)
+      .eq("author_id", teacherId);
+  } catch {
+    // ignore -- worst case a harmless stale draft banner shows next load
+  }
+
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath("/dashboard/teacher/notes");
 
   return note;
+}
+
+/**
+ * Periodic autosave (#13 of markdown-editor-todo.md), UPSERTing onto a
+ * single scratch row per (topic, author) rather than creating another
+ * `topic_notes` version -- see the migration comment in
+ * 2026_08_03_topic_note_drafts.sql for why that distinction matters.
+ * Deliberately quiet: called on an interval from NoteEditor while the
+ * doc is dirty, not meant to throw a user-facing toast on every network
+ * hiccup the way an explicit Save Draft click should.
+ */
+export async function saveTopicNoteDraft(topicId: string, content: string) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can author notes.");
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("topic_note_drafts")
+    .upsert(
+      { topic_id: topicId, author_id: teacherId, content, updated_at: new Date().toISOString() },
+      { onConflict: "topic_id,author_id" }
+    );
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Checked once when a teacher opens a note, to offer recovering
+ * unsaved work from a tab/browser that closed uncleanly (crash, battery
+ * death, network drop right as they navigated away) -- the case the
+ * existing `beforeunload` warning can't catch, since that only fires
+ * for a clean, in-app navigation attempt.
+ */
+export async function getTopicNoteDraft(
+  topicId: string
+): Promise<{ content: string; updatedAt: string } | null> {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can author notes.");
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("topic_note_drafts")
+    .select("content, updated_at")
+    .eq("topic_id", topicId)
+    .eq("author_id", teacherId)
+    .maybeSingle();
+  return data ? { content: data.content, updatedAt: data.updated_at } : null;
+}
+
+export async function clearTopicNoteDraft(topicId: string) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can author notes.");
+  const supabase = createClient();
+  await supabase
+    .from("topic_note_drafts")
+    .delete()
+    .eq("topic_id", topicId)
+    .eq("author_id", teacherId);
 }
 
 /**

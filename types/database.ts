@@ -141,6 +141,17 @@ export type TopicNote = {
   updated_at: string;
 };
 
+// Periodic-autosave scratch row (#13 of markdown-editor-todo.md) --
+// one per (topic_id, author_id), never versioned like TopicNote itself.
+// See the 2026_08_03_topic_note_drafts.sql migration for why this is a
+// separate table rather than another TopicNote row.
+export type TopicNoteDraft = {
+  topic_id: string;
+  author_id: string;
+  content: string;
+  updated_at: string;
+};
+
 export type TopicResource = {
   id: string;
   topic_id: string;
@@ -806,6 +817,27 @@ export type Database = {
           {
             foreignKeyName: "curriculum_topics_created_by_fkey";
             columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      topic_note_drafts: {
+        Row: TopicNoteDraft;
+        Insert: Partial<TopicNoteDraft>;
+        Update: Partial<TopicNoteDraft>;
+        Relationships: [
+          {
+            foreignKeyName: "topic_note_drafts_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "curriculum_topics";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "topic_note_drafts_author_id_fkey";
+            columns: ["author_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
