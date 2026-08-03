@@ -581,7 +581,7 @@ export type RouteVehicleHistory = {
 
 // --- Quiz / assessment types ---
 
-export type QuestionType = "mcq" | "true_false";
+export type QuestionType = "mcq" | "true_false" | "fill_blank" | "matching" | "essay";
 
 export type Quiz = {
   id: string;
@@ -607,6 +607,9 @@ export type QuizOption = {
   id: string;
   question_id: string;
   option_text: string;
+  // Left-side prompt for a "matching" question's pair; null for every
+  // other question type.
+  match_prompt: string | null;
   is_correct: boolean;
   sequence_order: number;
 };
@@ -627,6 +630,12 @@ export type QuizAnswer = {
   attempt_id: string;
   question_id: string;
   selected_option_id: string | null;
+  // fill_blank / essay free-text answer
+  answer_text: string | null;
+  // matching: { [optionId]: chosenRightSideText }
+  matched_pairs: Record<string, string> | null;
+  // essay only: manual score from grade_quiz_essay_answers(), null until graded
+  points_awarded: number | null;
   answered_at: string;
 };
 
@@ -635,12 +644,16 @@ export type QuizAnswer = {
 export type QuizAttemptQuestionRow = {
   question_id: string;
   question_text: string;
+  question_type: QuestionType;
   points: number;
   question_sequence: number;
-  option_id: string;
-  option_text: string;
-  option_sequence: number;
+  option_id: string | null;
+  option_text: string | null;
+  match_prompt: string | null;
+  option_sequence: number | null;
   selected_option_id: string | null;
+  answer_text: string | null;
+  matched_pairs: Record<string, string> | null;
 };
 
 export type TransportFeeStructure = {
@@ -1847,11 +1860,21 @@ export type Database = {
         Returns: QuizAttemptQuestionRow[];
       };
       answer_quiz_question: {
-        Args: { p_attempt_id: string; p_question_id: string; p_selected_option_id: string };
+        Args: {
+          p_attempt_id: string;
+          p_question_id: string;
+          p_selected_option_id?: string | null;
+          p_answer_text?: string | null;
+          p_matched_pairs?: Record<string, string> | null;
+        };
         Returns: void;
       };
       submit_quiz_attempt: {
         Args: { p_attempt_id: string };
+        Returns: { score: number; total_points: number }[];
+      };
+      grade_quiz_essay_answers: {
+        Args: { p_attempt_id: string; p_scores: Record<string, number> };
         Returns: { score: number; total_points: number }[];
       };
       send_fee_reminders: {

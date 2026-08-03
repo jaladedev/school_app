@@ -16,15 +16,20 @@ type Question = {
   id: string;
   text: string;
   points: number;
-  options: { id: string; text: string }[];
+  type: QuizAttemptQuestionRow["question_type"];
+  options: { id: string; text: string; matchPrompt: string | null }[];
 };
 
 function groupQuestions(rows: QuizAttemptQuestionRow[]): {
   questions: Question[];
-  answered: Record<string, string>;
+  selected: Record<string, string>;
+  text: Record<string, string>;
+  matched: Record<string, Record<string, string>>;
 } {
   const byId = new Map<string, Question>();
-  const answered: Record<string, string> = {};
+  const selected: Record<string, string> = {};
+  const text: Record<string, string> = {};
+  const matched: Record<string, Record<string, string>> = {};
 
   for (const r of rows) {
     if (!byId.has(r.question_id)) {
@@ -32,14 +37,21 @@ function groupQuestions(rows: QuizAttemptQuestionRow[]): {
         id: r.question_id,
         text: r.question_text,
         points: r.points,
+        type: r.question_type,
         options: [],
       });
     }
-    byId.get(r.question_id)!.options.push({ id: r.option_id, text: r.option_text });
-    if (r.selected_option_id) answered[r.question_id] = r.selected_option_id;
+    if (r.option_id) {
+      byId
+        .get(r.question_id)!
+        .options.push({ id: r.option_id, text: r.option_text ?? "", matchPrompt: r.match_prompt });
+    }
+    if (r.selected_option_id) selected[r.question_id] = r.selected_option_id;
+    if (r.answer_text) text[r.question_id] = r.answer_text;
+    if (r.matched_pairs) matched[r.question_id] = r.matched_pairs;
   }
 
-  return { questions: [...byId.values()], answered };
+  return { questions: [...byId.values()], selected, text, matched };
 }
 
 function formatClock(seconds: number) {
@@ -60,7 +72,9 @@ export function QuizAttemptRunner({
   const router = useRouter();
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
+  const [textAnswers, setTextAnswers] = useState<Record<string, string>>({});
+  const [matchedAnswers, setMatchedAnswers] = useState<Record<string, Record<string, string>>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -84,9 +98,11 @@ export function QuizAttemptRunner({
 
         const rows = await getQuizAttemptQuestions(attempt.id);
         if (cancelled) return;
-        const { questions: qs, answered } = groupQuestions(rows);
+        const { questions: qs, selected, text, matched } = groupQuestions(rows);
         setQuestions(qs);
-        setAnswers(answered);
+        setSelectedAnswers(selected);
+        setTextAnswers(text);
+        setMatchedAnswers(matched);
       } catch (err) {
         if (!cancelled) setLoadError(err instanceof Error ? err.message : "Something went wrong.");
       } finally {
@@ -124,12 +140,33 @@ export function QuizAttemptRunner({
   }, [secondsLeft, result, doSubmit]);
 
   function selectOption(questionId: string, optionId: string) {
-    setAnswers((a) => ({ ...a, [questionId]: optionId }));
+    setSelectedAnswers((a) => ({ ...a, [questionId]: optionId }));
     if (attemptId) {
-      answerQuizQuestion(attemptId, questionId, optionId).catch((err) => {
+      answerQuizQuestion(attemptId, questionId, { selectedOptionId: optionId }).catch((err) => {
         emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
       });
     }
+  }
+
+  function setTextAnswer(questionId: string, value: string) {
+    setTextAnswers((a) => ({ ...a, [questionId]: value }));
+    if (attemptId) {
+      answerQuizQuestion(attemptId, questionId, { answerText: value }).catch((err) => {
+        emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
+      });
+    }
+  }
+
+  function setMatchAnswer(questionId: string, optionId: string, chosenText: string) {
+    setMatchedAnswers((a) => {
+      const next = { ...a, [questionId]: { ...(a[questionId] ?? {}), [optionId]: chosenText } };
+      if (attemptId) {
+        answerQuizQuestion(attemptId, questionId, { matchedPairs: next[questionId] }).catch((err) => {
+          emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
+        });
+      }
+      return next;
+    });
   }
 
   if (loading) return <p className="text-sm text-ink-soft">Loading quiz…</p>;
@@ -152,7 +189,17 @@ export function QuizAttemptRunner({
     );
   }
 
-  const answeredCount = Object.keys(answers).length;
+  function isAnswered(q: Question) {
+    if (q.type === "matching") {
+      return q.options.every((o) => (matchedAnswers[q.id]?.[o.id] ?? "").trim());
+    }
+    if (q.type === "fill_blank" || q.type === "essay") {
+      return (textAnswers[q.id] ?? "").trim().length > 0;
+    }
+    return Boolean(selectedAnswers[q.id]);
+  }
+
+  const answeredCount = questions.filter(isAnswered).length;
 
   return (
     <div className="max-w-2xl">
@@ -184,26 +231,78 @@ export function QuizAttemptRunner({
               <span className="text-xs text-ink-soft">{q.points} pts</span>
             </div>
             <QuestionText text={q.text} className="mb-3" />
-            <div className="space-y-2">
-              {q.options.map((o) => (
-                <label
-                  key={o.id}
-                  className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-                    answers[q.id] === o.id
-                      ? "border-leaf bg-leaf-soft"
-                      : "border-rule hover:bg-paper"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`q-${q.id}`}
-                    checked={answers[q.id] === o.id}
-                    onChange={() => selectOption(q.id, o.id)}
-                  />
-                  {o.text}
-                </label>
-              ))}
-            </div>
+
+            {(q.type === "mcq" || q.type === "true_false") && (
+              <div className="space-y-2">
+                {q.options.map((o) => (
+                  <label
+                    key={o.id}
+                    className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                      selectedAnswers[q.id] === o.id
+                        ? "border-leaf bg-leaf-soft"
+                        : "border-rule hover:bg-paper"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`q-${q.id}`}
+                      checked={selectedAnswers[q.id] === o.id}
+                      onChange={() => selectOption(q.id, o.id)}
+                    />
+                    {o.text}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {q.type === "fill_blank" && (
+              <input
+                value={textAnswers[q.id] ?? ""}
+                onChange={(e) => setTextAnswer(q.id, e.target.value)}
+                placeholder="Your answer"
+                className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+              />
+            )}
+
+            {q.type === "essay" && (
+              <textarea
+                value={textAnswers[q.id] ?? ""}
+                onChange={(e) => setTextAnswer(q.id, e.target.value)}
+                placeholder="Write your answer…"
+                rows={5}
+                className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+              />
+            )}
+
+            {q.type === "matching" && (
+              <div className="space-y-2">
+                {q.options.map((o) => (
+                  <div key={o.id} className="flex items-center gap-2 text-sm">
+                    <span className="flex-1 rounded-lg border border-rule bg-paper px-3 py-2">
+                      {o.matchPrompt}
+                    </span>
+                    <span className="text-ink-soft">→</span>
+                    <select
+                      value={matchedAnswers[q.id]?.[o.id] ?? ""}
+                      onChange={(e) => setMatchAnswer(q.id, o.id, e.target.value)}
+                      className="flex-1 rounded-lg border border-rule px-3 py-2"
+                    >
+                      <option value="" disabled>
+                        Choose a match…
+                      </option>
+                      {[...q.options]
+                        .map((opt) => opt.text)
+                        .sort((a, b) => a.localeCompare(b))
+                        .map((text) => (
+                          <option key={text} value={text}>
+                            {text}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

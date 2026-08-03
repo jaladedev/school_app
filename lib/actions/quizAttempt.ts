@@ -30,13 +30,18 @@ export async function getQuizAttemptQuestions(
 export async function answerQuizQuestion(
   attemptId: string,
   questionId: string,
-  selectedOptionId: string
+  payload:
+    | { selectedOptionId: string }
+    | { answerText: string }
+    | { matchedPairs: Record<string, string> }
 ) {
   const supabase = createClient();
   const { error } = await supabase.rpc("answer_quiz_question", {
     p_attempt_id: attemptId,
     p_question_id: questionId,
-    p_selected_option_id: selectedOptionId,
+    p_selected_option_id: "selectedOptionId" in payload ? payload.selectedOptionId : null,
+    p_answer_text: "answerText" in payload ? payload.answerText : null,
+    p_matched_pairs: "matchedPairs" in payload ? payload.matchedPairs : null,
   });
   if (error) throw new Error(error.message);
 }

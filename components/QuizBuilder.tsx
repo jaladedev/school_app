@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { createQuiz } from "@/lib/actions/quiz";
 import { emitToast } from "@/lib/toast";
 
-type QuestionType = "mcq" | "true_false";
-type OptionDraft = { text: string; isCorrect: boolean };
+type QuestionType = "mcq" | "true_false" | "fill_blank" | "matching" | "essay";
+type OptionDraft = { text: string; isCorrect: boolean; matchPrompt?: string };
 type QuestionDraft = {
   questionText: string;
   questionType: QuestionType;
@@ -14,15 +14,37 @@ type QuestionDraft = {
   options: OptionDraft[];
 };
 
+function blankOptionsFor(type: QuestionType): OptionDraft[] {
+  switch (type) {
+    case "true_false":
+      return [
+        { text: "True", isCorrect: true },
+        { text: "False", isCorrect: false },
+      ];
+    case "fill_blank":
+      return [{ text: "", isCorrect: true }];
+    case "matching":
+      return [
+        { text: "", isCorrect: true, matchPrompt: "" },
+        { text: "", isCorrect: true, matchPrompt: "" },
+      ];
+    case "essay":
+      return [];
+    case "mcq":
+    default:
+      return [
+        { text: "", isCorrect: false },
+        { text: "", isCorrect: false },
+      ];
+  }
+}
+
 function blankQuestion(): QuestionDraft {
   return {
     questionText: "",
     questionType: "mcq",
     points: 1,
-    options: [
-      { text: "", isCorrect: false },
-      { text: "", isCorrect: false },
-    ],
+    options: blankOptionsFor("mcq"),
   };
 }
 
@@ -52,24 +74,7 @@ export function QuizBuilder({
 
   function setQuestionType(index: number, type: QuestionType) {
     setQuestions((qs) =>
-      qs.map((q, i) =>
-        i === index
-          ? {
-              ...q,
-              questionType: type,
-              options:
-                type === "true_false"
-                  ? [
-                      { text: "True", isCorrect: true },
-                      { text: "False", isCorrect: false },
-                    ]
-                  : [
-                      { text: "", isCorrect: false },
-                      { text: "", isCorrect: false },
-                    ],
-            }
-          : q
-      )
+      qs.map((q, i) => (i === index ? { ...q, questionType: type, options: blankOptionsFor(type) } : q))
     );
   }
 
@@ -98,9 +103,16 @@ export function QuizBuilder({
 
   function addOption(qIndex: number) {
     setQuestions((qs) =>
-      qs.map((q, i) =>
-        i === qIndex ? { ...q, options: [...q.options, { text: "", isCorrect: false }] } : q
-      )
+      qs.map((q, i) => {
+        if (i !== qIndex) return q;
+        const newRow: OptionDraft =
+          q.questionType === "fill_blank"
+            ? { text: "", isCorrect: true }
+            : q.questionType === "matching"
+              ? { text: "", isCorrect: true, matchPrompt: "" }
+              : { text: "", isCorrect: false };
+        return { ...q, options: [...q.options, newRow] };
+      })
     );
   }
 
@@ -142,7 +154,11 @@ export function QuizBuilder({
             questionText: q.questionText,
             questionType: q.questionType,
             points: Number(q.points) || 1,
-            options: q.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect })),
+            options: q.options.map((o) => ({
+              text: o.text,
+              isCorrect: o.isCorrect,
+              matchPrompt: o.matchPrompt,
+            })),
           })),
         });
         emitToast("Quiz created — publish it when you're ready.");
@@ -230,6 +246,9 @@ export function QuizBuilder({
               >
                 <option value="mcq">Multiple choice</option>
                 <option value="true_false">True / False</option>
+                <option value="fill_blank">Fill in the blank</option>
+                <option value="matching">Matching</option>
+                <option value="essay">Essay</option>
               </select>
               <label className="flex items-center gap-2 text-sm text-ink-soft">
                 Points
@@ -244,45 +263,130 @@ export function QuizBuilder({
               </label>
             </div>
 
-            <div className="space-y-2">
-              {q.options.map((o, oIndex) => (
-                <div key={oIndex} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name={`correct-${qIndex}`}
-                    checked={o.isCorrect}
-                    onChange={() => markCorrect(qIndex, oIndex)}
-                    aria-label="Correct answer"
-                  />
-                  <input
-                    required
-                    disabled={q.questionType === "true_false"}
-                    placeholder={`Option ${oIndex + 1}`}
-                    value={o.text}
-                    onChange={(e) => updateOption(qIndex, oIndex, { text: e.target.value })}
-                    className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold disabled:bg-paper"
-                  />
-                  {q.questionType === "mcq" && q.options.length > 2 && (
-                    <button
-                      type="button"
-                      onClick={() => removeOption(qIndex, oIndex)}
-                      className="text-xs text-clay hover:underline"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              ))}
-              {q.questionType === "mcq" && (
+            {(q.questionType === "mcq" || q.questionType === "true_false") && (
+              <div className="space-y-2">
+                {q.options.map((o, oIndex) => (
+                  <div key={oIndex} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name={`correct-${qIndex}`}
+                      checked={o.isCorrect}
+                      onChange={() => markCorrect(qIndex, oIndex)}
+                      aria-label="Correct answer"
+                    />
+                    <input
+                      required
+                      disabled={q.questionType === "true_false"}
+                      placeholder={`Option ${oIndex + 1}`}
+                      value={o.text}
+                      onChange={(e) => updateOption(qIndex, oIndex, { text: e.target.value })}
+                      className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold disabled:bg-paper"
+                    />
+                    {q.questionType === "mcq" && q.options.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => removeOption(qIndex, oIndex)}
+                        className="text-xs text-clay hover:underline"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {q.questionType === "mcq" && (
+                  <button
+                    type="button"
+                    onClick={() => addOption(qIndex)}
+                    className="text-xs text-leaf hover:underline"
+                  >
+                    + Add option
+                  </button>
+                )}
+              </div>
+            )}
+
+            {q.questionType === "fill_blank" && (
+              <div className="space-y-2">
+                <p className="text-xs text-ink-soft">
+                  Accepted answers (any one matches, case-insensitive)
+                </p>
+                {q.options.map((o, oIndex) => (
+                  <div key={oIndex} className="flex items-center gap-2">
+                    <input
+                      required={oIndex === 0}
+                      placeholder={`Accepted answer ${oIndex + 1}`}
+                      value={o.text}
+                      onChange={(e) => updateOption(qIndex, oIndex, { text: e.target.value })}
+                      className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+                    />
+                    {q.options.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeOption(qIndex, oIndex)}
+                        className="text-xs text-clay hover:underline"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
                 <button
                   type="button"
                   onClick={() => addOption(qIndex)}
                   className="text-xs text-leaf hover:underline"
                 >
-                  + Add option
+                  + Add another accepted answer
                 </button>
-              )}
-            </div>
+              </div>
+            )}
+
+            {q.questionType === "matching" && (
+              <div className="space-y-2">
+                <p className="text-xs text-ink-soft">Pairs students will match left to right</p>
+                {q.options.map((o, oIndex) => (
+                  <div key={oIndex} className="flex items-center gap-2">
+                    <input
+                      required
+                      placeholder={`Prompt ${oIndex + 1}`}
+                      value={o.matchPrompt ?? ""}
+                      onChange={(e) => updateOption(qIndex, oIndex, { matchPrompt: e.target.value })}
+                      className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+                    />
+                    <span className="text-ink-soft">→</span>
+                    <input
+                      required
+                      placeholder={`Match ${oIndex + 1}`}
+                      value={o.text}
+                      onChange={(e) => updateOption(qIndex, oIndex, { text: e.target.value })}
+                      className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+                    />
+                    {q.options.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => removeOption(qIndex, oIndex)}
+                        className="text-xs text-clay hover:underline"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addOption(qIndex)}
+                  className="text-xs text-leaf hover:underline"
+                >
+                  + Add pair
+                </button>
+              </div>
+            )}
+
+            {q.questionType === "essay" && (
+              <p className="rounded-lg bg-paper px-3 py-2 text-xs text-ink-soft">
+                Students answer in free text. You&apos;ll score this yourself after they submit —
+                it won&apos;t count toward their score automatically.
+              </p>
+            )}
           </div>
         ))}
       </div>

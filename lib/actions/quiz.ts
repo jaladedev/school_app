@@ -2,13 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
 
 type QuestionInput = {
   questionText: string;
-  questionType: "mcq" | "true_false";
+  questionType: "mcq" | "true_false" | "fill_blank" | "matching" | "essay";
   points: number;
-  options: { text: string; isCorrect: boolean }[];
+  // mcq/true_false: the option list, one marked correct.
+  // fill_blank: each option is one accepted answer (all is_correct: true).
+  // matching: each option is a pair — text is the right side, matchPrompt
+  //   the left side; is_correct is unused (every row is "correct" by
+  //   construction — matching is scored on the pairing, not per-option).
+  // essay: options is empty; not used at all.
+  options: { text: string; isCorrect: boolean; matchPrompt?: string }[];
 };
 
 export async function createQuiz(input: {
@@ -52,10 +59,22 @@ export async function createQuiz(input: {
   }
   for (const [i, q] of input.questions.entries()) {
     if (!q.questionText.trim()) throw new Error(`Question ${i + 1} needs text.`);
-    if (q.options.length < 2) throw new Error(`Question ${i + 1} needs at least two options.`);
-    if (!q.options.some((o) => o.isCorrect)) {
-      throw new Error(`Question ${i + 1} needs a correct option marked.`);
+    if (q.questionType === "mcq" || q.questionType === "true_false") {
+      if (q.options.length < 2) throw new Error(`Question ${i + 1} needs at least two options.`);
+      if (!q.options.some((o) => o.isCorrect)) {
+        throw new Error(`Question ${i + 1} needs a correct option marked.`);
+      }
+    } else if (q.questionType === "fill_blank") {
+      if (!q.options.length || q.options.every((o) => !o.text.trim())) {
+        throw new Error(`Question ${i + 1} needs at least one accepted answer.`);
+      }
+    } else if (q.questionType === "matching") {
+      if (q.options.length < 2) throw new Error(`Question ${i + 1} needs at least two pairs.`);
+      if (q.options.some((o) => !o.matchPrompt?.trim() || !o.text.trim())) {
+        throw new Error(`Question ${i + 1} has an incomplete pair.`);
+      }
     }
+    // essay: question text is the only requirement, already checked above.
   }
 
   const admin = createAdminClient();
@@ -114,15 +133,20 @@ export async function createQuiz(input: {
       .single();
     if (questionError) throw new Error(questionError.message);
 
-    const { error: optionsError } = await admin.from("quiz_options").insert(
-      q.options.map((o, oIndex) => ({
-        question_id: question.id,
-        option_text: o.text.trim(),
-        is_correct: o.isCorrect,
-        sequence_order: oIndex + 1,
-      }))
-    );
-    if (optionsError) throw new Error(optionsError.message);
+    const nonBlankOptions = q.options.filter((o) => o.text.trim());
+    if (nonBlankOptions.length) {
+      const { error: optionsError } = await admin.from("quiz_options").insert(
+        nonBlankOptions.map((o, oIndex) => ({
+          question_id: question.id,
+          option_text: o.text.trim(),
+          match_prompt: o.matchPrompt?.trim() || null,
+          // fill_blank has no "wrong" options — every accepted answer is correct
+          is_correct: q.questionType === "fill_blank" ? true : o.isCorrect,
+          sequence_order: oIndex + 1,
+        }))
+      );
+      if (optionsError) throw new Error(optionsError.message);
+    }
   }
 
   revalidatePath("/dashboard/teacher/quizzes");
@@ -140,5 +164,30 @@ export async function setQuizPublished(quizId: string, isPublished: boolean) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/teacher/quizzes");
+  revalidatePath(`/dashboard/teacher/quizzes/${quizId}`);
+}
+
+// Awards points for one or more essay answers on an already-submitted
+// attempt and recomputes that attempt's total score. `scores` maps
+// question id -> points awarded; a teacher can grade essays one at a
+// time across visits, each call only touches the questions it's given.
+export async function gradeQuizEssayAnswers(
+  quizId: string,
+  attemptId: string,
+  scores: Record<string, number>
+) {
+  await assertRole(["admin", "teacher"], "Only an admin or teacher can do this.");
+
+  // Runs as the caller's own session (not the admin client) — the RPC is
+  // SECURITY DEFINER and checks auth.uid() against is_admin()/
+  // subjects_taught internally, same pattern the student-facing RPCs in
+  // quizAttempt.ts already use.
+  const supabase = createClient();
+  const { error } = await supabase.rpc("grade_quiz_essay_answers", {
+    p_attempt_id: attemptId,
+    p_scores: scores,
+  });
+  if (error) throw new Error(error.message);
+
   revalidatePath(`/dashboard/teacher/quizzes/${quizId}`);
 }
