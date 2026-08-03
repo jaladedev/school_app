@@ -33,6 +33,7 @@ export type SlashCommandItem = {
 type SlashCommandBridge = {
   openResourcePicker?: () => void;
   openDiagramPanel?: () => void;
+  openEmojiPicker?: () => void;
 };
 
 // NoteEditor's "open the resource picker" / "open the diagram panel"
@@ -120,6 +121,14 @@ const ALL_ITEMS: SlashCommandItem[] = [
     run: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
       slashCommandBridge.openDiagramPanel?.();
+    },
+  },
+  {
+    title: "Emoji",
+    icon: "😀",
+    run: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      slashCommandBridge.openEmojiPicker?.();
     },
   },
   {

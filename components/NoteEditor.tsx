@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import { Extension, type Editor } from "@tiptap/core";
@@ -40,6 +40,8 @@ import {
 import { emitToast } from "@/lib/toast";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { ResourceChip } from "@/lib/tiptap/resource-node";
+import { EmojiPicker } from "@/components/EmojiPicker";
+import { clampPopoverToEditor } from "@/lib/tiptap/popover-position";
 import { MathInline, MathBlock } from "@/lib/tiptap/math-nodes";
 import type { TopicResource } from "@/types/database";
 
@@ -134,6 +136,16 @@ export function NoteEditor({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  // Set only when the picker is opened via the slash command -- gives it a
+  // cursor-anchored `position: fixed` spot instead of the toolbar-anchored
+  // dropdown, so picking an emoji while typing deep in a long note doesn't
+  // require jumping your eyes up to the toolbar and back. Left `null` for
+  // the toolbar button's own click, which anchors to itself instead (you
+  // just clicked it, so it's already where you're looking).
+  const [emojiPickerPos, setEmojiPickerPos] = useState<{ top: number; left: number } | null>(
+    null
+  );
   const [diagramPanelOpen, setDiagramPanelOpen] = useState(false);
 
   useEffect(() => {
@@ -150,13 +162,15 @@ export function NoteEditor({
   const [uploadingCount, setUploadingCount] = useState(0);
   const dragDepthRef = useRef(0);
   const pickerRef = useRef<HTMLDivElement | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+  const emojiPopupRef = useRef<HTMLDivElement | null>(null);
   const diagramSectionRef = useRef<HTMLDivElement | null>(null);
   const noteContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Scroll these into view whenever they open -- both can be triggered by
-  // the slash command from anywhere in a long note, and without this the
-  // popover/panel opens near the toolbar while the user is still looking
-  // at their cursor further down, making it seem like nothing happened.
+  // The resource picker still needs the old scroll-to-toolbar treatment --
+  // it has no cursor-relative anchor point the way emoji insertion does
+  // (you're picking a whole attachment, not something that lands at the
+  // caret), so bringing the toolbar into view is the right fix there.
   useEffect(() => {
     if (pickerOpen) pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [pickerOpen]);
@@ -235,6 +249,33 @@ export function NoteEditor({
     editor,
     selector: ({ editor }) => editor?.state,
   });
+
+  useEffect(() => {
+    slashCommandBridge.openEmojiPicker = () => {
+      // Read the caret's on-screen position right now, before React
+      // re-renders -- `editor.state.selection` reflects the document as it
+      // stands the instant this runs (the slash command's own deleteRange
+      // has already landed the cursor where "/emoji" used to be).
+      const pos = editor?.state.selection.from;
+      if (editor && pos != null) {
+        const coords = editor.view.coordsAtPos(pos);
+        setEmojiPickerPos({ left: coords.left, top: coords.bottom + 6 });
+      } else {
+        setEmojiPickerPos(null);
+      }
+      setEmojiPickerOpen(true);
+    };
+  });
+
+  // Re-clamp the cursor-anchored emoji popup inside the editor's bounds
+  // whenever it opens -- same reasoning and helper as MathInline's floating
+  // popup (see math-nodes.tsx): opening near the editor's right/bottom edge
+  // would otherwise render partly off the visible note.
+  useLayoutEffect(() => {
+    if (emojiPickerOpen && emojiPickerPos && emojiPopupRef.current) {
+      clampPopoverToEditor(emojiPopupRef.current, editor?.view?.dom ?? null);
+    }
+  }, [emojiPickerOpen, emojiPickerPos, editor]);
 
   useEffect(() => {
     if (!editor) return;
@@ -452,6 +493,26 @@ export function NoteEditor({
   }, [pickerOpen]);
 
   useEffect(() => {
+    if (!emojiPickerOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      // The cursor-anchored popup (emojiPopupRef) renders outside the
+      // toolbar wrapper's DOM subtree via `position: fixed`, so a click
+      // inside it wouldn't register as "inside emojiPickerRef" -- check
+      // both, or picking an emoji from the floating popup would
+      // immediately close itself before onSelect's own close ever ran.
+      const insideToolbarAnchor = emojiPickerRef.current?.contains(target);
+      const insideFloatingPopup = emojiPopupRef.current?.contains(target);
+      if (!insideToolbarAnchor && !insideFloatingPopup) {
+        setEmojiPickerOpen(false);
+        setEmojiPickerPos(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [emojiPickerOpen]);
+
+  useEffect(() => {
     if (!isDirty) return;
     function handleBeforeUnload(e: BeforeUnloadEvent) {
       e.preventDefault();
@@ -506,6 +567,15 @@ export function NoteEditor({
 
   function insertTable() {
     editor?.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run();
+  }
+
+  function insertEmoji(emoji: string) {
+    // Emoji are just Unicode text, not a custom node -- inserting as
+    // plain content means they round-trip through markdown for free
+    // (no serialize/parse wiring needed, unlike MathInline/ResourceChip).
+    editor?.chain().focus().insertContent(emoji).run();
+    setEmojiPickerOpen(false);
+    setEmojiPickerPos(null);
   }
 
   function insertMath(displayMode: boolean) {
@@ -1132,7 +1202,36 @@ export function NoteEditor({
             >
               Table
             </button>
+            <span className="mx-1 h-4 w-px bg-rule" />
+            <div className="relative" ref={emojiPickerRef}>
+              <button
+                type="button"
+                title="Insert emoji"
+                onClick={() => {
+                  setEmojiPickerPos(null); // toolbar-anchored, not cursor-anchored
+                  setEmojiPickerOpen((open) => !open);
+                }}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${emojiPickerOpen ? "bg-white" : ""}`}
+              >
+                😀
+              </button>
+              {emojiPickerOpen && !emojiPickerPos && (
+                <div className="absolute left-0 top-full z-20 mt-1">
+                  <EmojiPicker onSelect={insertEmoji} />
+                </div>
+              )}
+            </div>
           </div>
+
+          {emojiPickerOpen && emojiPickerPos && (
+            <div
+              ref={emojiPopupRef}
+              style={{ position: "fixed", left: emojiPickerPos.left, top: emojiPickerPos.top }}
+              className="z-20"
+            >
+              <EmojiPicker onSelect={insertEmoji} />
+            </div>
+          )}
 
           {editor && (
             <BubbleMenu

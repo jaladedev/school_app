@@ -146,12 +146,13 @@ Written back when the editor was a fixed 2-column Markdown/Preview grid (see #11
 
 Explicit Save Draft / Publish buttons remain for real saves, plus now periodic autosave. `NoteEditor.tsx` tracks `isDirty` against `lastSavedContent` and shows an "Unsaved changes" label + a `beforeunload` warning. Periodic autosave (every 20s, guarded by `isDirty`/online checks) writes to a new `topic_note_drafts` table via `saveTopicNoteDraft`/`getTopicNoteDraft`/`clearTopicNoteDraft` (`lib/actions/teacher.ts`) — a separate scratch table (upsert per topic/author, deleted on real save) rather than another `saveTopicNote` version row, avoiding the version-flooding problem. Offline detection via `navigator.onLine` + `online`/`offline` listeners. Saving indicator and last-saved timestamp tracked via `autosaveStatus`/`lastAutosaveAt`.
 
-## 14. Version History
+## 14. Version History — DONE
 
-**Check first** — `NoteVersionDiff.tsx` already exists in the codebase. Audit before building:
+Audited: view, compare, restore, and author/timestamp all present, split across two files rather than one.
 
-- Confirm it already covers: view previous versions, compare, restore, author/timestamp
-- Only build what's missing
+- View previous versions + author/timestamp — the "Version history" list in `page.tsx`, pulling `full_name` off the `profiles` join (falls back to "Unknown author" if the join comes back empty) and `updated_at` via `toLocaleString()`
+- Compare — `NoteVersionDiff.tsx`, word-level diff (`lib/diff.ts`) between any two versions, defaulting to the latest two so the most common comparison needs zero clicks
+- Restore — `RestoreVersionButton.tsx`, one per version row, restores as a new draft (doesn't overwrite history) via `restoreTopicNoteVersion`
 
 ## 15. Learning Objective Block — SUSPENDED
 
@@ -187,9 +188,13 @@ Currently: LaTeX via `$...$`/`$$...$$` with toolbar buttons and KaTeX rendering 
 
 - Remaining gap: a _visual_ equation builder (no manual LaTeX) — this is the only new piece; keep the existing LaTeX path as a power-user fallback
 
-## 20. Emoji Picker
+## 20. Emoji Picker — DONE
 
-Not present. New build.
+Built as `components/EmojiPicker.tsx`: 8 curated categories (Smileys, Gestures, People, Animals & Nature, Food, Activities, School & Objects, Symbols) — a hand-picked set rather than a full Unicode dataset, since most of the thousands of available emoji are never relevant to a school note.
+
+- Toolbar button (😀) next to Table, opens a tabbed category + grid popover (same dropdown/outside-click-close pattern as the resource picker)
+- Also reachable via slash command (`/emoji`), wired through `slashCommandBridge` same as Image/Video/Diagram
+- Inserts as plain Unicode text (`insertContent`), not a custom node — round-trips through markdown with zero extra serialize/parse code needed
 
 ## 21. Symbol Picker
 
