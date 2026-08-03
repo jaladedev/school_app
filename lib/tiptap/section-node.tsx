@@ -91,7 +91,7 @@ function SectionView({
       >
         <button
           type="button"
-          title="Drag to reorder section"
+          title="Drag to reorder section (or click inside and press Alt+Up/Down)"
           data-drag-handle
           onMouseDown={() => setDragArmed(true)}
           onMouseUp={() => setDragArmed(false)}

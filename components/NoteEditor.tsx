@@ -27,6 +27,7 @@ import { CodeBlock } from "@/lib/tiptap/code-block";
 import "highlight.js/styles/github-dark.css";
 import { Callout } from "@/lib/tiptap/callout-node";
 import { Section, groupIntoSections } from "@/lib/tiptap/section-node";
+import { BlockReorderShortcuts } from "@/lib/tiptap/block-reorder";
 import { SlashCommand, slashCommandBridge } from "@/lib/tiptap/slash-command";
 import { CharacterCount } from "@tiptap/extension-character-count";
 import {
@@ -197,6 +198,7 @@ export function NoteEditor({
     immediatelyRender: false,
     extensions: [
       TabTrap,
+      BlockReorderShortcuts,
       StarterKit.configure({
         link: { openOnClick: false, autolink: true },
         codeBlock: false,

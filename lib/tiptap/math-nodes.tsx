@@ -223,7 +223,7 @@ function makeMathView(displayMode: boolean) {
           type="button"
           onMouseDown={() => setDragArmed(true)}
           onMouseUp={() => setDragArmed(false)}
-          title="Drag to reorder"
+          title="Drag to reorder (or click inside and press Alt+Up/Down)"
           data-drag-handle
           className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab select-none items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
         >

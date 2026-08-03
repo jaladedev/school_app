@@ -124,7 +124,7 @@ function CalloutView({
           type="button"
           onMouseDown={() => setDragArmed(true)}
           onMouseUp={() => setDragArmed(false)}
-          title="Drag to reorder"
+          title="Drag to reorder (or click inside and press Alt+Up/Down)"
           data-drag-handle
           className="cursor-grab select-none rounded px-0.5 text-sm text-ink-soft/60 hover:text-ink-soft active:cursor-grabbing"
         >

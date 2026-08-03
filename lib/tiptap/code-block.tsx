@@ -96,7 +96,7 @@ function CodeBlockView({
             type="button"
             onMouseDown={() => setDragArmed(true)}
             onMouseUp={() => setDragArmed(false)}
-            title="Drag to reorder"
+            title="Drag to reorder (or click inside and press Alt+Up/Down)"
             data-drag-handle
             className="cursor-grab select-none rounded px-0.5 text-sm text-white/50 hover:text-white/80 active:cursor-grabbing"
           >

@@ -268,15 +268,13 @@ Currently: resources listed via `TopicResourceList`, inserted via a dropdown pic
 
 - Convert to persistent sidebar with one-click insertion (ties into #6 Resource Node)
 
-## 34. Drag-and-Drop Reordering — PARTIALLY DONE (correcting a stale entry)
+## 34. Drag-and-Drop Reordering — DONE (correcting a second stale pass)
 
-This entry was stale — it said "not present, depends on #10" for all four (sections/images/activities/resources), but that was never fully true:
+This entry was stale twice over — it originally said "not present, depends on #10" for all four (sections/images/activities/resources), which was already wrong; a later pass narrowed the gap to just Activities, which is now also done:
 
-- **Images/resources** — already done, and not actually dependent on #10 at all: `resource-node.tsx`'s drag handle + `moveResourceChip()` (delete-at-source, insert-at-target in one transaction) was built under **#6**, operating on raw ProseMirror positions rather than anything section-related. Verified with a position-math test in both directions (`tests/resource-chip-reorder.test.ts`) — forward and backward drags both preserve the other chips' relative order correctly.
-- **Sections** — done now via #10 (see its entry above).
-- **Activities** — still not present. "Activity"/"Homework" are the Callout node (#17) pre-set to those `calloutType`s, and `callout-node.tsx` has no drag handle or reorder logic at all — reordering one today means cut/paste. This is the one real gap left in #34's original scope.
-
-Remaining: add the same handle + move-transaction pattern from `resource-node.tsx` to `callout-node.tsx` (or promote Callout to a child of the new `section` node's drag mechanism, since a section already carries its whole content as a unit — reordering a callout _within_ a section body is the more precise ask here).
+- **Images/resources** — done, and not actually dependent on #10 at all: `resource-node.tsx`'s drag handle was built under **#6**. Verified with a position-math test in both directions (`tests/resource-chip-reorder.test.ts`).
+- **Sections** — done via #10.
+- **Activities** — done. `callout-node.tsx` has the same `dragArmed`-gated handle + `draggable: true` + `stopEvent: dragAwareStopEvent` pattern as `section-node.tsx`/`resource-node.tsx` (drag handle button, armed on mousedown, disarmed on mouseup/dragend so a plain click can't leave it draggable). No separate `moveResourceChip`-style transaction needed for any of the three — all three now ride native ProseMirror node dragging instead of a hand-rolled onDragStart/onDragOver/onDrop pipeline (see the comment above `ResourceChipView` in `resource-node.tsx` for why the hand-rolled version was replaced).
 
 ## 35. Presentation Mode — DONE
 
@@ -292,9 +290,10 @@ Remaining: add the same handle + move-transaction pattern from `resource-node.ts
 
 Not present. New build — Polls, Quick questions, Reflection prompts, Classroom activities (likely custom Nodes, same pattern as #15/#17).
 
-## 37. Accessibility Features
+## 37. Accessibility Features — IN PROGRESS
 
-Not present as a checked-off set.
+- ✅ Keyboard block reordering (`lib/tiptap/block-reorder.ts`, `BlockReorderShortcuts`) — Section/Callout/CodeBlock/MathBlock could previously only be reordered by dragging the handle, no keyboard/screen-reader path at all. Alt+Up / Alt+Down (and Mod-Alt- variants, since plain Alt+Arrow is taken by some browsers/WMs for tab/history nav) now swaps the block containing the cursor with its previous/next sibling — walks up from the selection to the *shallowest* ancestor of a draggable type (so a cursor in a paragraph inside a Callout inside a Section moves the Section, not the Callout), builds a `replaceWith` swap over the two sibling ranges, and re-resolves the selection into the moved block afterward rather than leaving it wherever ProseMirror's default position-mapping lands. Drag-handle `title` attributes on all four node types updated to mention the shortcut for discoverability. **Known gap:** ResourceChip is deliberately excluded — it's an inline node (lives inside a paragraph, not as a block sibling), so its "move" semantics would mean swapping with an adjacent inline sibling in the same paragraph, not this block-swap logic; needs its own pass.
+- Still not present: full keyboard navigation beyond this one gap, screen reader compatibility audit, high-contrast mode, adjustable font sizes, dyslexia-friendly font option.
 
 - Full keyboard navigation, Screen reader compatibility, High-contrast mode, Adjustable font sizes, Dyslexia-friendly font option
 
@@ -308,8 +307,8 @@ Not present as a checked-off set.
 4. ~~#4 tables~~ — DONE. ~~#5 images~~ — DONE. ~~#25 code blocks~~ — DONE (editor + published-view parity)
 5. ~~#8 slash commands, #17 callouts~~ — DONE. #15 learning objectives SUSPENDED, skip
 6. ~~#13 autosave~~ — DONE. ~~#28 word stats~~ — DONE. ~~#12 resizable panes~~ — NOT NEEDED (no split pane exists post-migration)
-7. ~~#10 block-based editing~~ — V1 DONE (see status above for what's deferred). ~~#34 images/resources~~ — already done under #6, verified. #34 activities (Callout drag handle) — NEXT
-8. Everything else (#20–24, #26, #27, #30–37) — lower priority, mostly additive
+7. ~~#10 block-based editing~~ — V1 DONE (see status above for what's deferred). ~~#34 drag-and-drop reordering~~ — DONE, all four (sections/images/resources/activities) confirmed working, no gaps left.
+8. Everything else (#20–24, #26, #27, #30–37) — lower priority, mostly additive. Of these, **#37 Accessibility** and **#30 Focus Mode** are the least additive (touch the whole editor rather than a single node type) — worth doing before more one-off Node types pile up. NEXT: #37, starting with keyboard navigation audit (drag-handle-only reordering from #34 has no keyboard equivalent yet, which is itself an accessibility gap introduced by this session's audit).
 
 ## Before building, verify these already exist
 
