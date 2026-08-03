@@ -2,6 +2,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import { useState } from "react";
 import katex from "katex";
+import { dragAwareStopEvent } from "./drag-utils";
 
 function renderKatex(latex: string, displayMode: boolean) {
   try {
@@ -21,6 +22,14 @@ function makeMathView(displayMode: boolean) {
   }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(node.attrs.latex ?? "");
+    // Only block-level math ($$...$$) gets a drag handle -- same
+    // reasoning as Section/Callout/ResourceChip (native PM node
+    // dragging via `draggable: true` + arm-on-mousedown, reset on
+    // mouseup/dragend so a plain click doesn't leave it stuck
+    // draggable). Inline math sits mid-sentence like a word; there's
+    // no analogous "reorder this token" gesture for it the way there
+    // is for a whole equation block, so it's left out.
+    const [dragArmed, setDragArmed] = useState(false);
 
     if (editing) {
       return (
@@ -51,18 +60,42 @@ function makeMathView(displayMode: boolean) {
       );
     }
 
+    if (!displayMode) {
+      return (
+        <NodeViewWrapper
+          as="span"
+          className="cursor-pointer rounded px-0.5 hover:bg-paper"
+          onClick={() => setEditing(true)}
+          contentEditable={false}
+          dangerouslySetInnerHTML={{ __html: renderKatex(node.attrs.latex || "\\,", displayMode) }}
+        />
+      );
+    }
+
     return (
       <NodeViewWrapper
-        as={displayMode ? "div" : "span"}
-        className={
-          displayMode
-            ? "my-2 cursor-pointer rounded-lg border border-transparent p-2 hover:border-rule"
-            : "cursor-pointer rounded px-0.5 hover:bg-paper"
-        }
-        onClick={() => setEditing(true)}
-        contentEditable={false}
-        dangerouslySetInnerHTML={{ __html: renderKatex(node.attrs.latex || "\\,", displayMode) }}
-      />
+        as="div"
+        className="group relative my-2 rounded-lg border border-transparent p-2 hover:border-rule"
+        draggable={dragArmed}
+        onDragEnd={() => setDragArmed(false)}
+      >
+        <span
+          onMouseDown={() => setDragArmed(true)}
+          onMouseUp={() => setDragArmed(false)}
+          title="Drag to reorder"
+          data-drag-handle
+          contentEditable={false}
+          className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
+        >
+          ⠿
+        </span>
+        <div
+          onClick={() => setEditing(true)}
+          contentEditable={false}
+          className="cursor-pointer"
+          dangerouslySetInnerHTML={{ __html: renderKatex(node.attrs.latex || "\\,", displayMode) }}
+        />
+      </NodeViewWrapper>
     );
   };
 }
@@ -73,6 +106,7 @@ function defineMathNode(name: "mathInline" | "mathBlock", displayMode: boolean) 
     group: displayMode ? "block" : "inline",
     inline: !displayMode,
     atom: true,
+    draggable: displayMode,
 
     addAttributes() {
       return { latex: { default: "" } };
@@ -96,8 +130,15 @@ function defineMathNode(name: "mathInline" | "mathBlock", displayMode: boolean) 
       // own NodeSelection over this atom node before our onClick runs,
       // which can crash BubbleMenu's live position tracking when the
       // node view swaps between rendered/editing state.
+      //
+      // For mathBlock (displayMode), same carve-out as ResourceChip's
+      // stopEvent needed once it became `draggable: true`: a blanket
+      // `() => true` tells ProseMirror's native node-dragging machinery
+      // to stand down for drag/drop events too, which silently disables
+      // the drag it needs to perform. mathInline isn't draggable, so it
+      // keeps the simple blanket version.
       return ReactNodeViewRenderer(makeMathView(displayMode), {
-        stopEvent: () => true,
+        stopEvent: displayMode ? dragAwareStopEvent : () => true,
       });
     },
   });

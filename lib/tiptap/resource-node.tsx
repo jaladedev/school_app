@@ -28,6 +28,7 @@ import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { updateMermaidResource, updateTopicResource } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import type { TopicResource } from "@/types/database";
+import { dragAwareStopEvent } from "./drag-utils";
 
 export const RESOURCE_TYPE_ICON: Record<TopicResource["resource_type"], string> = {
   image: "🖼️",
@@ -265,6 +266,7 @@ function MermaidNodeView({
     >
       <div
         onMouseDown={() => setDragArmed(true)}
+        onMouseUp={() => setDragArmed(false)}
         title="Drag to reorder"
         data-drag-handle
         className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
@@ -383,6 +385,7 @@ function ImageNodeView({
       >
         <span
           onMouseDown={() => setDragArmed(true)}
+          onMouseUp={() => setDragArmed(false)}
           title="Drag to reorder"
           data-drag-handle
           className="pointer-events-auto ml-1 inline-flex cursor-grab select-none items-center rounded-full border border-rule bg-white px-1.5 py-0.5 text-xs text-ink-soft shadow active:cursor-grabbing"
@@ -535,6 +538,7 @@ function ResourceChipDefaultView({
     >
       <span
         onMouseDown={() => setDragArmed(true)}
+        onMouseUp={() => setDragArmed(false)}
         contentEditable={false}
         title="Drag to reorder"
         data-drag-handle
@@ -741,7 +745,7 @@ export const ResourceChip = Node.create({
     // drag handling for this node's events was being told to stand down
     // by this override before it ever got the chance to run.
     return ReactNodeViewRenderer(ResourceChipView, {
-      stopEvent: ({ event }) => !event.type.startsWith("drag") && event.type !== "drop",
+      stopEvent: dragAwareStopEvent,
     });
   },
 

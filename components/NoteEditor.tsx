@@ -615,7 +615,7 @@ export function NoteEditor({
         <>
           {!isOnline && (
             <div className="mb-3 rounded-lg border border-clay/40 bg-clay/10 px-3 py-2 text-sm text-clay">
-              You're offline — changes aren't being saved. Reconnect to save or publish.
+              You&apos;re offline — changes aren&apos;t being saved. Reconnect to save or publish.
             </div>
           )}
 

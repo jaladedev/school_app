@@ -40,6 +40,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from "@tiptap
 import type { Editor } from "@tiptap/core";
 import type { Node as PMNode, Schema } from "@tiptap/pm/model";
 import { useState } from "react";
+import { dragAwareStopEvent } from "./drag-utils";
 
 function SectionView({
   node,
@@ -58,6 +59,13 @@ function SectionView({
   // Armed only while the mouse is down on the handle -- keeps native
   // HTML5 drag scoped to the handle instead of the whole section
   // (clicking/selecting text inside the body must not start a drag).
+  // Reset on mouseup as well as dragend: a plain click (mousedown then
+  // mouseup with no movement in between) never fires dragstart/dragend
+  // at all, so without the mouseup reset the node stayed `draggable`
+  // indefinitely after any click on the handle -- letting a later,
+  // unrelated drag gesture elsewhere (selecting text, dragging another
+  // node past this one) pick this section up and silently reposition
+  // it too.
   const [dragArmed, setDragArmed] = useState(false);
 
   function duplicate() {
@@ -86,6 +94,7 @@ function SectionView({
           title="Drag to reorder section"
           data-drag-handle
           onMouseDown={() => setDragArmed(true)}
+          onMouseUp={() => setDragArmed(false)}
           className="min-w-[1.5rem] cursor-grab rounded px-1 py-0.5 text-sm text-ink-soft hover:bg-white active:cursor-grabbing"
         >
           ⠿
@@ -158,7 +167,13 @@ export const Section = Node.create({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(SectionView);
+    // See drag-utils.ts: without this, Section's drag handle looked
+    // functional (cursor changed, showed the grab affordance) but
+    // dropping never actually repositioned it -- TipTap's default
+    // stopEvent handling and our own `dragArmed` state were both
+    // reacting to the same mousedown without one of them completing
+    // the move.
+    return ReactNodeViewRenderer(SectionView, { stopEvent: dragAwareStopEvent });
   },
 });
 

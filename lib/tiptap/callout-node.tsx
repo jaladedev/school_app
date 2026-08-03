@@ -19,6 +19,7 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from "@tiptap/react";
 import { useState } from "react";
+import { dragAwareStopEvent } from "./drag-utils";
 
 export type CalloutType =
   "tip" | "important" | "warning" | "remember" | "definition" | "example" | "activity" | "homework";
@@ -105,7 +106,10 @@ function CalloutView({
   // Same pattern as SectionView: armed only while the drag handle itself
   // is held down, so native HTML5 drag stays scoped to the handle
   // instead of the whole callout (clicking the type dropdown or
-  // selecting text in the body must not start a drag).
+  // selecting text in the body must not start a drag). Reset on mouseup
+  // too, not just dragend -- a plain click never fires dragend, and
+  // without this the callout stayed stuck `draggable` after any click,
+  // letting an unrelated later drag pick it up and reposition it.
   const [dragArmed, setDragArmed] = useState(false);
 
   return (
@@ -118,6 +122,7 @@ function CalloutView({
       <div contentEditable={false} className="mb-1 flex items-center gap-1.5">
         <span
           onMouseDown={() => setDragArmed(true)}
+          onMouseUp={() => setDragArmed(false)}
           title="Drag to reorder"
           data-drag-handle
           className="cursor-grab rounded px-0.5 text-sm text-ink-soft/60 hover:text-ink-soft active:cursor-grabbing"
@@ -169,7 +174,8 @@ export const Callout = Node.create({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(CalloutView);
+    // See drag-utils.ts / section-node.tsx's same comment.
+    return ReactNodeViewRenderer(CalloutView, { stopEvent: dragAwareStopEvent });
   },
 });
 

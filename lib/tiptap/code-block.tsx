@@ -17,6 +17,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from "@tiptap
 import { useState } from "react";
 import { createLowlight, common } from "lowlight";
 import { emitToast } from "@/lib/toast";
+import { dragAwareStopEvent } from "./drag-utils";
 
 const lowlight = createLowlight(common);
 
@@ -59,6 +60,16 @@ function CodeBlockView({
 }) {
   const [copied, setCopied] = useState(false);
   const language: string = node.attrs.language ?? "plaintext";
+  // Same pattern as Section/Callout/ResourceChip/MathBlock: armed only
+  // while the drag handle is held, reset on mouseup as well as dragend
+  // (a plain click never fires dragend, and without the mouseup reset
+  // the block stays stuck `draggable` after any click on the handle,
+  // letting a later unrelated drag elsewhere pick it up and reposition
+  // it). Unlike those other nodes, CodeBlock's content is normal
+  // editable text rather than an atom, so it needs no `stopEvent`
+  // carve-out here -- there's nothing blanket-stopping drag events in
+  // the first place for native PM dragging to be disabled by.
+  const [dragArmed, setDragArmed] = useState(false);
 
   async function handleCopy() {
     try {
@@ -71,22 +82,37 @@ function CodeBlockView({
   }
 
   return (
-    <NodeViewWrapper className="relative my-3 overflow-hidden rounded-lg border border-rule bg-[#0d1117]">
+    <NodeViewWrapper
+      className="group relative my-3 overflow-hidden rounded-lg border border-rule bg-[#0d1117]"
+      draggable={dragArmed}
+      onDragEnd={() => setDragArmed(false)}
+    >
       <div
         contentEditable={false}
         className="flex items-center justify-between border-b border-white/10 bg-white/5 px-3 py-1.5"
       >
-        <select
-          value={language}
-          onChange={(e) => updateAttributes({ language: e.target.value })}
-          className="rounded border border-white/10 bg-transparent px-1.5 py-0.5 text-xs text-white/70 outline-none"
-        >
-          {LANGUAGE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-[#0d1117] text-white">
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <span className="flex items-center gap-1.5">
+          <span
+            onMouseDown={() => setDragArmed(true)}
+            onMouseUp={() => setDragArmed(false)}
+            title="Drag to reorder"
+            data-drag-handle
+            className="cursor-grab rounded px-0.5 text-sm text-white/50 hover:text-white/80 active:cursor-grabbing"
+          >
+            ⠿
+          </span>
+          <select
+            value={language}
+            onChange={(e) => updateAttributes({ language: e.target.value })}
+            className="rounded border border-white/10 bg-transparent px-1.5 py-0.5 text-xs text-white/70 outline-none"
+          >
+            {LANGUAGE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value} className="bg-[#0d1117] text-white">
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </span>
         <button
           type="button"
           onClick={handleCopy}
@@ -103,8 +129,15 @@ function CodeBlockView({
 }
 
 export const CodeBlock = CodeBlockLowlight.extend({
+  draggable: true,
   addNodeView() {
-    return ReactNodeViewRenderer(CodeBlockView);
+    // Correction from the first pass: this DOES need the same
+    // stopEvent override Section/Callout/ResourceChip use (see
+    // drag-utils.ts) -- without it, this competes with TipTap's
+    // default stopEvent handling for the same mousedown the same way
+    // Section/Callout did, and the drag handle looks functional but
+    // never actually repositions the block on drop.
+    return ReactNodeViewRenderer(CodeBlockView, { stopEvent: dragAwareStopEvent });
   },
 }).configure({
   lowlight,
