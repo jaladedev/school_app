@@ -16,6 +16,33 @@ export default async function StudentGradesPage() {
     .eq("student_id", profile.id)
     .order("graded_at", { ascending: false });
 
+  // A grade row for a quiz is inserted the moment the student submits, with
+  // essay questions scored as 0 -- it only becomes a real final score once
+  // a teacher grades those essays (grade_quiz_essay_answers). Find which
+  // grade rows are still linked to an attempt with an ungraded essay
+  // answer so the number itself can be hidden until then.
+  const gradeIds = (grades ?? []).map((g) => g.id);
+  const { data: linkedAttempts } = gradeIds.length
+    ? await supabase.from("quiz_attempts").select("id, grade_id").in("grade_id", gradeIds)
+    : { data: [] };
+  const attemptIdToGradeId = new Map((linkedAttempts ?? []).map((a) => [a.id, a.grade_id]));
+  const linkedAttemptIds = (linkedAttempts ?? []).map((a) => a.id);
+
+  const { data: pendingEssayAnswers } = linkedAttemptIds.length
+    ? await supabase
+        .from("quiz_answers")
+        .select("attempt_id, quiz_questions!inner(question_type)")
+        .in("attempt_id", linkedAttemptIds)
+        .eq("quiz_questions.question_type", "essay")
+        .is("points_awarded", null)
+    : { data: [] };
+
+  const pendingGradeIds = new Set(
+    (pendingEssayAnswers ?? [])
+      .map((row) => attemptIdToGradeId.get(row.attempt_id))
+      .filter((id): id is string => !!id)
+  );
+
   const bySubject = new Map<string, typeof grades>();
   for (const g of grades ?? []) {
     const subjectName = g.assessments?.subjects?.name ?? "Unknown subject";
@@ -45,7 +72,13 @@ export default async function StudentGradesPage() {
                   </p>
                 </div>
                 <span className="font-display text-lg font-semibold text-leaf">
-                  {g.score} / {g.assessments?.max_score}
+                  {pendingGradeIds.has(g.id) ? (
+                    <span className="text-sm font-medium text-marigold-dark">Awaiting grading</span>
+                  ) : (
+                    <>
+                      {g.score} / {g.assessments?.max_score}
+                    </>
+                  )}
                 </span>
               </div>
             ))}

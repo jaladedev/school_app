@@ -23,7 +23,10 @@ export function EssayGradingForm({
 }) {
   const [scores, setScores] = useState<Record<string, string>>(
     Object.fromEntries(
-      essayAnswers.map((a) => [a.questionId, a.pointsAwarded != null ? String(a.pointsAwarded) : ""])
+      essayAnswers.map((a) => [
+        a.questionId,
+        a.pointsAwarded != null ? String(a.pointsAwarded) : "",
+      ])
     )
   );
   const [isPending, startTransition] = useTransition();

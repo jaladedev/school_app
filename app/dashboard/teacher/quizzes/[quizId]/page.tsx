@@ -36,9 +36,7 @@ export default async function TeacherQuizDetailPage({
     .order("submitted_at", { ascending: false, nullsFirst: false });
 
   const essayQuestions = (questions ?? []).filter((q) => q.question_type === "essay");
-  const submittedAttemptIds = (attempts ?? [])
-    .filter((a) => a.submitted_at)
-    .map((a) => a.id);
+  const submittedAttemptIds = (attempts ?? []).filter((a) => a.submitted_at).map((a) => a.id);
 
   // Only fetched when the quiz actually has essay questions and at least
   // one submitted attempt — most quizzes have neither, so this stays a
@@ -133,7 +131,8 @@ export default async function TeacherQuizDetailPage({
                     .sort((a, b) => a.sequence_order - b.sequence_order)
                     .map((o) => (
                       <li key={o.id} className="text-ink-soft">
-                        {o.match_prompt} → <span className="font-medium text-ink">{o.option_text}</span>
+                        {o.match_prompt} →{" "}
+                        <span className="font-medium text-ink">{o.option_text}</span>
                       </li>
                     ))}
                 </ul>

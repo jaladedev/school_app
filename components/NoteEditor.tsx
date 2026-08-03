@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type DragEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type DragEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import { Extension, type Editor } from "@tiptap/core";
@@ -143,9 +151,7 @@ export function NoteEditor({
   // require jumping your eyes up to the toolbar and back. Left `null` for
   // the toolbar button's own click, which anchors to itself instead (you
   // just clicked it, so it's already where you're looking).
-  const [emojiPickerPos, setEmojiPickerPos] = useState<{ top: number; left: number } | null>(
-    null
-  );
+  const [emojiPickerPos, setEmojiPickerPos] = useState<{ top: number; left: number } | null>(null);
   const [diagramPanelOpen, setDiagramPanelOpen] = useState(false);
 
   useEffect(() => {

@@ -31,9 +31,7 @@ export async function answerQuizQuestion(
   attemptId: string,
   questionId: string,
   payload:
-    | { selectedOptionId: string }
-    | { answerText: string }
-    | { matchedPairs: Record<string, string> }
+    { selectedOptionId: string } | { answerText: string } | { matchedPairs: Record<string, string> }
 ) {
   const supabase = createClient();
   const { error } = await supabase.rpc("answer_quiz_question", {

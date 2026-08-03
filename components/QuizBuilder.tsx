@@ -74,7 +74,9 @@ export function QuizBuilder({
 
   function setQuestionType(index: number, type: QuestionType) {
     setQuestions((qs) =>
-      qs.map((q, i) => (i === index ? { ...q, questionType: type, options: blankOptionsFor(type) } : q))
+      qs.map((q, i) =>
+        i === index ? { ...q, questionType: type, options: blankOptionsFor(type) } : q
+      )
     );
   }
 
@@ -349,7 +351,9 @@ export function QuizBuilder({
                       required
                       placeholder={`Prompt ${oIndex + 1}`}
                       value={o.matchPrompt ?? ""}
-                      onChange={(e) => updateOption(qIndex, oIndex, { matchPrompt: e.target.value })}
+                      onChange={(e) =>
+                        updateOption(qIndex, oIndex, { matchPrompt: e.target.value })
+                      }
                       className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
                     />
                     <span className="text-ink-soft">→</span>
@@ -383,8 +387,8 @@ export function QuizBuilder({
 
             {q.questionType === "essay" && (
               <p className="rounded-lg bg-paper px-3 py-2 text-xs text-ink-soft">
-                Students answer in free text. You&apos;ll score this yourself after they submit —
-                it won&apos;t count toward their score automatically.
+                Students answer in free text. You&apos;ll score this yourself after they submit — it
+                won&apos;t count toward their score automatically.
               </p>
             )}
           </div>
