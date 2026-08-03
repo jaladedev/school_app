@@ -130,21 +130,13 @@ Currently: fixed 2-column Markdown/Preview grid (no toggle modes).
 - Student View
 - Presentation View
 
-## 12. Resizable Split Screen
+## 12. Resizable Split Screen — NOT NEEDED
 
-Currently fixed-width grid columns.
+Written back when the editor was a fixed 2-column Markdown/Preview grid (see #11's note above — same reframing applies). Post-TipTap-migration there is no side-by-side pane at all: `NoteEditor.tsx` is a single WYSIWYG view (edit IS the render), and the mobile Write/Preview toggle (restored — see #32) swaps that one pane's editability rather than showing two panes together. Nothing to resize. Only reopen this if a genuine side-by-side mode (e.g. #11's "Split View" option) gets built later — until then, drop it.
 
-- Add drag-to-resize between edit/preview panes
+## 13. Auto Save — DONE
 
-## 13. Auto Save — PARTIALLY DONE
-
-Explicit Save Draft / Publish buttons remain the only way to persist a note. However, the "did I lose anything" half of this already exists as a side effect of earlier UX work: `NoteEditor.tsx` tracks `isDirty` against `lastSavedContent` and shows an "Unsaved changes" label + a `beforeunload` warning — deliberately not autosave, since `saveTopicNote` is append-only (every save inserts a new version row) and silently saving on every navigation attempt would flood version history with junk rows.
-
-Remaining:
-- Periodic auto-save (would need a debounced/interval save distinct from the append-only version-save path above — e.g. a separate draft-only upsert column, not another `saveTopicNote` row, to avoid the version-flooding problem)
-- Saving indicator
-- Last saved timestamp
-- Offline detection
+Explicit Save Draft / Publish buttons remain for real saves, plus now periodic autosave. `NoteEditor.tsx` tracks `isDirty` against `lastSavedContent` and shows an "Unsaved changes" label + a `beforeunload` warning. Periodic autosave (every 20s, guarded by `isDirty`/online checks) writes to a new `topic_note_drafts` table via `saveTopicNoteDraft`/`getTopicNoteDraft`/`clearTopicNoteDraft` (`lib/actions/teacher.ts`) — a separate scratch table (upsert per topic/author, deleted on real save) rather than another `saveTopicNote` version row, avoiding the version-flooding problem. Offline detection via `navigator.onLine` + `online`/`offline` listeners. Saving indicator and last-saved timestamp tracked via `autosaveStatus`/`lastAutosaveAt`.
 
 ## 14. Version History
 
@@ -231,9 +223,9 @@ Not present.
 - Spell checking (can lean on browser-native `spellcheck` attribute as a first pass)
 - Grammar suggestions (bigger lift — likely third-party service)
 
-## 28. Word Statistics
+## 28. Word Statistics — DONE
 
-Not present. New build via `@tiptap/extension-character-count` + custom counts for headings/tables/images/resources.
+Built via `@tiptap/extension-character-count` (words/characters) + custom `computeNoteStats()` in `NoteEditor.tsx` that walks the doc for headings/tables/images/resource chips, plus a rough reading-time estimate (words / 200 wpm).
 
 ## 29. Keyboard Shortcuts
 
@@ -253,9 +245,9 @@ Not present. New build — hide sidebar/toolbar/nav.
 
 Not present. New build.
 
-## 32. Mobile Optimization
+## 32. Mobile Optimization — FIXED
 
-Not present. New build — Write / Preview / Resources tabs.
+Write/Preview tabs (`mobileTab` state, tab buttons, `md:hidden` toggle bar) were deleted with no replacement in the "Word Statistics" commit (`e154cea`) — restored, and improved beyond the original: the old toggle was cosmetic-only (toolbar stayed visible, content stayed editable regardless of tab). Now `editor.setEditable(mobileTab !== "preview")` makes Preview an actual read view, and the toolbar hides on mobile while previewing (`hidden md:flex`). Desktop is unaffected since the toggle bar itself is `md:hidden`. Resources tab (from the original "Write / Preview / Resources" scope) still not built.
 
 ## 33. Resource Sidebar
 
@@ -290,7 +282,7 @@ Not present as a checked-off set.
 3. ~~#6/#7 resource cards + drag-drop upload~~ — DONE
 4. ~~#4 tables~~ — DONE. ~~#5 images~~ — DONE. ~~#25 code blocks~~ — DONE (editor + published-view parity)
 5. ~~#8 slash commands, #17 callouts~~ — DONE. #15 learning objectives SUSPENDED, skip
-6. #13 autosave, #12 resizable panes, #28 word stats — NEXT (note: #13's unsaved-changes warning/indicator is already done as a side effect of earlier work — see its section; periodic autosave, saved timestamp, and offline detection are the remaining pieces)
+6. ~~#13 autosave~~ — DONE. ~~#28 word stats~~ — DONE. ~~#12 resizable panes~~ — NOT NEEDED (no split pane exists post-migration)
 7. #10 block-based editing (structural — do after the above stabilize)
 8. Everything else (#20–24, #26, #27, #30–37) — lower priority, mostly additive
 

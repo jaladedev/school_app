@@ -131,6 +131,7 @@ export function NoteEditor({
   const [diagramTitle, setDiagramTitle] = useState("");
   const [diagramCode, setDiagramCode] = useState(DEFAULT_MERMAID);
   const [isSavingDiagram, setIsSavingDiagram] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"write" | "preview">("write");
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [bubblePos, setBubblePos] = useState<{ top: number; left: number } | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -209,6 +210,10 @@ export function NoteEditor({
   }, [editor, localResources]);
 
   const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;
+
+  useEffect(() => {
+    editor?.setEditable(mobileTab !== "preview");
+  }, [editor, mobileTab]);
 
   function computeNoteStats(ed: NonNullable<typeof editor>) {
     let headings = 0;
@@ -788,8 +793,28 @@ export function NoteEditor({
             </section>
           )}
 
-          {/* Toolbar */}
-          <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper p-1">
+          {/* Mobile write/preview toggle — md:hidden, desktop always shows toolbar + editable view */}
+          <div className="mb-2 flex gap-1 rounded-lg border border-rule bg-paper p-1 md:hidden">
+            <button
+              type="button"
+              onClick={() => setMobileTab("write")}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "write" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
+            >
+              Write
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileTab("preview")}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "preview" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
+            >
+              Preview
+            </button>
+          </div>
+
+          {/* Toolbar — hidden on mobile while previewing; always shown on desktop */}
+          <div
+            className={`mb-2 ${mobileTab === "preview" ? "hidden md:flex" : "flex"} flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper p-1`}
+          >
             <button
               type="button"
               title="Undo"
