@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
-import { Extension } from "@tiptap/core";
+import { Extension, type Editor } from "@tiptap/core";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { Table } from "@tiptap/extension-table";
@@ -104,6 +104,17 @@ const TabTrap = Extension.create({
   },
 });
 
+// Wraps the document's top-level content into `Section` nodes -- the boxes
+// with the drag handle/duplicate/delete controls in the editor. This has to
+// run any time the doc is replaced wholesale (initial load, restoring an
+// autosave draft), or the content renders flat with no section chrome.
+function applySectionGrouping(editor: Editor) {
+  const grouped = groupIntoSections(editor.schema, editor.state.doc);
+  const tr = editor.state.tr.replaceWith(0, editor.state.doc.content.size, grouped.content);
+  tr.setMeta("addToHistory", false);
+  editor.view.dispatch(tr);
+}
+
 export function NoteEditor({
   topicId,
   noteId,
@@ -140,6 +151,7 @@ export function NoteEditor({
   const dragDepthRef = useRef(0);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const diagramSectionRef = useRef<HTMLDivElement | null>(null);
+  const noteContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Scroll these into view whenever they open -- both can be triggered by
   // the slash command from anywhere in a long note, and without this the
@@ -214,10 +226,7 @@ export function NoteEditor({
 
     onCreate({ editor: created }) {
       requestAnimationFrame(() => {
-        const grouped = groupIntoSections(created.schema, created.state.doc);
-        const tr = created.state.tr.replaceWith(0, created.state.doc.content.size, grouped.content);
-        tr.setMeta("addToHistory", false);
-        created.view.dispatch(tr);
+        applySectionGrouping(created);
       });
     },
   });
@@ -373,6 +382,12 @@ export function NoteEditor({
   function restoreDraft() {
     if (!editor || !draftBanner) return;
     editor.commands.setContent(draftBanner.content);
+    // setContent parses the raw markdown flat -- re-apply the same
+    // section-grouping pass used on initial load, or the section
+    // boxes/controls vanish even though the content itself is intact.
+    requestAnimationFrame(() => {
+      applySectionGrouping(editor);
+    });
     setDraftBanner(null);
   }
 
@@ -1121,91 +1136,115 @@ export function NoteEditor({
               editor={editor}
               pluginKey="tableBubbleMenu"
               shouldShow={({ editor: e }) => e.isActive("table")}
+              options={{
+                placement: "top",
+                offset: 10,
+                flip: { boundary: noteContainerRef.current ?? "clippingAncestors", padding: 8 },
+                shift: { boundary: noteContainerRef.current ?? "clippingAncestors", padding: 8 },
+              }}
             >
-              <div className="flex flex-wrap items-center gap-1 rounded-lg border border-rule bg-marigold/10 p-1 shadow-lg">
-                <span className="px-1 text-xs font-medium text-ink-soft">Table:</span>
-                <button
-                  type="button"
-                  title="Add row above"
-                  onClick={() => editor.chain().focus().addRowBefore().run()}
-                  className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white"
-                >
-                  ↑ Row
-                </button>
-                <button
-                  type="button"
-                  title="Add row below"
-                  onClick={() => editor.chain().focus().addRowAfter().run()}
-                  className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white"
-                >
-                  ↓ Row
-                </button>
-                <button
-                  type="button"
-                  title="Delete row"
-                  onClick={() => editor.chain().focus().deleteRow().run()}
-                  className="min-w-[2rem] rounded-md px-2 py-1 text-xs text-red-700 hover:bg-white"
-                >
-                  Delete row
-                </button>
-                <span className="mx-1 h-4 w-px bg-rule" />
-                <button
-                  type="button"
-                  title="Add column left"
-                  onClick={() => editor.chain().focus().addColumnBefore().run()}
-                  className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white"
-                >
-                  ← Col
-                </button>
-                <button
-                  type="button"
-                  title="Add column right"
-                  onClick={() => editor.chain().focus().addColumnAfter().run()}
-                  className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white"
-                >
-                  → Col
-                </button>
-                <button
-                  type="button"
-                  title="Delete column"
-                  onClick={() => editor.chain().focus().deleteColumn().run()}
-                  className="min-w-[2rem] rounded-md px-2 py-1 text-xs text-red-700 hover:bg-white"
-                >
-                  Delete col
-                </button>
-                <span className="mx-1 h-4 w-px bg-rule" />
-                <button
-                  type="button"
-                  title="Merge cells"
-                  disabled={!editor.can().mergeCells()}
-                  onClick={() => editor.chain().focus().mergeCells().run()}
-                  className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white disabled:opacity-40"
-                >
-                  Merge
-                </button>
-                <button
-                  type="button"
-                  title="Split cell"
-                  disabled={!editor.can().splitCell()}
-                  onClick={() => editor.chain().focus().splitCell().run()}
-                  className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white disabled:opacity-40"
-                >
-                  Split
-                </button>
-                <button
-                  type="button"
-                  title="Toggle header row"
-                  onClick={() => editor.chain().focus().toggleHeaderRow().run()}
-                  className="min-w-[2rem] rounded-md px-2 py-1 text-xs hover:bg-white"
-                >
-                  Header row
-                </button>
-                <span className="mx-1 h-4 w-px bg-rule" />
+              <div className="flex flex-wrap items-center gap-0.5 rounded-xl border border-rule/70 bg-white p-1.5 shadow-lg shadow-ink/10 ring-1 ring-ink/5">
+                <span className="px-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+                  Table
+                </span>
+                <span className="mx-0.5 h-5 w-px bg-rule/70" />
+
+                <div className="flex items-center gap-0.5" role="group" aria-label="Row actions">
+                  <button
+                    type="button"
+                    title="Add row above"
+                    onClick={() => editor.chain().focus().addRowBefore().run()}
+                    className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30"
+                  >
+                    <span aria-hidden="true">↑</span> Row
+                  </button>
+                  <button
+                    type="button"
+                    title="Add row below"
+                    onClick={() => editor.chain().focus().addRowAfter().run()}
+                    className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30"
+                  >
+                    <span aria-hidden="true">↓</span> Row
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete row"
+                    onClick={() => editor.chain().focus().deleteRow().run()}
+                    className="rounded-md px-2 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 active:bg-red-100"
+                  >
+                    Delete row
+                  </button>
+                </div>
+
+                <span className="mx-1 h-5 w-px bg-rule/70" />
+
+                <div className="flex items-center gap-0.5" role="group" aria-label="Column actions">
+                  <button
+                    type="button"
+                    title="Add column left"
+                    onClick={() => editor.chain().focus().addColumnBefore().run()}
+                    className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30"
+                  >
+                    <span aria-hidden="true">←</span> Col
+                  </button>
+                  <button
+                    type="button"
+                    title="Add column right"
+                    onClick={() => editor.chain().focus().addColumnAfter().run()}
+                    className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30"
+                  >
+                    <span aria-hidden="true">→</span> Col
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete column"
+                    onClick={() => editor.chain().focus().deleteColumn().run()}
+                    className="rounded-md px-2 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 active:bg-red-100"
+                  >
+                    Delete col
+                  </button>
+                </div>
+
+                <span className="mx-1 h-5 w-px bg-rule/70" />
+
+                <div className="flex items-center gap-0.5" role="group" aria-label="Cell actions">
+                  <button
+                    type="button"
+                    title="Merge cells"
+                    disabled={!editor.can().mergeCells()}
+                    onClick={() => editor.chain().focus().mergeCells().run()}
+                    className="rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30 disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    Merge
+                  </button>
+                  <button
+                    type="button"
+                    title="Split cell"
+                    disabled={!editor.can().splitCell()}
+                    onClick={() => editor.chain().focus().splitCell().run()}
+                    className="rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30 disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    Split
+                  </button>
+                  <button
+                    type="button"
+                    title="Toggle header row"
+                    onClick={() => editor.chain().focus().toggleHeaderRow().run()}
+                    className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors hover:bg-paper active:bg-rule/30 ${
+                      editor.isActive("tableHeader") ? "bg-marigold/15 text-ink" : "text-ink"
+                    }`}
+                  >
+                    Header row
+                  </button>
+                </div>
+
+                <span className="mx-1 h-5 w-px bg-rule/70" />
+
                 <button
                   type="button"
                   title="Delete table"
                   onClick={() => editor.chain().focus().deleteTable().run()}
-                  className="min-w-[2rem] rounded-md px-2 py-1 text-xs text-red-700 hover:bg-white"
+                  className="rounded-md px-2 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 active:bg-red-100"
                 >
                   Delete table
                 </button>
@@ -1214,7 +1253,15 @@ export function NoteEditor({
           )}
 
           {editor && (
-            <BubbleMenu editor={editor}>
+            <BubbleMenu
+              editor={editor}
+              options={{
+                placement: "top",
+                offset: 10,
+                flip: { boundary: noteContainerRef.current ?? "clippingAncestors", padding: 8 },
+                shift: { boundary: noteContainerRef.current ?? "clippingAncestors", padding: 8 },
+              }}
+            >
               <div className="flex items-center gap-1 rounded-lg border border-rule bg-white px-1 py-1 shadow-lg">
                 <button
                   type="button"
@@ -1257,6 +1304,7 @@ export function NoteEditor({
             </BubbleMenu>
           )}
           <div
+            ref={noteContainerRef}
             onDragEnter={handleDragEnter}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
