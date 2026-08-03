@@ -112,13 +112,20 @@ Built on `@tiptap/suggestion` (`lib/tiptap/slash-command.tsx`), no tippy.js depe
 
 Present via TipTap's `BubbleMenu` — has Bold, Italic, Underline, Highlight, Link.
 
-## 10. Block-Based Editing
+## 10. Block-Based Editing — V1 DONE
 
-Not present — content is currently one flat markdown string. Biggest structural change after #0.
+New `section` node (`lib/tiptap/section-node.tsx`) wraps a heading + every following block up to the next heading. Drag-to-reorder (native HTML5 drag armed only via the ⠿ handle, not the whole section), duplicate (⧉), delete (🗑), and collapse/expand (▾/▸, hides body via CSS without unmounting so ProseMirror position mapping stays intact) all work as single node operations. "Section" added to the slash-command menu (#8) to insert a new empty one.
 
-- Drag sections, Duplicate sections, Delete sections
-- Collapse/Expand sections
-- Reorder sections
+Sections carry no markdown fence syntax — boundaries are fully recoverable from heading positions, so `serialize()` just flattens a section back to plain child content. That means the persisted markdown is byte-identical to an unsectioned doc: `saveTopicNote`, version history (#14), the published view, and Presentation Mode (#35) all need zero changes. Grouping happens once client-side, right after initial parse (`groupIntoSections()` in an `onCreate` transaction with `addToHistory: false`), not via a markdown-it block rule.
+
+Known v1 limitations (deliberately deferred, not just missed):
+- Every heading level starts a new flat section — an h3 doesn't nest inside its parent h2's section. Revisit only if sub-section dragging turns out to matter.
+- Typing a new heading inside an existing section's body does **not** auto-split it — no input rule watches for that yet. Use the Section slash command to start a new one explicitly. Auto-split is a plausible v2 but needs care around mid-typing undo steps.
+- Content before the first heading in a doc is left ungrouped at the top level.
+
+This unblocks #34 (Drag-and-Drop Reordering), which was waiting on #10 existing.
+
+**Bug found and fixed post-"done":** the grouping transaction was originally dispatched synchronously inside `onCreate`, which is silently discarded by Tiptap/ProseMirror — `docChanged` reports `true` but the state reverts right after, no error surfaced. Invisible on new/empty notes (nothing to group), so it only showed up opening a preexisting note. A timing sweep found the real cutover sits at a single animation frame, not any microtask count, pointing to the view's own render/measure cycle — fixed by deferring via `requestAnimationFrame` rather than guessing a `setTimeout` delay. Covered by `tests/section-grouping.test.ts` so this can't silently regress again.
 
 ## 11. Better Preview
 
@@ -255,9 +262,15 @@ Currently: resources listed via `TopicResourceList`, inserted via a dropdown pic
 
 - Convert to persistent sidebar with one-click insertion (ties into #6 Resource Node)
 
-## 34. Drag-and-Drop Reordering
+## 34. Drag-and-Drop Reordering — PARTIALLY DONE (correcting a stale entry)
 
-Not present for sections/images/activities/resources — depends on #10 (blocks) existing first.
+This entry was stale — it said "not present, depends on #10" for all four (sections/images/activities/resources), but that was never fully true:
+
+- **Images/resources** — already done, and not actually dependent on #10 at all: `resource-node.tsx`'s drag handle + `moveResourceChip()` (delete-at-source, insert-at-target in one transaction) was built under **#6**, operating on raw ProseMirror positions rather than anything section-related. Verified with a position-math test in both directions (`tests/resource-chip-reorder.test.ts`) — forward and backward drags both preserve the other chips' relative order correctly.
+- **Sections** — done now via #10 (see its entry above).
+- **Activities** — still not present. "Activity"/"Homework" are the Callout node (#17) pre-set to those `calloutType`s, and `callout-node.tsx` has no drag handle or reorder logic at all — reordering one today means cut/paste. This is the one real gap left in #34's original scope.
+
+Remaining: add the same handle + move-transaction pattern from `resource-node.tsx` to `callout-node.tsx` (or promote Callout to a child of the new `section` node's drag mechanism, since a section already carries its whole content as a unit — reordering a callout *within* a section body is the more precise ask here).
 
 ## 35. Presentation Mode
 
@@ -283,7 +296,7 @@ Not present as a checked-off set.
 4. ~~#4 tables~~ — DONE. ~~#5 images~~ — DONE. ~~#25 code blocks~~ — DONE (editor + published-view parity)
 5. ~~#8 slash commands, #17 callouts~~ — DONE. #15 learning objectives SUSPENDED, skip
 6. ~~#13 autosave~~ — DONE. ~~#28 word stats~~ — DONE. ~~#12 resizable panes~~ — NOT NEEDED (no split pane exists post-migration)
-7. #10 block-based editing (structural — do after the above stabilize)
+7. ~~#10 block-based editing~~ — V1 DONE (see status above for what's deferred). ~~#34 images/resources~~ — already done under #6, verified. #34 activities (Callout drag handle) — NEXT
 8. Everything else (#20–24, #26, #27, #30–37) — lower priority, mostly additive
 
 ## Before building, verify these already exist

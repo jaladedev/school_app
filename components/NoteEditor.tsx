@@ -18,6 +18,7 @@ import { TaskItem } from "@tiptap/extension-task-item";
 import { CodeBlock } from "@/lib/tiptap/code-block";
 import "highlight.js/styles/github-dark.css";
 import { Callout } from "@/lib/tiptap/callout-node";
+import { Section, groupIntoSections } from "@/lib/tiptap/section-node";
 import { SlashCommand, slashCommandBridge } from "@/lib/tiptap/slash-command";
 import { CharacterCount } from "@tiptap/extension-character-count";
 import {
@@ -155,6 +156,7 @@ export function NoteEditor({
       }),
       CodeBlock,
       Callout,
+      Section,
       SlashCommand,
       CharacterCount,
       Table.configure({ resizable: true }),
@@ -194,6 +196,15 @@ export function NoteEditor({
         return true;
       },
     },
+
+    onCreate({ editor: created }) {
+      requestAnimationFrame(() => {
+        const grouped = groupIntoSections(created.schema, created.state.doc);
+        const tr = created.state.tr.replaceWith(0, created.state.doc.content.size, grouped.content);
+        tr.setMeta("addToHistory", false);
+        created.view.dispatch(tr);
+      });
+    },
   });
 
   useEditorState({
@@ -211,6 +222,13 @@ export function NoteEditor({
 
   const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;
 
+  // The mobile Write/Preview toggle only renders below `md` (the tab bar
+  // itself is `md:hidden`), so this never fires from user interaction on
+  // desktop — mobileTab stays "write" there and editing is unaffected.
+  // Toggling real editability (not just a cosmetic class) is what makes
+  // "Preview" an actual read view: same TipTap content/node-views (tables,
+  // images, Mermaid, resource chips) render identically, just without a
+  // cursor or toolbar.
   useEffect(() => {
     editor?.setEditable(mobileTab !== "preview");
   }, [editor, mobileTab]);

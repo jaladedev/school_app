@@ -66,6 +66,27 @@ const ALL_ITEMS: SlashCommandItem[] = [
       editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run(),
   },
   {
+    title: "Section",
+    description: "A draggable, collapsible group starting with a heading",
+    icon: "⠿",
+    // Typing a heading inside an existing section's body doesn't
+    // auto-split it (see section-node.tsx's known limitations) --
+    // this is the explicit way to start a new, separate section.
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "section",
+          content: [
+            { type: "heading", attrs: { level: 2 } },
+            { type: "paragraph" },
+          ],
+        })
+        .run(),
+  },
+  {
     title: "Table",
     icon: "▦",
     run: ({ editor, range }) =>
