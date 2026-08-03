@@ -547,6 +547,75 @@ export async function getTopicNoteVersionContent(noteId: string): Promise<string
   return data.content;
 }
 
+/**
+ * Restores an older version as the note's current content. Like
+ * `saveTopicNote`, this is append-only -- it never overwrites or deletes
+ * the version being restored *from*, or any version in between. It reads
+ * that version's content and inserts it as a brand-new version on top,
+ * so "restore" is really "re-save the old content as the newest save".
+ * That keeps the full history intact (the fact that a restore happened
+ * is itself just another row) and means undo-ing a bad restore is the
+ * same "restore an older version" action, not a special case.
+ *
+ * Restored content always comes back in as a 'draft', regardless of
+ * whether the version being restored was published -- matches
+ * `saveTopicNote`'s own moderation gate: re-publishing something old
+ * still ought to go through the same HOD review a fresh publish would,
+ * rather than silently reinstating a possibly-outdated approval.
+ */
+export async function restoreTopicNoteVersion(topicId: string, versionNoteId: string) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can author notes.");
+  const supabase = createClient();
+
+  const { data: source, error: sourceError } = await supabase
+    .from("topic_notes")
+    .select("content, topic_id")
+    .eq("id", versionNoteId)
+    .single();
+
+  if (sourceError || !source) {
+    throw new Error(
+      "That version isn't available (it may have been removed, or you don't have access to it)."
+    );
+  }
+  // Defends against a stale/tampered `versionNoteId` from a different
+  // topic ever landing in this topic's history -- the version picker only
+  // ever offers versions already scoped to `topicId`, so this should be
+  // unreachable in normal use, but it's a cheap check against a crafted
+  // request.
+  if (source.topic_id !== topicId) {
+    throw new Error("That version doesn't belong to this topic.");
+  }
+
+  const { data: latest } = await supabase
+    .from("topic_notes")
+    .select("version")
+    .eq("topic_id", topicId)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: restored, error } = await supabase
+    .from("topic_notes")
+    .insert({
+      topic_id: topicId,
+      author_id: teacherId,
+      content: source.content,
+      status: "draft",
+      moderation_status: "approved",
+      version: (latest?.version ?? 0) + 1,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/teacher/notes/${topicId}`);
+  revalidatePath("/dashboard/teacher/notes");
+
+  return restored;
+}
+
 const TOPIC_RESOURCE_BUCKET = "topic-resources";
 const MAX_TOPIC_RESOURCE_BYTES = 20 * 1024 * 1024;
 const RESOURCE_TYPES = new Map<string, Extract<ResourceType, "image" | "pdf" | "audio" | "video">>([

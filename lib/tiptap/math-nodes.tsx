@@ -115,7 +115,9 @@ function makeMathView(displayMode: boolean) {
       return (
         <NodeViewWrapper
           as="div"
-          className={displayMode ? "inline-block align-middle" : "relative inline-block align-middle"}
+          className={
+            displayMode ? "inline-block align-middle" : "relative inline-block align-middle"
+          }
         >
           {!displayMode && (
             <span

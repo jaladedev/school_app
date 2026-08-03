@@ -273,9 +273,15 @@ This entry was stale — it said "not present, depends on #10" for all four (sec
 
 Remaining: add the same handle + move-transaction pattern from `resource-node.tsx` to `callout-node.tsx` (or promote Callout to a child of the new `section` node's drag mechanism, since a section already carries its whole content as a unit — reordering a callout _within_ a section body is the more precise ask here).
 
-## 35. Presentation Mode
+## 35. Presentation Mode — DONE
 
-Not present. New build — full-screen slide view (`NoteSlideView.tsx` exists, worth checking before building from scratch).
+`NoteSlideView.tsx` already covers this fully — confirmed by audit, nothing new needed:
+
+- Splits note content into slides on every top-level `## ` heading (sub-headings stay inside their parent slide), with an optional intro slide for content before the first heading
+- Real fullscreen (`requestFullscreen`), auto-scales slide content to fit the viewport (measures natural height at a fixed logical width, derives a uniform scale, clamps between 0.5x–2.25x, falls back to scroll if a slide is too dense to shrink further)
+- Keyboard nav (←/→, PageUp/PageDown, Escape to exit fullscreen) + Prev/Next buttons + clickable dot indicator
+- Resource markers (`[[resource:ID]]`) render inline per-slide via the same `splitContentByMarkers`/`TopicResourceItem` the published note view uses, with any note-wide unreferenced resources trailing on the last slide
+- Wired into `NoteWorkspace.tsx` as an Edit/Present toggle — Present is disabled until the note has been saved at least once (deliberately shows the last-_saved_ content, not live unsaved editor state, matching how the rest of the page already treats saves as the source of truth), and the classroom `BellTimer` sits above the slides in Present mode specifically since that's what actually gets projected
 
 ## 36. Student Engagement Components
 
@@ -302,6 +308,6 @@ Not present as a checked-off set.
 
 ## Before building, verify these already exist
 
-- #14 Version History → `NoteVersionDiff.tsx`
-- #35 Presentation Mode → `NoteSlideView.tsx`
+- #14 Version History → `NoteVersionDiff.tsx` — audited; view/compare were done, restore + author display were missing and have now been added
+- #35 Presentation Mode → `NoteSlideView.tsx` — audited; already fully covers this, nothing built
 - #24 Audio embedding → existing upload resource type may already cover this

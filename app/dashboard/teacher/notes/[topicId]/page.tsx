@@ -5,6 +5,7 @@ import { NoteWorkspace } from "@/components/NoteWorkspace";
 import { TopicResourceUpload } from "@/components/TopicResourceUpload";
 import { TopicResourceList } from "@/components/TopicResourceList";
 import { NoteVersionDiff } from "@/components/NoteVersionDiff";
+import { RestoreVersionButton } from "@/components/RestoreVersionButton";
 import { formatLevel } from "@/types/database";
 
 export default async function TeacherNoteEditPage({
@@ -33,7 +34,7 @@ export default async function TeacherNoteEditPage({
 
   const { data: versions } = await supabase
     .from("topic_notes")
-    .select("id, version, status, moderation_status, updated_at")
+    .select("id, version, status, moderation_status, updated_at, author_id, profiles(full_name)")
     .eq("topic_id", resolvedParams.topicId)
     .order("version", { ascending: false });
 
@@ -160,17 +161,30 @@ export default async function TeacherNoteEditPage({
         <section className="mt-6 rounded-xl border border-rule bg-white p-4">
           <h2 className="font-display text-lg font-semibold text-ink">Version history</h2>
           <div className="mt-3 space-y-2">
-            {versions.map((version) => (
+            {versions.map((version, i) => (
               <div
                 key={version.id}
                 className="flex items-center justify-between rounded-lg bg-paper px-3 py-2 text-sm"
               >
                 <span className="font-medium text-ink">Version {version.version}</span>
-                <span className="text-xs text-ink-soft">
-                  {version.status}
-                  {version.status === "published" ? ` (${version.moderation_status})` : ""} ·{" "}
-                  {new Date(version.updated_at).toLocaleString()}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-ink-soft">
+                    {/* `profiles` comes back as an array from this join
+                        shape even though author_id -> profiles is a
+                        single row; take the first entry. */}
+                    {(Array.isArray(version.profiles) ? version.profiles[0] : version.profiles)
+                      ?.full_name ?? "Unknown author"}{" "}
+                    · {version.status}
+                    {version.status === "published" ? ` (${version.moderation_status})` : ""} ·{" "}
+                    {new Date(version.updated_at).toLocaleString()}
+                  </span>
+                  <RestoreVersionButton
+                    topicId={resolvedParams.topicId}
+                    versionNoteId={version.id}
+                    versionNumber={version.version}
+                    isLatest={i === 0}
+                  />
+                </div>
               </div>
             ))}
           </div>

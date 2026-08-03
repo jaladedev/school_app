@@ -770,7 +770,10 @@ export function NoteEditor({
           </div>
 
           {diagramPanelOpen && (
-            <section ref={diagramSectionRef} className="mb-4 rounded-xl border border-rule bg-white p-4">
+            <section
+              ref={diagramSectionRef}
+              className="mb-4 rounded-xl border border-rule bg-white p-4"
+            >
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-display text-sm font-semibold text-ink">
                   Generate Mermaid diagram
