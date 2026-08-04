@@ -201,9 +201,15 @@ Built as `components/EmojiPicker.tsx`: 8 curated categories (Smileys, Gestures, 
 
 Built as `components/SymbolPicker.tsx`: a compact toolbar popover with curated Mathematics, Science, and Greek-letter tabs. Symbols insert directly at the cursor as Unicode text, so they round-trip through Markdown without a custom node or serializer.
 
-## 22. Link Preview
+## 22. Link Preview — DONE
 
-Not present. New build — title, thumbnail, description on paste/insert.
+Title, thumbnail, and description fetched server-side (`lib/linkPreview.ts`) and stored as a `link` resource — reusing the existing `link` resource type and its rendering path (`TopicContent.tsx`'s `case "link"`) rather than a separate node/schema.
+
+- SSRF-guarded fetch: resolves and checks every hop's IP (including redirects, followed manually and re-checked one at a time rather than trusting `fetch`'s own auto-follow) against private/loopback/link-local ranges before requesting it, restricted to http(s), capped at 200KB read since og: tags are always in `<head>`
+- "Add link" toolbar button + panel, a `/link` slash command, and paste-a-bare-URL auto-detection (only when the *entire* clipboard payload is one URL, not a URL embedded in a sentence) — all three funnel into the same `createLinkResource`/`handleAddLinkPreview`
+- Rendering: a real preview card (thumbnail + title + description + hostname) in `TopicResourceItem` — shared by the published view, Presentation Mode, and the editor's own resource-chip popover, so building it once in `TopicContent.tsx` covered all three. Falls back to the original bare-link rendering for a `link` resource with no fetched metadata (older resources predating this feature, or a page with no og: tags at all). The existing video-embed iframe branch (#23) is checked first and unaffected.
+- "Refresh preview from URL" in the resource-edit popover for when the auto-fetched preview goes stale or fetched wrong the first time — separate action (`refreshLinkPreview`) from the generic title/file edit, since it touches fields (`description`, the og:image `file_url`) that edit never does
+- One new column: `topic_resources.description` (migration `2026_08_03e_topic_resources_link_description.sql`) — title/content/file_url all reuse the columns `createVideoEmbedResource` already established for `link`-type resources
 
 ## 23. Video Embedding — DONE
 

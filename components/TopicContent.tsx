@@ -287,6 +287,52 @@ export function TopicResourceItem({
           );
         }
       }
+      // #22 Link Preview: `description`/`file_url` (repurposed as the
+      // og:image URL for `link` resources specifically -- see
+      // createLinkResource) are only populated when the URL was added
+      // through the "Add link" panel or paste-a-bare-URL, which fetch
+      // that metadata server-side. A `link` resource without either
+      // (e.g. one added before this feature existed, or a page with no
+      // og: tags at all) falls back to the original bare-link
+      // rendering rather than showing an empty card shell.
+      if (resource.description || resource.file_url) {
+        let hostname = resource.content ?? "";
+        try {
+          hostname = resource.content ? new URL(resource.content).hostname : "";
+        } catch {
+          // keep the raw content as a last resort
+        }
+        return (
+          <a
+            href={resource.content ?? "#"}
+            target="_blank"
+            rel="noreferrer"
+            className="my-4 flex overflow-hidden rounded-xl border border-rule bg-white transition hover:border-marigold"
+          >
+            {resource.file_url && !failed && (
+              <div className="hidden w-40 shrink-0 bg-paper sm:block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={resource.file_url}
+                  alt=""
+                  loading="lazy"
+                  onError={() => setFailed(true)}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            )}
+            <div className="min-w-0 flex-1 p-3">
+              <p className="truncate text-sm font-medium text-ink">
+                {resource.title ?? resource.content}
+              </p>
+              {resource.description && (
+                <p className="mt-1 line-clamp-2 text-xs text-ink-soft">{resource.description}</p>
+              )}
+              {hostname && <p className="mt-1.5 truncate text-xs text-ink-soft/70">{hostname}</p>}
+            </div>
+          </a>
+        );
+      }
       return (
         <a
           href={resource.content ?? "#"}
@@ -297,6 +343,7 @@ export function TopicResourceItem({
           {resource.title ?? resource.content}
         </a>
       );
+
 
     default:
       return null;

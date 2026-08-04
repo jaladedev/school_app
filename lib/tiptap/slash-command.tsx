@@ -34,6 +34,7 @@ type SlashCommandBridge = {
   openResourcePicker?: () => void;
   openDiagramPanel?: () => void;
   openEmojiPicker?: () => void;
+  openLinkPreviewPanel?: () => void;
 };
 
 // NoteEditor's "open the resource picker" / "open the diagram panel"
@@ -121,6 +122,15 @@ const ALL_ITEMS: SlashCommandItem[] = [
     run: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
       slashCommandBridge.openDiagramPanel?.();
+    },
+  },
+  {
+    title: "Link",
+    description: "Preview card with title, thumbnail, and description",
+    icon: "🔗",
+    run: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      slashCommandBridge.openLinkPreviewPanel?.();
     },
   },
   {

@@ -1,0 +1,12 @@
+-- Supports #22 Link Preview: og:description (or the meta description
+-- fallback) fetched when a teacher adds a link resource. `title` and
+-- `content` already had homes (og:title and the raw URL respectively,
+-- matching what `createVideoEmbedResource`/`TopicContent.tsx` already
+-- expected for `link` resources) and `file_url` doubles as the
+-- og:image URL -- every read path that signs `file_url` already skips
+-- anything starting with "http" (see the
+-- `resource.file_url.startsWith("http")` guard in both the teacher
+-- notes page and the student topic page), so an external og:image URL
+-- passes through untouched rather than being mistaken for a private
+-- bucket object path. Description had nowhere to go without this.
+alter table topic_resources add column if not exists description text;

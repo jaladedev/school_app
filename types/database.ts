@@ -160,6 +160,10 @@ export type TopicResource = {
   title: string | null;
   content: string | null;
   file_url: string | null;
+  // og:description (or the meta-description fallback) for `link`
+  // resources specifically -- see createLinkResource in teacher.ts.
+  // Every other resource type leaves this null.
+  description: string | null;
   sequence_order: number;
   uploaded_by: string | null;
   created_at: string;

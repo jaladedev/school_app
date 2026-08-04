@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { videoEmbedUrl } from "@/lib/video-embed";
+import { fetchLinkMetadata } from "@/lib/linkPreview";
 import type {
   AssessmentType,
   AttendanceStatus,
@@ -884,6 +885,93 @@ export async function createVideoEmbedResource(
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath(`/dashboard/student/topics/${topicId}`);
   return data;
+}
+
+// Unlike createVideoEmbedResource (which only ever needs client-side URL
+// pattern matching -- YouTube/Vimeo ids are extractable from the URL
+// itself, no fetch required), a generic link preview has to actually
+// visit the page to find its og:title/description/image, since there's
+// no way to know those from the URL alone. See fetchLinkMetadata for
+// why that fetch is SSRF-guarded.
+export async function createLinkResource(topicId: string, noteId: string, url: string) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can add links.");
+  const supabase = createClient();
+  await assertTeacherOwnsTopic(supabase, teacherId, topicId);
+
+  const metadata = await fetchLinkMetadata(url.trim());
+
+  const { data: latest } = await supabase
+    .from("topic_resources")
+    .select("sequence_order")
+    .eq("topic_id", topicId)
+    .order("sequence_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { data, error } = await supabase
+    .from("topic_resources")
+    .insert({
+      topic_id: topicId,
+      note_id: noteId,
+      resource_type: "link",
+      title: metadata.title,
+      content: url.trim(),
+      file_url: metadata.image,
+      description: metadata.description,
+      sequence_order: (latest?.sequence_order ?? 0) + 1,
+      uploaded_by: teacherId,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  revalidatePath(`/dashboard/teacher/notes/${topicId}`);
+  revalidatePath(`/dashboard/student/topics/${topicId}`);
+  return data;
+}
+
+/**
+ * Re-fetches og:title/description/image for an existing `link`
+ * resource and overwrites them in place -- for when the auto-fetch at
+ * creation time got a stale or wrong preview (a site's og:image
+ * changed since, or the page briefly served an error page instead of
+ * its real content). Same `resourceId`, so every `[[resource:ID]]`
+ * marker pointing at it keeps resolving, no different from
+ * `updateMermaidResource`'s "same id, new content" approach.
+ */
+export async function refreshLinkPreview(resourceId: string) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can edit links.");
+  const supabase = createClient();
+
+  const { data: existing } = await supabase
+    .from("topic_resources")
+    .select("id, topic_id, resource_type, content")
+    .eq("id", resourceId)
+    .single();
+
+  if (!existing) throw new Error("Resource not found.");
+  if (existing.resource_type !== "link") {
+    throw new Error("Only link resources can be refreshed this way.");
+  }
+  if (!existing.content) throw new Error("This link has no URL to refresh from.");
+
+  await assertTeacherOwnsTopic(supabase, teacherId, existing.topic_id);
+
+  const metadata = await fetchLinkMetadata(existing.content);
+
+  const { data: resource, error } = await supabase
+    .from("topic_resources")
+    .update({
+      title: metadata.title,
+      description: metadata.description,
+      file_url: metadata.image,
+    })
+    .eq("id", resourceId)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  revalidatePath(`/dashboard/teacher/notes/${existing.topic_id}`);
+  revalidatePath(`/dashboard/student/topics/${existing.topic_id}`);
+  return resource;
 }
 
 export async function createMermaidResource(

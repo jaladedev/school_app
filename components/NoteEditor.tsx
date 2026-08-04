@@ -42,6 +42,7 @@ import {
   saveTopicNote,
   createMermaidResource,
   createVideoEmbedResource,
+  createLinkResource,
   uploadTopicResource,
   saveTopicNoteDraft,
   getTopicNoteDraft,
@@ -80,6 +81,21 @@ const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
 };
 
 const DEFAULT_MERMAID = "flowchart TD\n  A[Start] --> B[End]";
+
+// Used by the paste handler to decide whether a paste is "just a URL"
+// (triggers the link-preview auto-fetch) versus a URL embedded in
+// other text (pastes as plain text, unchanged). Deliberately narrower
+// than a general URL-detection regex: the whole trimmed string must
+// parse as one http(s) URL with nothing else around it.
+function isBareHttpUrl(text: string): boolean {
+  try {
+    const url = new URL(text);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const TEXT_COLORS = [
   "#1f2937",
   "#475569",
@@ -222,6 +238,9 @@ export function NoteEditor({
   const [videoUrl, setVideoUrl] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
   const [isSavingVideoEmbed, setIsSavingVideoEmbed] = useState(false);
+  const [linkPreviewOpen, setLinkPreviewOpen] = useState(false);
+  const [linkPreviewUrl, setLinkPreviewUrl] = useState("");
+  const [isSavingLinkPreview, setIsSavingLinkPreview] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [replaceTerm, setReplaceTerm] = useState("");
@@ -231,6 +250,7 @@ export function NoteEditor({
   useEffect(() => {
     slashCommandBridge.openResourcePicker = () => setPickerOpen(true);
     slashCommandBridge.openDiagramPanel = () => setDiagramPanelOpen(true);
+    slashCommandBridge.openLinkPreviewPanel = () => setLinkPreviewOpen(true);
   });
   const [diagramTitle, setDiagramTitle] = useState("");
   const [diagramCode, setDiagramCode] = useState(DEFAULT_MERMAID);
@@ -338,10 +358,26 @@ export function NoteEditor({
         const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
           f.type.startsWith("image/")
         );
-        if (files.length === 0) return false; // let normal paste handling run
-        event.preventDefault();
-        void uploadDroppedFiles(files);
-        return true;
+        if (files.length > 0) {
+          event.preventDefault();
+          void uploadDroppedFiles(files);
+          return true;
+        }
+
+        // #22 Link Preview "on paste": only when the *entire* clipboard
+        // payload is one bare URL and nothing else (trimmed exact
+        // match, not just "contains a URL somewhere") -- pasting a URL
+        // as part of a sentence ("see https://example.com for more")
+        // should still paste as plain text, not get swapped for a
+        // resource card the teacher didn't ask for.
+        const pastedText = event.clipboardData?.getData("text/plain")?.trim() ?? "";
+        if (pastedText && isBareHttpUrl(pastedText)) {
+          event.preventDefault();
+          void handleAddLinkPreview(pastedText);
+          return true;
+        }
+
+        return false; // let normal paste handling run
       },
     },
 
@@ -428,6 +464,7 @@ export function NoteEditor({
     setColorPickerOpen(false);
     setDiagramPanelOpen(false);
     setVideoEmbedOpen(false);
+    setLinkPreviewOpen(false);
     setFocusMode(true);
     requestAnimationFrame(() => editor?.commands.focus());
   }
@@ -703,6 +740,36 @@ export function NoteEditor({
     } finally {
       setIsSavingVideoEmbed(false);
     }
+  }
+
+  // Shared by both the "Add link" panel and the paste-a-bare-URL
+  // shortcut below -- fetches title/description/image server-side
+  // (fetchLinkMetadata is SSRF-guarded, see lib/linkPreview.ts) and
+  // drops the result in as a resource chip the same way every other
+  // insert path here does.
+  async function handleAddLinkPreview(url: string) {
+    setIsSavingLinkPreview(true);
+    try {
+      const savedNoteId = await ensureNoteId();
+      const resource = await createLinkResource(topicId, savedNoteId, url);
+      setLocalResources((previous) => [...previous, resource]);
+      insertResourceMarker(resource);
+      setLinkPreviewUrl("");
+      setLinkPreviewOpen(false);
+      emitToast("Link preview added.");
+    } catch (err: unknown) {
+      emitToast(err instanceof Error ? err.message : "Unable to fetch a preview for that link.", "error");
+    } finally {
+      setIsSavingLinkPreview(false);
+    }
+  }
+
+  function handleInsertLinkPreview() {
+    if (!linkPreviewUrl.trim()) {
+      emitToast("Paste a link first.", "error");
+      return;
+    }
+    void handleAddLinkPreview(linkPreviewUrl.trim());
   }
 
   useEffect(() => {
@@ -1131,6 +1198,14 @@ export function NoteEditor({
                 >
                   Embed video
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setLinkPreviewOpen((open) => !open)}
+                  disabled={isPending}
+                  className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
+                >
+                  Add link
+                </button>
 
                 <button
                   onClick={() => handleSave("draft")}
@@ -1189,6 +1264,44 @@ export function NoteEditor({
                   className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
                 >
                   {isSavingVideoEmbed ? "Embedding…" : "Insert video"}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {!focusMode && linkPreviewOpen && (
+            <section className="mb-4 rounded-xl border border-rule bg-white p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-display text-sm font-semibold text-ink">Add link</h3>
+                <button
+                  type="button"
+                  onClick={() => setLinkPreviewOpen(false)}
+                  className="text-xs text-ink-soft hover:underline"
+                >
+                  Close
+                </button>
+              </div>
+              <p className="mb-3 text-sm text-ink-soft">
+                Paste any link -- title, thumbnail, and description are fetched automatically.
+              </p>
+              <input
+                value={linkPreviewUrl}
+                onChange={(e) => setLinkPreviewUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isSavingLinkPreview) handleInsertLinkPreview();
+                }}
+                placeholder="https://example.com/article"
+                type="url"
+                className="w-full rounded-lg border border-rule p-2 text-sm outline-none focus-visible:border-marigold"
+              />
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleInsertLinkPreview}
+                  disabled={isSavingLinkPreview}
+                  className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
+                >
+                  {isSavingLinkPreview ? "Fetching…" : "Add link"}
                 </button>
               </div>
             </section>

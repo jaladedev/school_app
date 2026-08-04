@@ -26,7 +26,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { clampPopoverToEditor } from "./popover-position";
 import { TopicResourceItem } from "@/components/TopicContent";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
-import { updateMermaidResource, updateTopicResource } from "@/lib/actions/teacher";
+import { updateMermaidResource, updateTopicResource, refreshLinkPreview } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import type { TopicResource } from "@/types/database";
 import { dragAwareStopEvent } from "./drag-utils";
@@ -481,6 +481,7 @@ function ResourceChipDefaultView({
   const [editTitle, setEditTitle] = useState(resource?.title ?? "");
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshingPreview, setIsRefreshingPreview] = useState(false);
   const [dragArmed, setDragArmed] = useState(false);
   const wrapperRef = useRef<HTMLSpanElement | null>(null);
   const popoverRef = useRef<HTMLSpanElement | null>(null);
@@ -546,6 +547,28 @@ function ResourceChipDefaultView({
       emitToast(message, "error");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  // Re-fetches title/description/thumbnail from the stored URL --
+  // separate from handleSaveEdit/updateTopicResource since this
+  // updates fields (description, og:image) that the generic edit form
+  // never touches (see refreshLinkPreview's doc comment for why the
+  // auto-fetched preview can go stale or fetch wrong the first time).
+  async function handleRefreshPreview() {
+    if (!resource) return;
+    setIsRefreshingPreview(true);
+    try {
+      const updated = await refreshLinkPreview(resource.id);
+      const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
+      storage.onResourceUpdated?.(updated);
+      setEditTitle(updated.title ?? "");
+      emitToast("Preview refreshed.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to refresh the preview.";
+      emitToast(message, "error");
+    } finally {
+      setIsRefreshingPreview(false);
     }
   }
 
@@ -617,6 +640,16 @@ function ResourceChipDefaultView({
                     className="mt-1 block w-full text-xs text-ink-soft"
                   />
                 </label>
+              )}
+              {resource.resource_type === "link" && (
+                <button
+                  type="button"
+                  onClick={handleRefreshPreview}
+                  disabled={isRefreshingPreview}
+                  className="mb-1 text-xs font-medium text-leaf hover:underline disabled:opacity-60"
+                >
+                  {isRefreshingPreview ? "Refreshing…" : "Refresh preview from URL"}
+                </button>
               )}
               <span className="mt-3 flex items-center justify-end gap-2">
                 <button
