@@ -31,32 +31,9 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Messages", href: "/dashboard/messages" },
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
-  admin: [
-    { label: "Overview", href: "/dashboard/admin" },
-    { label: "Classes", href: "/dashboard/admin/classes" },
-    { label: "Promote Students", href: "/dashboard/admin/classes/promote" },
-    { label: "Academic Year Rollover", href: "/dashboard/admin/rollover" },
-    { label: "Subjects", href: "/dashboard/admin/subjects" },
-    { label: "Students", href: "/dashboard/admin/students" },
-    { label: "Parents", href: "/dashboard/admin/parents" },
-    { label: "Timetables", href: "/dashboard/admin/timetables" },
-    { label: "Scheme of Work", href: "/dashboard/admin/curriculum" },
-    { label: "Staff", href: "/dashboard/admin/staff" },
-    { label: "Grade Moderation", href: "/dashboard/admin/grades" },
-    { label: "Lesson Plan Review", href: "/dashboard/admin/lesson-plans" },
-    { label: "Fees", href: "/dashboard/admin/fees" },
-    { label: "ID Cards", href: "/dashboard/admin/id-cards" },
-    { label: "Library", href: "/dashboard/library" },
-    { label: "Inventory", href: "/dashboard/admin/inventory" },
-    { label: "Hostels", href: "/dashboard/admin/hostels" },
-    { label: "Transport", href: "/dashboard/admin/transport" },
-    { label: "Analytics", href: "/dashboard/admin/analytics" },
-    { label: "Audit Log", href: "/dashboard/admin/audit-log" },
-    { label: "Messages", href: "/dashboard/messages" },
-    { label: "Announcements", href: "/dashboard/announcements" },
-    { label: "Bulk Email", href: "/dashboard/admin/bulk-email" },
-    { label: "Settings", href: "/dashboard/admin/settings" },
-  ],
+  // Kept as a flat list for findActiveHref/etc — derived from
+  // ADMIN_NAV_SECTIONS below so the two can't drift out of sync.
+  admin: [],
   parent: [
     { label: "Overview", href: "/dashboard/parent" },
     { label: "Attendance", href: "/dashboard/parent/attendance" },
@@ -71,6 +48,70 @@ const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
     { label: "Announcements", href: "/dashboard/announcements" },
   ],
 };
+
+// The admin menu has 23 destinations — too many to scan as one flat
+// list — so it's grouped into labeled sections instead. Every other
+// role's list stays short enough that a flat list is still the
+// simplest, most scannable option.
+const ADMIN_NAV_SECTIONS: { section: string; items: { label: string; href: string }[] }[] = [
+  {
+    section: "Overview",
+    items: [
+      { label: "Overview", href: "/dashboard/admin" },
+      { label: "Analytics", href: "/dashboard/admin/analytics" },
+      { label: "Audit Log", href: "/dashboard/admin/audit-log" },
+    ],
+  },
+  {
+    section: "Academics",
+    items: [
+      { label: "Classes", href: "/dashboard/admin/classes" },
+      { label: "Promote Students", href: "/dashboard/admin/classes/promote" },
+      { label: "Academic Year Rollover", href: "/dashboard/admin/rollover" },
+      { label: "Subjects", href: "/dashboard/admin/subjects" },
+      { label: "Timetables", href: "/dashboard/admin/timetables" },
+      { label: "Scheme of Work", href: "/dashboard/admin/curriculum" },
+      { label: "Grade Moderation", href: "/dashboard/admin/grades" },
+      { label: "Lesson Plan Review", href: "/dashboard/admin/lesson-plans" },
+    ],
+  },
+  {
+    section: "People",
+    items: [
+      { label: "Students", href: "/dashboard/admin/students" },
+      { label: "Parents", href: "/dashboard/admin/parents" },
+      { label: "Staff", href: "/dashboard/admin/staff" },
+      { label: "ID Cards", href: "/dashboard/admin/id-cards" },
+    ],
+  },
+  {
+    section: "Fees",
+    items: [{ label: "Fees", href: "/dashboard/admin/fees" }],
+  },
+  {
+    section: "Facilities",
+    items: [
+      { label: "Library", href: "/dashboard/library" },
+      { label: "Inventory", href: "/dashboard/admin/inventory" },
+      { label: "Hostels", href: "/dashboard/admin/hostels" },
+      { label: "Transport", href: "/dashboard/admin/transport" },
+    ],
+  },
+  {
+    section: "Communication",
+    items: [
+      { label: "Messages", href: "/dashboard/messages" },
+      { label: "Announcements", href: "/dashboard/announcements" },
+      { label: "Bulk Email", href: "/dashboard/admin/bulk-email" },
+    ],
+  },
+  {
+    section: "Settings",
+    items: [{ label: "Settings", href: "/dashboard/admin/settings" }],
+  },
+];
+
+NAV_BY_ROLE.admin = ADMIN_NAV_SECTIONS.flatMap((s) => s.items);
 
 // A driver isn't teaching staff — they only need their own route and
 // the general messaging/announcements areas, not the full teacher menu
@@ -134,6 +175,39 @@ export function Sidebar({
   const pathname = usePathname();
   const activeHref = findActiveHref(pathname, items);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const activeSectionName = ADMIN_NAV_SECTIONS.find((g) =>
+    g.items.some((i) => i.href === activeHref)
+  )?.section;
+
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    () => new Set(activeSectionName ? [activeSectionName] : [])
+  );
+
+  // Load any previously-saved open/closed state once on mount, then keep
+  // the active section forced open on top of it (in case the saved state
+  // predates navigating somewhere new).
+  useEffect(() => {
+    const saved = localStorage.getItem("admin-sidebar-sections");
+    if (saved) {
+      const set = new Set<string>(JSON.parse(saved));
+      if (activeSectionName) set.add(activeSectionName);
+      setOpenSections(set);
+    }
+    // Deliberately mount-only: re-running this on every activeSectionName
+    // change would clobber a section the user just manually closed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function toggleSection(section: string) {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      localStorage.setItem("admin-sidebar-sections", JSON.stringify([...next]));
+      return next;
+    });
+  }
 
   // Close the drawer automatically on navigation — otherwise it stays
   // open over the new page until manually dismissed.
@@ -209,23 +283,80 @@ export function Sidebar({
             </button>
           </div>
           <nav className="space-y-1">
-            {items.map((item) => {
-              const isActive = item.href === activeHref;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`block rounded-lg px-3 py-2 text-sm transition ${
-                    isActive
-                      ? "bg-leaf-soft font-medium text-leaf"
-                      : "text-ink hover:bg-leaf-soft hover:text-leaf"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+            {role === "admin" ? (
+              ADMIN_NAV_SECTIONS.map((group) => {
+                const isOpen = openSections.has(group.section);
+                return (
+                  <div key={group.section} className="mb-1.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(group.section)}
+                      aria-expanded={isOpen}
+                      className="flex w-full items-center justify-between px-3 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft/70"
+                    >
+                      {group.section}
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 10 10"
+                        fill="none"
+                        aria-hidden="true"
+                        className={`transition-transform ${isOpen ? "rotate-90" : ""}`}
+                      >
+                        <path
+                          d="M3 1.5L7 5l-4 3.5"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    {isOpen && (
+                      <div className="mt-0.5">
+                        {group.items.map((item) => {
+                          const isActive = item.href === activeHref;
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              aria-current={isActive ? "page" : undefined}
+                              className={`block rounded-lg px-3 py-1.5 text-sm transition ${
+                                isActive
+                                  ? "bg-leaf-soft font-medium text-leaf"
+                                  : "text-ink hover:bg-leaf-soft hover:text-leaf"
+                              }`}
+                            >
+                              {item.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <>
+                {items.map((item) => {
+                  const isActive = item.href === activeHref;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={isActive ? "page" : undefined}
+                      className={`block rounded-lg px-3 py-2 text-sm transition ${
+                        isActive
+                          ? "bg-leaf-soft font-medium text-leaf"
+                          : "text-ink hover:bg-leaf-soft hover:text-leaf"
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </>
+            )}
           </nav>
         </div>
         <div className="shrink-0 space-y-2 border-t border-rule px-2 pt-4">

@@ -204,6 +204,7 @@ All migrations below are now confirmed applied via live schema dumps (hostel tab
 - [x] Server-side search — students, staff
 - [x] Pagination now present on staff page and teacher attendance/notes pages
 - [x] Active link state in Sidebar
+- [x] Admin sidebar grouped into sections (Overview, Academics, People, Fees, Facilities, Communication, Settings) — the flat 23-item list was hard to scan. `ADMIN_NAV_SECTIONS` is the source of truth; `NAV_BY_ROLE.admin` is derived from it (flattened) so active-route matching can't drift out of sync with the grouped view. Every other role's nav stays flat — short enough not to need it.
 - [x] Breadcrumbs for deep routes
 - [x] Global `TermYearSelector` sync is now implemented via shared localStorage-backed state across report-card pages
 - [x] Responsive table handling for mobile — dense tables use horizontal-scroll wrappers and retain natural column widths; markdown tables scroll horizontally on narrow screens
