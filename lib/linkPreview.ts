@@ -113,8 +113,7 @@ export async function fetchLinkMetadata(rawUrl: string): Promise<LinkMetadata> {
           // Some sites serve a bare, meta-tag-free page to unrecognized
           // clients -- a normal browser UA gets the real og: tags most
           // of the time without needing per-site special-casing.
-          "User-Agent":
-            "Mozilla/5.0 (compatible; SchoolAppLinkPreview/1.0; +link-preview-fetch)",
+          "User-Agent": "Mozilla/5.0 (compatible; SchoolAppLinkPreview/1.0; +link-preview-fetch)",
           Accept: "text/html",
         },
       });

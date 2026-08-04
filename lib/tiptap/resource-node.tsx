@@ -26,7 +26,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { clampPopoverToEditor } from "./popover-position";
 import { TopicResourceItem } from "@/components/TopicContent";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
-import { updateMermaidResource, updateTopicResource, refreshLinkPreview } from "@/lib/actions/teacher";
+import {
+  updateMermaidResource,
+  updateTopicResource,
+  refreshLinkPreview,
+} from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import type { TopicResource } from "@/types/database";
 import { dragAwareStopEvent } from "./drag-utils";

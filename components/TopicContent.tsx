@@ -344,7 +344,6 @@ export function TopicResourceItem({
         </a>
       );
 
-
     default:
       return null;
   }

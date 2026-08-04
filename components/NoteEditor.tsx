@@ -758,7 +758,10 @@ export function NoteEditor({
       setLinkPreviewOpen(false);
       emitToast("Link preview added.");
     } catch (err: unknown) {
-      emitToast(err instanceof Error ? err.message : "Unable to fetch a preview for that link.", "error");
+      emitToast(
+        err instanceof Error ? err.message : "Unable to fetch a preview for that link.",
+        "error"
+      );
     } finally {
       setIsSavingLinkPreview(false);
     }
