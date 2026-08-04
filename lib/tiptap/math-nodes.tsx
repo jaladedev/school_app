@@ -1,9 +1,63 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
-import { useLayoutEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import katex from "katex";
 import { dragAwareStopEvent } from "./drag-utils";
 import { clampPopoverToEditor } from "./popover-position";
+
+// MathLive registers the <math-field> custom element as a side effect of
+// being imported. It touches `document`/`customElements` at module scope,
+// so it can't be imported at the top of a file that also runs during Next's
+// server-side render -- guarded with a dynamic `import()` inside a
+// `useEffect` in MathFieldInput below instead of a static import here.
+type MathfieldElement = HTMLElement & {
+  value: string;
+  executeCommand: (command: string | [string, ...unknown[]]) => boolean;
+};
+
+// MathLive's own React typings (`mathlive/dist/react.d.ts`) require React 19
+// JSX types and don't line up with this project's React 18 setup, so the
+// custom element is typed locally instead -- just enough (children, class,
+// the one custom attribute used, and the DOM event handlers) to type-check
+// the usage in MathFieldInput below.
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      "math-field": React.DetailedHTMLProps<
+        React.HTMLAttributes<MathfieldElement> & {
+          "math-virtual-keyboard-policy"?: "auto" | "manual" | "sandboxed";
+        },
+        MathfieldElement
+      >;
+    }
+  }
+}
+
+// Preference for which editor a teacher sees by default when opening a math
+// node -- Visual (MathLive, click-to-build) or LaTeX (the original raw-text
+// input + symbol toolbar). This mirrors the existing a11y-menu pattern
+// (`NoteEditor.tsx`'s font size/high-contrast/dyslexia toggles): a reading
+// preference, not note content, so it lives in localStorage rather than
+// round-tripping through saved markdown.
+const MATH_MODE_STORAGE_KEY = "note-editor-math-mode";
+type MathEditMode = "visual" | "latex";
+
+function getStoredMathMode(): MathEditMode {
+  if (typeof window === "undefined") return "visual";
+  return window.localStorage.getItem(MATH_MODE_STORAGE_KEY) === "latex" ? "latex" : "visual";
+}
+
+function setStoredMathMode(mode: MathEditMode) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(MATH_MODE_STORAGE_KEY, mode);
+}
 
 function renderKatex(latex: string, displayMode: boolean) {
   try {
@@ -42,6 +96,137 @@ const MATH_SYMBOLS: { label: string; insert: string; caret: number; title: strin
   { label: "≈", insert: "\\approx", caret: 7, title: "Approximately" },
 ];
 
+// Visual equation editor: a MathLive <math-field> bound to the same `draft`
+// string LaTeXInput uses. MathLive typesets live as you type/click -- a
+// fraction shows as an actual bar with numerator/denominator boxes you tab
+// or arrow between, not `\frac{}{}` source text -- and exposes the result
+// as a plain LaTeX string via `.value`, so it drops into the exact same
+// `draft`/`updateAttributes({ latex })` flow the LaTeX-input mode already
+// uses. No changes needed to storage, markdown serialize/parse, or the
+// KaTeX-rendered (non-editing) display state below -- this only replaces
+// what's shown *while* `editing` is true.
+export type MathFieldHandle = {
+  // Inserts a LaTeX snippet at the field's current cursor/selection using
+  // MathLive's own "insert" command -- unlike the plain-text-input version
+  // in LATEX_SYMBOLS' caller, this lets MathLive place the cursor inside
+  // the inserted structure itself (e.g. straight into a fraction's
+  // numerator box) rather than needing a hand-computed caret offset.
+  insert: (latex: string) => void;
+  focus: () => void;
+};
+
+const MathFieldInput = forwardRef<
+  MathFieldHandle,
+  {
+    draft: string;
+    setDraft: (v: string) => void;
+    displayMode: boolean;
+    onCommit: (latex: string) => void;
+    onCancel: () => void;
+    autoFocusToken: string;
+  }
+>(function MathFieldInput(
+  { draft, setDraft, displayMode, onCommit, onCancel, autoFocusToken },
+  forwardedRef
+) {
+  const fieldRef = useRef<MathfieldElement | null>(null);
+  const [ready, setReady] = useState(false);
+  // Enter/Escape already resolve the edit (commit or cancel) and unmount
+  // this field via `setEditing(false)`; unmounting a focused custom element
+  // can itself fire a `blur` event, which would otherwise call `onCommit` a
+  // second time right after `onCancel` already ran, re-saving the draft
+  // Escape was meant to discard. Set right before either path unmounts, so
+  // the resulting blur is a no-op.
+  const resolvedRef = useRef(false);
+
+  useImperativeHandle(forwardedRef, () => ({
+    insert: (latex: string) => {
+      fieldRef.current?.executeCommand(["insert", latex]);
+      fieldRef.current?.focus();
+      if (fieldRef.current) setDraft(fieldRef.current.value);
+    },
+    focus: () => fieldRef.current?.focus(),
+  }));
+
+  // MathLive's custom element registration touches `document`, which
+  // doesn't exist during Next's server-side render -- load it only once
+  // we're definitely in the browser (mirrors the guard comment on the
+  // `MathfieldElement` type above).
+  useEffect(() => {
+    let cancelled = false;
+    import("mathlive").then(() => {
+      if (!cancelled) setReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !fieldRef.current) return;
+    // Keep the field's internal value in sync if `draft` changes from
+    // outside this component (e.g. a symbol-toolbar click while in visual
+    // mode, or switching back from LaTeX mode with edited text) without
+    // fighting the user's own typing -- only push when they actually differ.
+    if (fieldRef.current.value !== draft) {
+      fieldRef.current.value = draft;
+    }
+  }, [ready, draft]);
+
+  // Autofocus once, when this input first mounts (switching into visual
+  // mode, or opening a fresh node) -- `autoFocusToken` changes only on those
+  // transitions, not on every keystroke, so this doesn't refocus mid-edit.
+  useEffect(() => {
+    if (ready) fieldRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, autoFocusToken]);
+
+  if (!ready) {
+    // Same-shape placeholder so layout doesn't jump once MathLive finishes
+    // loading; real content swaps in via the effect above.
+    return (
+      <div className="w-full min-w-[16rem] rounded border border-rule px-2 py-1.5 text-sm text-ink-soft">
+        Loading equation editor…
+      </div>
+    );
+  }
+
+  return (
+    <math-field
+      ref={fieldRef}
+      className="w-full min-w-[16rem] rounded border border-rule px-2 py-1.5 text-base outline-none focus:border-marigold"
+      // MathLive ships its own virtual keyboard for touch devices; teachers
+      // are on laptops/desktops for note-writing, and an unrequested
+      // on-screen keyboard popping up mid-note would be more disruptive
+      // than helpful, so it's suppressed here.
+      math-virtual-keyboard-policy="manual"
+      onInput={(e: React.FormEvent<MathfieldElement>) => setDraft(e.currentTarget.value)}
+      onBlur={(e: React.FocusEvent<MathfieldElement>) => {
+        if (resolvedRef.current) return;
+        onCommit(e.currentTarget.value ?? draft);
+      }}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        // Enter both commits *and* is MathLive's own "move to next slot"
+        // key inside nested structures (e.g. numerator -> denominator) --
+        // only treat it as commit when nothing is left to navigate into,
+        // i.e. the field's own default handling didn't already consume it.
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          resolvedRef.current = true;
+          onCommit(fieldRef.current?.value ?? draft);
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          resolvedRef.current = true;
+          onCancel();
+        }
+      }}
+    >
+      {draft}
+    </math-field>
+  );
+});
+
 function makeMathView(displayMode: boolean) {
   return function MathView({
     node,
@@ -54,8 +239,23 @@ function makeMathView(displayMode: boolean) {
   }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(node.attrs.latex ?? "");
+    const [mode, setMode] = useState<MathEditMode>("visual");
     const inputRef = useRef<HTMLInputElement>(null);
+    const mathFieldRef = useRef<MathFieldHandle>(null);
     const popupRef = useRef<HTMLDivElement>(null);
+
+    // Load the stored mode preference once we're in the browser (matches
+    // the a11y-menu localStorage pattern) rather than defaulting every node
+    // to "visual" and then flashing to "latex" a moment later for someone
+    // who prefers the raw-text mode.
+    useEffect(() => {
+      setMode(getStoredMathMode());
+    }, []);
+
+    function switchMode(next: MathEditMode) {
+      setMode(next);
+      setStoredMathMode(next);
+    }
 
     // Inline math's popup floats out of the text flow (absolute-positioned,
     // see comment below), which means it can render past the editor's own
@@ -83,7 +283,10 @@ function makeMathView(displayMode: boolean) {
     // the next frame because `setDraft` re-renders the input with new
     // text first -- setting selectionRange before that commit would be
     // clobbered by React re-applying the (still-stale-looking) value.
-    function insertSymbol(insert: string, caret: number) {
+    // Only used in LaTeX mode -- visual mode has its own insert path below,
+    // since MathLive computes its own post-insert cursor position rather
+    // than needing a hand-tracked character offset.
+    function insertSymbolLatex(insert: string, caret: number) {
       const el = inputRef.current;
       const start = el?.selectionStart ?? draft.length;
       const end = el?.selectionEnd ?? draft.length;
@@ -94,6 +297,16 @@ function makeMathView(displayMode: boolean) {
         el?.focus();
         el?.setSelectionRange(cursor, cursor);
       });
+    }
+
+    // Shared by both modes' symbol toolbar: routes the insert to whichever
+    // editor is currently showing.
+    function insertSymbol(insert: string, caret: number) {
+      if (mode === "visual") {
+        mathFieldRef.current?.insert(insert);
+      } else {
+        insertSymbolLatex(insert, caret);
+      }
     }
 
     if (editing) {
@@ -156,49 +369,100 @@ function makeMathView(displayMode: boolean) {
                 : "absolute left-0 top-full z-20 mt-1 w-max max-w-[24rem] rounded-md border border-marigold bg-white p-2 shadow-lg"
             }
           >
-            <div className="mb-1.5 flex flex-wrap gap-0.5" contentEditable={false}>
-              {MATH_SYMBOLS.map((sym) => (
+            <div className="mb-1.5 flex items-center justify-between gap-2" contentEditable={false}>
+              <div className="flex flex-wrap gap-0.5">
+                {MATH_SYMBOLS.map((sym) => (
+                  <button
+                    key={sym.label}
+                    type="button"
+                    title={sym.title}
+                    // Keep focus on the active editor instead of the button
+                    // -- a normal click blurs the input/math-field first,
+                    // which for LaTeX mode would fire onBlur and close
+                    // editing before the click handler ever ran.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => insertSymbol(sym.insert, sym.caret)}
+                    className="min-w-[1.75rem] rounded px-1 py-0.5 font-serif text-sm text-ink hover:bg-paper"
+                  >
+                    {sym.label}
+                  </button>
+                ))}
+              </div>
+              {/* Visual/LaTeX toggle -- visual is the default click-to-build
+                  equation editor (#19's remaining gap); LaTeX stays as the
+                  power-user fallback for anyone who'd rather type source
+                  directly. Choice persists per-browser via localStorage,
+                  same pattern as the Aa accessibility menu. */}
+              <div className="flex shrink-0 rounded border border-rule text-xs">
                 <button
-                  key={sym.label}
                   type="button"
-                  title={sym.title}
-                  // Keep focus on the input instead of the button -- a
-                  // normal click blurs the input first, which would
-                  // fire the input's onBlur and close editing before
-                  // the click handler ever ran.
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => insertSymbol(sym.insert, sym.caret)}
-                  className="min-w-[1.75rem] rounded px-1 py-0.5 font-serif text-sm text-ink hover:bg-paper"
+                  onClick={() => switchMode("visual")}
+                  aria-pressed={mode === "visual"}
+                  className={`rounded-l px-1.5 py-0.5 ${
+                    mode === "visual" ? "bg-marigold/30 text-ink" : "text-ink-soft hover:bg-paper"
+                  }`}
                 >
-                  {sym.label}
+                  Visual
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => switchMode("latex")}
+                  aria-pressed={mode === "latex"}
+                  className={`rounded-r border-l border-rule px-1.5 py-0.5 ${
+                    mode === "latex" ? "bg-marigold/30 text-ink" : "text-ink-soft hover:bg-paper"
+                  }`}
+                >
+                  LaTeX
+                </button>
+              </div>
             </div>
-            <input
-              ref={inputRef}
-              autoFocus
-              onMouseDownCapture={(e) => e.stopPropagation()}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={() => {
-                updateAttributes({ latex: draft });
-                setEditing(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  updateAttributes({ latex: draft });
+            {mode === "visual" ? (
+              <MathFieldInput
+                ref={mathFieldRef}
+                draft={draft}
+                setDraft={setDraft}
+                displayMode={displayMode}
+                autoFocusToken={mode}
+                onCommit={(latex) => {
+                  updateAttributes({ latex });
                   setEditing(false);
-                }
-                if (e.key === "Escape") {
+                }}
+                onCancel={() => {
                   setDraft(node.attrs.latex ?? "");
                   setEditing(false);
+                }}
+              />
+            ) : (
+              <input
+                ref={inputRef}
+                autoFocus
+                onMouseDownCapture={(e) => e.stopPropagation()}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={() => {
+                  updateAttributes({ latex: draft });
+                  setEditing(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    updateAttributes({ latex: draft });
+                    setEditing(false);
+                  }
+                  if (e.key === "Escape") {
+                    setDraft(node.attrs.latex ?? "");
+                    setEditing(false);
+                  }
+                }}
+                className="w-full min-w-[16rem] rounded border border-rule px-2 py-1 font-mono text-sm outline-none focus:border-marigold"
+                placeholder={
+                  displayMode ? "\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}" : "x^2 + 3x - 4 = 0"
                 }
-              }}
-              className="w-full min-w-[16rem] rounded border border-rule px-2 py-1 font-mono text-sm outline-none focus:border-marigold"
-              placeholder={displayMode ? "\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}" : "x^2 + 3x - 4 = 0"}
-            />
-            {draft.trim() && (
+              />
+            )}
+            {mode === "latex" && draft.trim() && (
               <div
                 className="mt-1.5 border-t border-rule pt-1.5 text-sm"
                 dangerouslySetInnerHTML={{ __html: renderKatex(draft, displayMode) }}
