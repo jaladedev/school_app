@@ -124,27 +124,6 @@ const MathFieldInput = forwardRef<
     if (fieldRef.current.value !== initialValue) fieldRef.current.value = initialValue;
   }, [ready, initialValue]);
 
-  // hard-stop native events so ProseMirror never sees them (shadow DOM fix)
-  useEffect(() => {
-    if (!ready || !fieldRef.current) return;
-    const el = fieldRef.current;
-    const stop = (e: Event) => {
-      e.stopPropagation();
-      (e as any).stopImmediatePropagation?.();
-    };
-    const evts = [
-      "keydown",
-      "keyup",
-      "keypress",
-      "beforeinput",
-      "input",
-      "compositionstart",
-      "compositionend",
-    ];
-    evts.forEach((t) => el.addEventListener(t, stop, true));
-    return () => evts.forEach((t) => el.removeEventListener(t, stop, true));
-  }, [ready]);
-
   useEffect(() => {
     if (!ready) return;
     const raf = requestAnimationFrame(() => {

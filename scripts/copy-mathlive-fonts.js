@@ -1,16 +1,22 @@
-// Copies MathLive's bundled KaTeX fonts into public/ so the browser can
-// load them from a path that actually exists in Next's build output.
-// MathLive's default fontsDirectory assumes its fonts sit next to its own
-// JS chunk, which isn't true once webpack bundles it -- see
-// lib/tiptap/math-nodes.tsx, which points fontsDirectory at "/mathlive-fonts".
-// Runs automatically via the "postinstall" script in package.json.
 const fs = require("fs");
 const path = require("path");
 
-const src = path.join(__dirname, "..", "node_modules", "mathlive", "fonts");
+const possibleSrcs = [
+  path.join(__dirname, "..", "node_modules", "mathlive", "dist", "fonts"),
+  path.join(__dirname, "..", "node_modules", "mathlive", "fonts"),
+];
+
+let src = null;
+for (const candidate of possibleSrcs) {
+  if (fs.existsSync(candidate)) {
+    src = candidate;
+    break;
+  }
+}
+
 const dest = path.join(__dirname, "..", "public", "mathlive-fonts");
 
-if (!fs.existsSync(src)) {
+if (!src) {
   console.warn("[copy-mathlive-fonts] mathlive/fonts not found, skipping");
   process.exit(0);
 }
