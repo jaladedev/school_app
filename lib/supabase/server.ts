@@ -1,5 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
-import { isAuthRetryableFetchError } from "@supabase/supabase-js";
+import { isAuthRetryableFetchError, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { Database } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
@@ -34,26 +34,42 @@ export function createClient() {
   );
 }
 
+// Shared by every server-side call site that needs the current user (this
+// file's getCurrentProfile, plus assertRole/clearMustChangePassword in
+// lib/actions/authGuards.ts and the ownership check in lib/actions/fees.ts).
+// Extracted so all of them get the same retry-on-transient-network-blip
+// behavior -- a raw, unguarded `await supabase.auth.getUser()` treats a
+// network hiccup exactly the same as "not signed in" (both come back as
+// `user: null`), which surfaced as a real bug: `assertRole` was throwing
+// "You must be signed in." for a legitimately signed-in teacher purely
+// because of an intermittent local network fetch failure, right in the
+// middle of the exact same network flakiness this retry already handles
+// gracefully everywhere else it's used.
+export async function getUserWithRetry(supabase: SupabaseClient<Database>) {
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] = null;
+  let error: Awaited<ReturnType<typeof supabase.auth.getUser>>["error"] = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+    error = result.error;
+    if (!error || !isAuthRetryableFetchError(error)) break;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  return { user, error, isTransient: error ? isAuthRetryableFetchError(error) : false };
+}
+
 // Fetch the current user's profile (role, name) — used across dashboard pages.
 export async function getCurrentProfile() {
   const supabase = createClient();
 
   // A cold connection (first outbound request after the dev server starts,
   // or after any idle period) is the single most common cause of a
-  // transient getUser() failure in practice -- the retry below exists
-  // specifically for that case: one short-lived retry, so a one-off blip
-  // resolves silently instead of surfacing the retry-screen error every
-  // single time. If it fails twice in a row, that's no longer "the
+  // transient getUser() failure in practice -- getUserWithRetry's retry
+  // exists specifically for that case: one short-lived retry, so a one-off
+  // blip resolves silently instead of surfacing the retry-screen error
+  // every single time. If it fails twice in a row, that's no longer "the
   // connection was cold," so it's let through to the error path below.
-  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] = null;
-  let getUserError: Awaited<ReturnType<typeof supabase.auth.getUser>>["error"] = null;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const result = await supabase.auth.getUser();
-    user = result.data.user;
-    getUserError = result.error;
-    if (!getUserError || !isAuthRetryableFetchError(getUserError)) break;
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
+  const { user, error: getUserError, isTransient } = await getUserWithRetry(supabase);
 
   // A null user here has two very different causes: genuinely not signed
   // in, or the request to Supabase's Auth server itself failed (network
@@ -64,7 +80,7 @@ export async function getCurrentProfile() {
   // Throwing here instead lets that case surface as a normal error (caught
   // by Next's nearest error.tsx, which has a built-in retry), rather than
   // masquerading as a logout.
-  if (getUserError && isAuthRetryableFetchError(getUserError)) {
+  if (getUserError && isTransient) {
     // The thrown Error's [cause] only ever showed
     // `AuthRetryableFetchError: fetch failed` -- that's supabase-js's own
     // wrapper, not the actual network error underneath it. Logging the

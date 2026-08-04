@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserWithRetry } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserRole } from "@/types/database";
 
@@ -21,9 +21,20 @@ export async function assertRole(
   errorMessage: string
 ): Promise<{ id: string; role: UserRole }> {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Was previously an unguarded `await supabase.auth.getUser()` with no
+  // retry and the error silently discarded -- a transient network fetch
+  // failure looks identical to "actually not signed in" (`user: null`
+  // either way), so an intermittent blip here threw "You must be signed
+  // in." for a legitimately signed-in teacher instead of retrying, the way
+  // getCurrentProfile() already does. getUserWithRetry gives this the same
+  // one-retry-then-give-up behavior.
+  const { user, error: getUserError, isTransient } = await getUserWithRetry(supabase);
+
+  if (getUserError && isTransient) {
+    throw new Error("Couldn't verify your session right now — check your connection and retry.", {
+      cause: getUserError,
+    });
+  }
 
   if (!user) {
     throw new Error("You must be signed in.");
@@ -46,9 +57,13 @@ export async function assertRole(
 /** Clears only the current user's first-login password-change flag. */
 export async function clearMustChangePassword() {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, error: getUserError, isTransient } = await getUserWithRetry(supabase);
+
+  if (getUserError && isTransient) {
+    throw new Error("Couldn't verify your session right now — check your connection and retry.", {
+      cause: getUserError,
+    });
+  }
 
   if (!user) throw new Error("You must be signed in.");
 

@@ -31,6 +31,14 @@ export function NoteWorkspace({
   // resources created this session (a dropped file, a saved diagram)
   // immediately, not just after a `router.refresh()` round trip.
   const [sidebarResources, setSidebarResources] = useState(resources);
+  // #32 mobile Resources tab: lifted here (rather than living inside
+  // NoteEditor) because the actual Resources content is ResourceSidebar,
+  // a sibling of NoteEditor, not a child of it -- NoteEditor only owns
+  // the Write/Preview/Resources tab *bar* UI (and hides its own content
+  // area when "resources" is active), while this state decides whether
+  // ResourceSidebar itself is visible below `lg`. On `lg`+ the sidebar is
+  // always shown side-by-side regardless of this tab, same as before.
+  const [mobileTab, setMobileTab] = useState<"write" | "preview" | "resources">("write");
 
   return (
     <div>
@@ -77,9 +85,13 @@ export function NoteWorkspace({
               resources={resources}
               placeholder={placeholder}
               onResourcesChange={setSidebarResources}
+              mobileTab={mobileTab}
+              onMobileTabChange={setMobileTab}
             />
           </div>
-          <ResourceSidebar resources={sidebarResources} editorRef={editorRef} />
+          <div className={mobileTab === "resources" ? "block" : "hidden lg:block"}>
+            <ResourceSidebar resources={sidebarResources} editorRef={editorRef} />
+          </div>
         </div>
       ) : (
         <>

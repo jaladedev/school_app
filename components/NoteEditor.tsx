@@ -184,6 +184,8 @@ export type NoteEditorHandle = {
   uploadFiles: (files: File[]) => Promise<void>;
 };
 
+type MobileTab = "write" | "preview" | "resources";
+
 type NoteEditorProps = {
   topicId: string;
   noteId?: string;
@@ -195,6 +197,18 @@ type NoteEditorProps = {
   // resource list changes, so a sidebar rendered by the parent can stay
   // in sync without waiting for a full `router.refresh()` round trip.
   onResourcesChange?: (resources: TopicResource[]) => void;
+  // #32 Resources tab: the mobile Write/Preview/Resources tab bar lives
+  // here (it's rendered alongside the toolbar), but the actual Resources
+  // *content* is `ResourceSidebar`, which NoteWorkspace renders as a
+  // sibling of this component, not a child -- so the "which tab is
+  // active" state needs to live in NoteWorkspace and be passed down as a
+  // controlled pair, rather than living only in this component's own
+  // state, or NoteWorkspace would have no way to know when to show the
+  // sidebar on mobile. Falls back to internal state if omitted, so this
+  // component still works standalone / in tests without a parent wiring
+  // this up.
+  mobileTab?: MobileTab;
+  onMobileTabChange?: (tab: MobileTab) => void;
 };
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
@@ -206,6 +220,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     resources = [],
     placeholder = "Write the topic explanation here. Use tables for summaries, and the ∑ button for math.",
     onResourcesChange,
+    mobileTab: controlledMobileTab,
+    onMobileTabChange,
   },
   ref
 ) {
@@ -293,7 +309,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const [diagramTitle, setDiagramTitle] = useState("");
   const [diagramCode, setDiagramCode] = useState(DEFAULT_MERMAID);
   const [isSavingDiagram, setIsSavingDiagram] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"write" | "preview">("write");
+  const [internalMobileTab, setInternalMobileTab] = useState<MobileTab>("write");
+  const mobileTab = controlledMobileTab ?? internalMobileTab;
+  const setMobileTab = onMobileTabChange ?? setInternalMobileTab;
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [bubblePos, setBubblePos] = useState<{ top: number; left: number } | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -614,13 +632,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;
 
-  // The mobile Write/Preview toggle only renders below `md` (the tab bar
-  // itself is `md:hidden`), so this never fires from user interaction on
-  // desktop — mobileTab stays "write" there and editing is unaffected.
-  // Toggling real editability (not just a cosmetic class) is what makes
-  // "Preview" an actual read view: same TipTap content/node-views (tables,
-  // images, Mermaid, resource chips) render identically, just without a
-  // cursor or toolbar.
+  // The mobile Write/Preview/Resources tab bar only renders below `md`
+  // (the tab bar itself is `md:hidden`), so this never fires from user
+  // interaction on desktop — mobileTab stays "write" there and editing is
+  // unaffected. Toggling real editability (not just a cosmetic class) is
+  // what makes "Preview" an actual read view: same TipTap content/node-views
+  // (tables, images, Mermaid, resource chips) render identically, just
+  // without a cursor or toolbar. "Resources" doesn't touch editability at
+  // all -- it just hides this component's own content area (see the
+  // `topic-prose` div's className below) so the sidebar NoteWorkspace
+  // renders alongside this component can take its place on a small screen.
   useEffect(() => {
     editor?.setEditable(mobileTab !== "preview");
   }, [editor, mobileTab]);
@@ -1631,15 +1652,22 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
               >
                 Preview
               </button>
+              <button
+                type="button"
+                onClick={() => setMobileTab("resources")}
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "resources" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
+              >
+                Resources
+              </button>
             </div>
           )}
 
-          {/* Toolbar — hidden on mobile while previewing; always shown on desktop */}
+          {/* Toolbar — hidden on mobile except while actually writing; always shown on desktop */}
           {!focusMode && (
             <div
               role="toolbar"
               aria-label="Note formatting"
-              className={`mb-2 ${mobileTab === "preview" ? "hidden md:flex" : "flex"} flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper p-1`}
+              className={`mb-2 ${mobileTab !== "write" ? "hidden md:flex" : "flex"} flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper p-1`}
             >
               <button
                 type="button"
@@ -2368,8 +2396,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
             onDrop={handleDrop}
             style={{ "--note-font-size": `${fontScale}rem` } as React.CSSProperties}
             className={`topic-prose relative min-h-[24rem] bg-white p-4 ${
-              highContrast ? "a11y-high-contrast" : ""
-            } ${dyslexiaFont ? "a11y-dyslexia-font" : ""} ${
+              mobileTab === "resources" ? "hidden md:block" : ""
+            } ${highContrast ? "a11y-high-contrast" : ""} ${dyslexiaFont ? "a11y-dyslexia-font" : ""} ${
               focusMode
                 ? "mx-auto mt-10 max-w-4xl rounded-lg border border-rule shadow-sm"
                 : `rounded-lg border ${isDraggingFile ? "border-2 border-dashed border-marigold bg-marigold/10" : "border-rule"}`
@@ -2391,7 +2419,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           </div>
 
           {editor && (
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-soft">
+            <div
+              className={`mt-2 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-soft ${
+                mobileTab === "resources" ? "hidden md:flex" : "flex"
+              }`}
+            >
               {(() => {
                 const stats = computeNoteStats(editor);
                 return (
@@ -2429,7 +2461,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
             </div>
           )}
 
-          <p className="mt-3 text-xs text-ink-soft">
+          <p
+            className={`mt-3 text-xs text-ink-soft ${
+              mobileTab === "resources" ? "hidden md:block" : ""
+            }`}
+          >
             Images, videos, and other uploaded resources are attached separately after publishing —
             use &quot;Insert resource&quot; to place one at a specific point in the text, drag a
             file straight onto the editor to upload and insert it in one step, or &quot;Generate

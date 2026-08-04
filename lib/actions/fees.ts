@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserWithRetry } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import type { EducationLevel, PaymentMethod } from "@/types/database";
@@ -248,9 +248,19 @@ export async function voidInvoice(invoiceId: string, reason: string) {
 // triggered by the client instead of by Paystack calling back to you.
 export async function verifyPaystackPayment(input: { reference: string; invoiceId: string }) {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // See lib/actions/authGuards.ts's assertRole for why this uses
+  // getUserWithRetry instead of a bare getUser() call: a transient network
+  // fetch failure and "not signed in" both come back as `user: null`, so
+  // an unguarded call here would wrongly reject a real payment-verification
+  // attempt from a legitimately signed-in student/parent during a network
+  // blip -- worse here than most call sites, since it's mid-payment.
+  const { user, error: getUserError, isTransient } = await getUserWithRetry(supabase);
+
+  if (getUserError && isTransient) {
+    throw new Error("Couldn't verify your session right now — check your connection and retry.", {
+      cause: getUserError,
+    });
+  }
 
   if (!user) throw new Error("You must be signed in.");
 
