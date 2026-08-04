@@ -255,9 +255,9 @@ TipTap ships common ones (Ctrl+B/I/U) by default — mostly free with migration.
 
 `NoteEditor.tsx` now has a toolbar focus-mode control. It opens the editor in a fixed, full-viewport distraction-free layer that covers the dashboard sidebar and navigation, hides the save/resource/formatting/search controls, and centers a wider reading-and-writing surface. An always-visible **Exit focus mode** button and Escape return to the normal editor; entering focus mode also returns keyboard focus to the document, so writing can continue immediately. Ctrl/Cmd+S remains available through the existing global shortcut.
 
-## 31. Fullscreen Editing
+## 31. Fullscreen Editing — DONE
 
-Not present. New build.
+The editor toolbar now has a real browser Fullscreen toggle (`requestFullscreen`), with an exit state and normal Escape support. Focus mode remains the separate distraction-free dashboard overlay.
 
 ## 32. Mobile Optimization — FIXED
 

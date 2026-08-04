@@ -194,6 +194,7 @@ export function NoteEditor({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [symbolPickerOpen, setSymbolPickerOpen] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [a11yMenuOpen, setA11yMenuOpen] = useState(false);
   const a11yMenuRef = useRef<HTMLDivElement | null>(null);
   // Note-reading accessibility prefs (#37) -- a per-browser display
@@ -280,6 +281,7 @@ export function NoteEditor({
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const symbolPickerRef = useRef<HTMLDivElement | null>(null);
   const colorPickerRef = useRef<HTMLDivElement | null>(null);
+  const editorShellRef = useRef<HTMLDivElement | null>(null);
   const emojiPopupRef = useRef<HTMLDivElement | null>(null);
   const diagramSectionRef = useRef<HTMLDivElement | null>(null);
   const noteContainerRef = useRef<HTMLDivElement | null>(null);
@@ -506,6 +508,21 @@ export function NoteEditor({
     setFocusMode(true);
     requestAnimationFrame(() => editor?.commands.focus());
   }
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await editorShellRef.current?.requestFullscreen();
+    } catch {
+      emitToast("Fullscreen is not available in this browser.", "error");
+    }
+  }
+
+  useEffect(() => {
+    const update = () => setIsFullscreen(document.fullscreenElement === editorShellRef.current);
+    document.addEventListener("fullscreenchange", update);
+    return () => document.removeEventListener("fullscreenchange", update);
+  }, []);
 
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus();
@@ -891,6 +908,15 @@ export function NoteEditor({
     if (url) editor.chain().focus().setLink({ href: url }).run();
   }
 
+  function openSlashCommands() {
+    if (!editor) return;
+    editor.commands.focus();
+    requestAnimationFrame(() => {
+      const { from, to } = editor.state.selection;
+      editor.view.dispatch(editor.state.tr.insertText("/", from, to));
+    });
+  }
+
   // Ctrl/Cmd+S saves a draft, Ctrl/Cmd+K opens links, Ctrl/Cmd+F opens
   // search, and Ctrl/Cmd+/ inserts the slash that activates the existing
   // TipTap suggestion menu. Ctrl/Cmd+B and +I are StarterKit keymaps.
@@ -913,7 +939,7 @@ export function NoteEditor({
       } else if (e.key === "/" || e.code === "Slash") {
         if (!editor?.view.dom.contains(e.target as Node)) return;
         e.preventDefault();
-        editor.chain().focus().insertContent("/").run();
+        openSlashCommands();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -1105,10 +1131,9 @@ export function NoteEditor({
 
   return (
     <div
+      ref={editorShellRef}
       suppressHydrationWarning
-      className={
-        focusMode ? "fixed inset-0 z-50 overflow-y-auto bg-paper px-4 py-6 sm:px-8" : undefined
-      }
+      className={`${focusMode ? "fixed inset-0 z-50 overflow-y-auto bg-paper px-4 py-6 sm:px-8" : ""} [&:fullscreen]:h-screen [&:fullscreen]:overflow-y-auto [&:fullscreen]:bg-paper [&:fullscreen]:p-6`}
     >
       {!editor ? (
         <div className="min-h-[24rem] animate-pulse rounded-lg border border-rule bg-white p-4" />
@@ -1162,9 +1187,16 @@ export function NoteEditor({
           )}
 
           {!focusMode && (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs uppercase tracking-wide text-ink-soft">
-                Currently: {initialStatus}
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rule bg-white p-3 shadow-sm">
+              <p className="flex flex-wrap items-center gap-2 text-sm text-ink">
+                <span className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  Currently
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${initialStatus === "published" ? "bg-leaf/15 text-leaf" : initialStatus === "draft" ? "bg-marigold/20 text-ink" : "bg-paper text-ink-soft"}`}
+                >
+                  {initialStatus}
+                </span>
                 {isDirty && (
                   <span className="ml-2 normal-case text-marigold-dark">Unsaved changes</span>
                 )}
@@ -1238,6 +1270,13 @@ export function NoteEditor({
                   className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
                 >
                   Embed video
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  className="rounded-lg border border-marigold bg-marigold/15 px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold/25"
+                >
+                  {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                 </button>
                 <button
                   type="button"
@@ -1977,7 +2016,7 @@ export function NoteEditor({
                 type="button"
                 title="Slash commands (Ctrl/Cmd+/)"
                 aria-label="Open slash commands"
-                onClick={() => editor.chain().focus().insertContent("/").run()}
+                onClick={openSlashCommands}
                 className="min-w-[2rem] rounded-md px-2 py-1 font-mono text-sm hover:bg-white"
               >
                 /

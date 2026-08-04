@@ -325,6 +325,7 @@ export const SlashCommand = Extension.create<{
         char: "/",
         allowSpaces: false,
         startOfLine: false,
+        allowedPrefixes: null,
         items: getItems,
         command: ({ editor, range, props }) => {
           props.run({ editor, range });
