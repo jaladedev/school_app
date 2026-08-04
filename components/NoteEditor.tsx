@@ -160,6 +160,7 @@ export function NoteEditor({
   const [searchTerm, setSearchTerm] = useState("");
   const [replaceTerm, setReplaceTerm] = useState("");
   const [matchCase, setMatchCase] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
 
   useEffect(() => {
     slashCommandBridge.openResourcePicker = () => setPickerOpen(true);
@@ -344,6 +345,15 @@ export function NoteEditor({
     }
     editor.view.dispatch(transaction);
     editor.commands.focus();
+  }
+
+  function enterFocusMode() {
+    setSearchOpen(false);
+    setPickerOpen(false);
+    setEmojiPickerOpen(false);
+    setDiagramPanelOpen(false);
+    setFocusMode(true);
+    requestAnimationFrame(() => editor?.commands.focus());
   }
 
   useEffect(() => {
@@ -650,6 +660,10 @@ export function NoteEditor({
   // StarterKit's keymap, so only the app-specific shortcuts are wired here.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && focusMode && !searchOpen) {
+        setFocusMode(false);
+        return;
+      }
       if (!(e.metaKey || e.ctrlKey)) return;
       if (e.key === "s") {
         e.preventDefault();
@@ -665,7 +679,7 @@ export function NoteEditor({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor]);
+  }, [editor, focusMode, searchOpen]);
 
   function insertResourceMarker(resource: TopicResource) {
     const storage = editor?.storage.resourceChip;
@@ -845,18 +859,33 @@ export function NoteEditor({
   }
 
   return (
-    <div suppressHydrationWarning>
+    <div
+      suppressHydrationWarning
+      className={
+        focusMode ? "fixed inset-0 z-50 overflow-y-auto bg-paper px-4 py-6 sm:px-8" : undefined
+      }
+    >
       {!editor ? (
         <div className="min-h-[24rem] animate-pulse rounded-lg border border-rule bg-white p-4" />
       ) : (
         <>
-          {!isOnline && (
+          {focusMode && (
+            <button
+              type="button"
+              onClick={() => setFocusMode(false)}
+              className="fixed right-4 top-4 z-10 rounded-lg border border-rule bg-white px-3 py-1.5 text-sm font-medium text-ink shadow-sm hover:bg-paper"
+            >
+              Exit focus mode <span className="text-ink-soft">Esc</span>
+            </button>
+          )}
+
+          {!focusMode && !isOnline && (
             <div className="mb-3 rounded-lg border border-clay/40 bg-clay/10 px-3 py-2 text-sm text-clay">
               You&apos;re offline — changes aren&apos;t being saved. Reconnect to save or publish.
             </div>
           )}
 
-          {draftBanner && (
+          {!focusMode && draftBanner && (
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-marigold/50 bg-marigold/10 px-3 py-2 text-sm text-ink">
               <span>
                 Found unsaved changes from{" "}
@@ -887,96 +916,98 @@ export function NoteEditor({
             </div>
           )}
 
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs uppercase tracking-wide text-ink-soft">
-              Currently: {initialStatus}
-              {isDirty && (
-                <span className="ml-2 normal-case text-marigold-dark">Unsaved changes</span>
-              )}
-              {isSavingDraft && <span className="ml-2 normal-case">Saving…</span>}
-              {!isSavingDraft && lastSavedAt && (
-                <span className="ml-2 normal-case">
-                  Last saved{" "}
-                  {lastSavedAt.toLocaleTimeString(undefined, {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </span>
-              )}
-              {isDirty && autosaveStatus === "saved" && lastAutosaveAt && (
-                <span className="ml-2 normal-case text-ink-soft/70">
-                  (autosaved{" "}
-                  {lastAutosaveAt.toLocaleTimeString(undefined, {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                  )
-                </span>
-              )}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative" ref={pickerRef}>
+          {!focusMode && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs uppercase tracking-wide text-ink-soft">
+                Currently: {initialStatus}
+                {isDirty && (
+                  <span className="ml-2 normal-case text-marigold-dark">Unsaved changes</span>
+                )}
+                {isSavingDraft && <span className="ml-2 normal-case">Saving…</span>}
+                {!isSavingDraft && lastSavedAt && (
+                  <span className="ml-2 normal-case">
+                    Last saved{" "}
+                    {lastSavedAt.toLocaleTimeString(undefined, {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                )}
+                {isDirty && autosaveStatus === "saved" && lastAutosaveAt && (
+                  <span className="ml-2 normal-case text-ink-soft/70">
+                    (autosaved{" "}
+                    {lastAutosaveAt.toLocaleTimeString(undefined, {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                    )
+                  </span>
+                )}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative" ref={pickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen((open) => !open)}
+                    disabled={isPending || localResources.length === 0}
+                    className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
+                    title={
+                      localResources.length === 0
+                        ? "No resources attached to this topic yet"
+                        : undefined
+                    }
+                  >
+                    Insert resource
+                  </button>
+                  {pickerOpen && localResources.length > 0 && (
+                    <div className="absolute right-0 z-10 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-rule bg-white py-1 shadow-lg">
+                      {localResources.map((resource) => (
+                        <button
+                          key={resource.id}
+                          type="button"
+                          onClick={() => handlePickResource(resource)}
+                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-paper"
+                        >
+                          <span className="truncate">{resource.title ?? "Untitled resource"}</span>
+                          <span className="shrink-0 text-xs uppercase tracking-wide text-ink-soft">
+                            {RESOURCE_TYPE_LABEL[resource.resource_type]}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => setPickerOpen((open) => !open)}
-                  disabled={isPending || localResources.length === 0}
+                  onClick={() => setDiagramPanelOpen((open) => !open)}
+                  disabled={isPending}
                   className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
-                  title={
-                    localResources.length === 0
-                      ? "No resources attached to this topic yet"
-                      : undefined
-                  }
                 >
-                  Insert resource
+                  Generate Mermaid diagram
                 </button>
-                {pickerOpen && localResources.length > 0 && (
-                  <div className="absolute right-0 z-10 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-rule bg-white py-1 shadow-lg">
-                    {localResources.map((resource) => (
-                      <button
-                        key={resource.id}
-                        type="button"
-                        onClick={() => handlePickResource(resource)}
-                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-paper"
-                      >
-                        <span className="truncate">{resource.title ?? "Untitled resource"}</span>
-                        <span className="shrink-0 text-xs uppercase tracking-wide text-ink-soft">
-                          {RESOURCE_TYPE_LABEL[resource.resource_type]}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+
+                <button
+                  onClick={() => handleSave("draft")}
+                  disabled={isPending || !isOnline}
+                  title={!isOnline ? "You're offline" : undefined}
+                  className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
+                >
+                  {isSavingDraft ? "Saving…" : "Save draft"}
+                </button>
+                <button
+                  onClick={() => handleSave("published")}
+                  disabled={isPending || !isOnline}
+                  title={!isOnline ? "You're offline" : undefined}
+                  className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
+                >
+                  Publish
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setDiagramPanelOpen((open) => !open)}
-                disabled={isPending}
-                className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
-              >
-                Generate Mermaid diagram
-              </button>
-
-              <button
-                onClick={() => handleSave("draft")}
-                disabled={isPending || !isOnline}
-                title={!isOnline ? "You're offline" : undefined}
-                className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
-              >
-                {isSavingDraft ? "Saving…" : "Save draft"}
-              </button>
-              <button
-                onClick={() => handleSave("published")}
-                disabled={isPending || !isOnline}
-                title={!isOnline ? "You're offline" : undefined}
-                className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
-              >
-                Publish
-              </button>
             </div>
-          </div>
+          )}
 
-          {diagramPanelOpen && (
+          {!focusMode && diagramPanelOpen && (
             <section
               ref={diagramSectionRef}
               className="mb-4 rounded-xl border border-rule bg-white p-4"
@@ -1052,7 +1083,7 @@ export function NoteEditor({
           )}
 
           {/* Mobile write/preview toggle — md:hidden, desktop always shows toolbar + editable view */}
-          {searchOpen && (
+          {!focusMode && searchOpen && (
             <section
               className="mb-3 rounded-lg border border-rule bg-paper p-3"
               aria-label="Search and replace"
@@ -1155,322 +1186,335 @@ export function NoteEditor({
             </section>
           )}
 
-          <div className="mb-2 flex gap-1 rounded-lg border border-rule bg-paper p-1 md:hidden">
-            <button
-              type="button"
-              onClick={() => setMobileTab("write")}
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "write" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
-            >
-              Write
-            </button>
-            <button
-              type="button"
-              onClick={() => setMobileTab("preview")}
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "preview" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
-            >
-              Preview
-            </button>
-          </div>
-
-          {/* Toolbar — hidden on mobile while previewing; always shown on desktop */}
-          <div
-            className={`mb-2 ${mobileTab === "preview" ? "hidden md:flex" : "flex"} flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper p-1`}
-          >
-            <button
-              type="button"
-              title="Undo"
-              onClick={() => editor.chain().focus().undo().run()}
-              className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-            >
-              ↺
-            </button>
-            <button
-              type="button"
-              title="Redo"
-              onClick={() => editor.chain().focus().redo().run()}
-              className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-            >
-              ↻
-            </button>
-            <span className="mx-1 h-4 w-px bg-rule" />
-            <button
-              type="button"
-              title="Search and replace (Ctrl/Cmd+F)"
-              onClick={() => setSearchOpen(true)}
-              aria-label="Search and replace"
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${searchOpen ? "bg-white" : ""}`}
-            >
-              <span aria-hidden="true"> Find ⌕</span>
-            </button>
-            <button
-              type="button"
-              title="Bold (Ctrl/Cmd+B)"
-              onClick={() => editor.chain().focus().toggleBold().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm font-semibold hover:bg-white ${editor.isActive("bold") ? "bg-white" : ""}`}
-            >
-              B
-            </button>
-            <button
-              type="button"
-              title="Italic (Ctrl/Cmd+I)"
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm italic hover:bg-white ${editor.isActive("italic") ? "bg-white" : ""}`}
-            >
-              I
-            </button>
-            <select
-              title="Paragraph style"
-              value={
-                editor.isActive("heading", { level: 1 })
-                  ? "h1"
-                  : editor.isActive("heading", { level: 2 })
-                    ? "h2"
-                    : editor.isActive("heading", { level: 3 })
-                      ? "h3"
-                      : "p"
-              }
-              onChange={(e) => {
-                const value = e.target.value;
-                const chain = editor.chain().focus();
-                if (value === "p") chain.setParagraph().run();
-                else chain.toggleHeading({ level: Number(value.slice(1)) as 1 | 2 | 3 }).run();
-              }}
-              className="rounded-md border-none bg-transparent px-2 py-1 text-sm hover:bg-white"
-            >
-              <option value="p">Paragraph</option>
-              <option value="h1">Heading 1</option>
-              <option value="h2">Heading 2</option>
-              <option value="h3">Heading 3</option>
-            </select>
-            <span className="mx-1 h-4 w-px bg-rule" />
-            <button
-              type="button"
-              title="Bulleted list"
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("bulletList") ? "bg-white" : ""}`}
-            >
-              •
-            </button>
-            <button
-              type="button"
-              title="Numbered list"
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("orderedList") ? "bg-white" : ""}`}
-            >
-              1.
-            </button>
-            <button
-              type="button"
-              title="Blockquote"
-              onClick={() => editor.chain().focus().toggleBlockquote().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("blockquote") ? "bg-white" : ""}`}
-            >
-              &ldquo;
-            </button>
-            <button
-              type="button"
-              title="Underline (Ctrl/Cmd+U)"
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm underline hover:bg-white ${editor.isActive("underline") ? "bg-white" : ""}`}
-            >
-              U
-            </button>
-            <button
-              type="button"
-              title="Strikethrough"
-              onClick={() => editor.chain().focus().toggleStrike().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm line-through hover:bg-white ${editor.isActive("strike") ? "bg-white" : ""}`}
-            >
-              S
-            </button>
-            <label
-              title="Text color"
-              className="flex min-w-[2rem] cursor-pointer items-center justify-center rounded-md px-1 py-1 text-sm hover:bg-white"
-            >
-              A
-              <input
-                type="color"
-                onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
-                value={editor.getAttributes("textStyle").color || "#1f2937"}
-                className="ml-0.5 h-4 w-4 cursor-pointer border-none bg-transparent p-0"
-              />
-            </label>
-            <button
-              type="button"
-              title="Highlight"
-              onClick={() => editor.chain().focus().toggleHighlight().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("highlight") ? "bg-white" : ""}`}
-            >
-              ▧
-            </button>
-            <button
-              type="button"
-              title="Superscript"
-              onClick={() => editor.chain().focus().toggleSuperscript().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("superscript") ? "bg-white" : ""}`}
-            >
-              x²
-            </button>
-            <button
-              type="button"
-              title="Subscript"
-              onClick={() => editor.chain().focus().toggleSubscript().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("subscript") ? "bg-white" : ""}`}
-            >
-              x₂
-            </button>
-            <span className="mx-1 h-4 w-px bg-rule" />
-            <button
-              type="button"
-              title="Align left"
-              onClick={() => editor.chain().focus().setTextAlign("left").run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "left" }) ? "bg-white" : ""}`}
-            >
-              ⟸
-            </button>
-            <button
-              type="button"
-              title="Align center"
-              onClick={() => editor.chain().focus().setTextAlign("center").run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "center" }) ? "bg-white" : ""}`}
-            >
-              ⟺
-            </button>
-            <button
-              type="button"
-              title="Align right"
-              onClick={() => editor.chain().focus().setTextAlign("right").run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "right" }) ? "bg-white" : ""}`}
-            >
-              ⟹
-            </button>
-            <button
-              type="button"
-              title="Justify"
-              onClick={() => editor.chain().focus().setTextAlign("justify").run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "justify" }) ? "bg-white" : ""}`}
-            >
-              ☰
-            </button>
-            <span className="mx-1 h-4 w-px bg-rule" />
-            <button
-              type="button"
-              title="Checklist"
-              onClick={() => editor.chain().focus().toggleTaskList().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("taskList") ? "bg-white" : ""}`}
-            >
-              ☑
-            </button>
-            <button
-              type="button"
-              title="Outdent (Shift+Tab)"
-              onClick={() => {
-                const itemType = editor.isActive("taskItem") ? "taskItem" : "listItem";
-                editor.chain().focus().liftListItem(itemType).run();
-              }}
-              disabled={
-                !editor.can().liftListItem("listItem") && !editor.can().liftListItem("taskItem")
-              }
-              className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white disabled:opacity-40"
-            >
-              ⇤
-            </button>
-            <button
-              type="button"
-              title="Indent (Tab)"
-              onClick={() => {
-                const itemType = editor.isActive("taskItem") ? "taskItem" : "listItem";
-                editor.chain().focus().sinkListItem(itemType).run();
-              }}
-              disabled={
-                !editor.can().sinkListItem("listItem") && !editor.can().sinkListItem("taskItem")
-              }
-              className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white disabled:opacity-40"
-            >
-              ⇥
-            </button>
-            <span className="mx-1 h-4 w-px bg-rule" />
-            <button
-              type="button"
-              title="Horizontal rule"
-              onClick={() => editor.chain().focus().setHorizontalRule().run()}
-              className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-            >
-              ―
-            </button>
-            <span className="mx-1 h-4 w-px bg-rule" />
-            <button
-              type="button"
-              title="Code block"
-              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-              className={`min-w-[2rem] rounded-md px-2 py-1 font-mono text-sm hover:bg-white ${editor.isActive("codeBlock") ? "bg-white" : ""}`}
-            >
-              {"</>"}
-            </button>
-            <span className="mx-1 h-4 w-px bg-rule" />
-            <button
-              type="button"
-              title="Callout (Tip/Warning/etc. — type '/' for more options)"
-              onClick={() =>
-                editor
-                  .chain()
-                  .focus()
-                  .insertContent({
-                    type: "callout",
-                    attrs: { calloutType: "tip" },
-                    content: [{ type: "paragraph" }],
-                  })
-                  .run()
-              }
-              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("callout") ? "bg-white" : ""}`}
-            >
-              💡
-            </button>
-            <span className="mx-1 h-4 w-px bg-rule" />
-            <button
-              type="button"
-              title="Inline math (LaTeX)"
-              onClick={() => insertMath(false)}
-              className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-            >
-              ∑
-            </button>
-            <button
-              type="button"
-              title="Block math (LaTeX)"
-              onClick={() => insertMath(true)}
-              className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-            >
-              ∑∑
-            </button>
-            <button
-              type="button"
-              title="Insert table"
-              onClick={insertTable}
-              className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-            >
-              Table
-            </button>
-            <span className="mx-1 h-4 w-px bg-rule" />
-            <div className="relative" ref={emojiPickerRef}>
+          {!focusMode && (
+            <div className="mb-2 flex gap-1 rounded-lg border border-rule bg-paper p-1 md:hidden">
               <button
                 type="button"
-                title="Insert emoji"
-                onClick={() => {
-                  setEmojiPickerPos(null); // toolbar-anchored, not cursor-anchored
-                  setEmojiPickerOpen((open) => !open);
-                }}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${emojiPickerOpen ? "bg-white" : ""}`}
+                onClick={() => setMobileTab("write")}
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "write" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
               >
-                😀
+                Write
               </button>
-              {emojiPickerOpen && !emojiPickerPos && (
-                <div className="absolute left-0 top-full z-20 mt-1">
-                  <EmojiPicker onSelect={insertEmoji} />
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => setMobileTab("preview")}
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mobileTab === "preview" ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}
+              >
+                Preview
+              </button>
             </div>
-          </div>
+          )}
+
+          {/* Toolbar — hidden on mobile while previewing; always shown on desktop */}
+          {!focusMode && (
+            <div
+              className={`mb-2 ${mobileTab === "preview" ? "hidden md:flex" : "flex"} flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper p-1`}
+            >
+              <button
+                type="button"
+                title="Undo"
+                onClick={() => editor.chain().focus().undo().run()}
+                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+              >
+                ↺
+              </button>
+              <button
+                type="button"
+                title="Redo"
+                onClick={() => editor.chain().focus().redo().run()}
+                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+              >
+                ↻
+              </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              <button
+                type="button"
+                title="Search and replace (Ctrl/Cmd+F)"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Search and replace"
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${searchOpen ? "bg-white" : ""}`}
+              >
+                <span aria-hidden="true"> Find ⌕</span>
+              </button>
+              <button
+                type="button"
+                title="Focus mode"
+                aria-label="Enter focus mode"
+                onClick={enterFocusMode}
+                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+              >
+                <span aria-hidden="true">⛶</span>
+              </button>
+              <button
+                type="button"
+                title="Bold (Ctrl/Cmd+B)"
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm font-semibold hover:bg-white ${editor.isActive("bold") ? "bg-white" : ""}`}
+              >
+                B
+              </button>
+              <button
+                type="button"
+                title="Italic (Ctrl/Cmd+I)"
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm italic hover:bg-white ${editor.isActive("italic") ? "bg-white" : ""}`}
+              >
+                I
+              </button>
+              <select
+                title="Paragraph style"
+                value={
+                  editor.isActive("heading", { level: 1 })
+                    ? "h1"
+                    : editor.isActive("heading", { level: 2 })
+                      ? "h2"
+                      : editor.isActive("heading", { level: 3 })
+                        ? "h3"
+                        : "p"
+                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const chain = editor.chain().focus();
+                  if (value === "p") chain.setParagraph().run();
+                  else chain.toggleHeading({ level: Number(value.slice(1)) as 1 | 2 | 3 }).run();
+                }}
+                className="rounded-md border-none bg-transparent px-2 py-1 text-sm hover:bg-white"
+              >
+                <option value="p">Paragraph</option>
+                <option value="h1">Heading 1</option>
+                <option value="h2">Heading 2</option>
+                <option value="h3">Heading 3</option>
+              </select>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              <button
+                type="button"
+                title="Bulleted list"
+                onClick={() => editor.chain().focus().toggleBulletList().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("bulletList") ? "bg-white" : ""}`}
+              >
+                •
+              </button>
+              <button
+                type="button"
+                title="Numbered list"
+                onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("orderedList") ? "bg-white" : ""}`}
+              >
+                1.
+              </button>
+              <button
+                type="button"
+                title="Blockquote"
+                onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("blockquote") ? "bg-white" : ""}`}
+              >
+                &ldquo;
+              </button>
+              <button
+                type="button"
+                title="Underline (Ctrl/Cmd+U)"
+                onClick={() => editor.chain().focus().toggleUnderline().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm underline hover:bg-white ${editor.isActive("underline") ? "bg-white" : ""}`}
+              >
+                U
+              </button>
+              <button
+                type="button"
+                title="Strikethrough"
+                onClick={() => editor.chain().focus().toggleStrike().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm line-through hover:bg-white ${editor.isActive("strike") ? "bg-white" : ""}`}
+              >
+                S
+              </button>
+              <label
+                title="Text color"
+                className="flex min-w-[2rem] cursor-pointer items-center justify-center rounded-md px-1 py-1 text-sm hover:bg-white"
+              >
+                A
+                <input
+                  type="color"
+                  onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+                  value={editor.getAttributes("textStyle").color || "#1f2937"}
+                  className="ml-0.5 h-4 w-4 cursor-pointer border-none bg-transparent p-0"
+                />
+              </label>
+              <button
+                type="button"
+                title="Highlight"
+                onClick={() => editor.chain().focus().toggleHighlight().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("highlight") ? "bg-white" : ""}`}
+              >
+                ▧
+              </button>
+              <button
+                type="button"
+                title="Superscript"
+                onClick={() => editor.chain().focus().toggleSuperscript().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("superscript") ? "bg-white" : ""}`}
+              >
+                x²
+              </button>
+              <button
+                type="button"
+                title="Subscript"
+                onClick={() => editor.chain().focus().toggleSubscript().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("subscript") ? "bg-white" : ""}`}
+              >
+                x₂
+              </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              <button
+                type="button"
+                title="Align left"
+                onClick={() => editor.chain().focus().setTextAlign("left").run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "left" }) ? "bg-white" : ""}`}
+              >
+                ⟸
+              </button>
+              <button
+                type="button"
+                title="Align center"
+                onClick={() => editor.chain().focus().setTextAlign("center").run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "center" }) ? "bg-white" : ""}`}
+              >
+                ⟺
+              </button>
+              <button
+                type="button"
+                title="Align right"
+                onClick={() => editor.chain().focus().setTextAlign("right").run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "right" }) ? "bg-white" : ""}`}
+              >
+                ⟹
+              </button>
+              <button
+                type="button"
+                title="Justify"
+                onClick={() => editor.chain().focus().setTextAlign("justify").run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "justify" }) ? "bg-white" : ""}`}
+              >
+                ☰
+              </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              <button
+                type="button"
+                title="Checklist"
+                onClick={() => editor.chain().focus().toggleTaskList().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("taskList") ? "bg-white" : ""}`}
+              >
+                ☑
+              </button>
+              <button
+                type="button"
+                title="Outdent (Shift+Tab)"
+                onClick={() => {
+                  const itemType = editor.isActive("taskItem") ? "taskItem" : "listItem";
+                  editor.chain().focus().liftListItem(itemType).run();
+                }}
+                disabled={
+                  !editor.can().liftListItem("listItem") && !editor.can().liftListItem("taskItem")
+                }
+                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white disabled:opacity-40"
+              >
+                ⇤
+              </button>
+              <button
+                type="button"
+                title="Indent (Tab)"
+                onClick={() => {
+                  const itemType = editor.isActive("taskItem") ? "taskItem" : "listItem";
+                  editor.chain().focus().sinkListItem(itemType).run();
+                }}
+                disabled={
+                  !editor.can().sinkListItem("listItem") && !editor.can().sinkListItem("taskItem")
+                }
+                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white disabled:opacity-40"
+              >
+                ⇥
+              </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              <button
+                type="button"
+                title="Horizontal rule"
+                onClick={() => editor.chain().focus().setHorizontalRule().run()}
+                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+              >
+                ―
+              </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              <button
+                type="button"
+                title="Code block"
+                onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 font-mono text-sm hover:bg-white ${editor.isActive("codeBlock") ? "bg-white" : ""}`}
+              >
+                {"</>"}
+              </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              <button
+                type="button"
+                title="Callout (Tip/Warning/etc. — type '/' for more options)"
+                onClick={() =>
+                  editor
+                    .chain()
+                    .focus()
+                    .insertContent({
+                      type: "callout",
+                      attrs: { calloutType: "tip" },
+                      content: [{ type: "paragraph" }],
+                    })
+                    .run()
+                }
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("callout") ? "bg-white" : ""}`}
+              >
+                💡
+              </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              <button
+                type="button"
+                title="Inline math (LaTeX)"
+                onClick={() => insertMath(false)}
+                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+              >
+                ∑
+              </button>
+              <button
+                type="button"
+                title="Block math (LaTeX)"
+                onClick={() => insertMath(true)}
+                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+              >
+                ∑∑
+              </button>
+              <button
+                type="button"
+                title="Insert table"
+                onClick={insertTable}
+                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
+              >
+                Table
+              </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              <div className="relative" ref={emojiPickerRef}>
+                <button
+                  type="button"
+                  title="Insert emoji"
+                  onClick={() => {
+                    setEmojiPickerPos(null); // toolbar-anchored, not cursor-anchored
+                    setEmojiPickerOpen((open) => !open);
+                  }}
+                  className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${emojiPickerOpen ? "bg-white" : ""}`}
+                >
+                  😀
+                </button>
+                {emojiPickerOpen && !emojiPickerPos && (
+                  <div className="absolute left-0 top-full z-20 mt-1">
+                    <EmojiPicker onSelect={insertEmoji} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {emojiPickerOpen && emojiPickerPos && (
             <div
@@ -1660,7 +1704,11 @@ export function NoteEditor({
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`topic-prose relative min-h-[24rem] rounded-lg border bg-white p-4 ${isDraggingFile ? "border-2 border-dashed border-marigold bg-marigold/10" : "border-rule"}`}
+            className={`topic-prose relative min-h-[24rem] bg-white p-4 ${
+              focusMode
+                ? "mx-auto mt-10 max-w-4xl rounded-lg border border-rule shadow-sm"
+                : `rounded-lg border ${isDraggingFile ? "border-2 border-dashed border-marigold bg-marigold/10" : "border-rule"}`
+            }`}
           >
             <EditorContent editor={editor} />
             {isDraggingFile && (

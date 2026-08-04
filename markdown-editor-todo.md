@@ -251,9 +251,9 @@ TipTap ships common ones (Ctrl+B/I/U) by default — mostly free with migration.
 - Still need: Ctrl+/ (slash menu, once #8 exists)
 - Add shortcut hints in UI — done for B/I/U toolbar buttons via `title`
 
-## 30. Focus Mode
+## 30. Focus Mode — DONE
 
-Not present. New build — hide sidebar/toolbar/nav.
+`NoteEditor.tsx` now has a toolbar focus-mode control. It opens the editor in a fixed, full-viewport distraction-free layer that covers the dashboard sidebar and navigation, hides the save/resource/formatting/search controls, and centers a wider reading-and-writing surface. An always-visible **Exit focus mode** button and Escape return to the normal editor; entering focus mode also returns keyboard focus to the document, so writing can continue immediately. Ctrl/Cmd+S remains available through the existing global shortcut.
 
 ## 31. Fullscreen Editing
 
