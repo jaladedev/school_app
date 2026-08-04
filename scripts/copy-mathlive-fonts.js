@@ -21,4 +21,6 @@ for (const file of fs.readdirSync(src)) {
   fs.copyFileSync(path.join(src, file), path.join(dest, file));
 }
 
-console.log(`[copy-mathlive-fonts] copied ${fs.readdirSync(dest).length} font files to public/mathlive-fonts`);
+console.log(
+  `[copy-mathlive-fonts] copied ${fs.readdirSync(dest).length} font files to public/mathlive-fonts`
+);
