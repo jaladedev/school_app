@@ -153,7 +153,7 @@ Audited: view, compare, restore, and author/timestamp all present, split across 
 - View previous versions + author/timestamp — the "Version history" list in `page.tsx`, pulling `full_name` off the `profiles` join (falls back to "Unknown author" if the join comes back empty) and `updated_at` via `toLocaleString()`
 - Compare — `NoteVersionDiff.tsx`, word-level diff (`lib/diff.ts`) between any two versions, defaulting to the latest two so the most common comparison needs zero clicks
 - Restore — `RestoreVersionButton.tsx`, one per version row, restores as a new draft (doesn't overwrite history) via `restoreTopicNoteVersion`
-- Delete — `DeleteVersionButton.tsx`, one per version row (including the current version — deleting it just falls back to the next-highest remaining version, same as if it had never been saved). `deleteTopicNoteVersion` required its own migration (`2026_08_03b_topic_notes_delete_version.sql`) since `topic_notes` had no DELETE RLS policy at all before this. Refuses to delete the only remaining version. For resources attached to the version being deleted: `note_id` only records which version a resource was *uploaded under*, not every version whose content still references it (a save carries forward whatever `[[resource:UUID]]` markers were already in the content) — so each attached resource is checked against every surviving version's content and reassigned to one that still references it rather than deleted; only genuinely-unreferenced resources are hard-deleted (storage object + row)
+- Delete — `DeleteVersionButton.tsx`, one per version row (including the current version — deleting it just falls back to the next-highest remaining version, same as if it had never been saved). `deleteTopicNoteVersion` required its own migration (`2026_08_03b_topic_notes_delete_version.sql`) since `topic_notes` had no DELETE RLS policy at all before this. Refuses to delete the only remaining version. For resources attached to the version being deleted: `note_id` only records which version a resource was _uploaded under_, not every version whose content still references it (a save carries forward whatever `[[resource:UUID]]` markers were already in the content) — so each attached resource is checked against every surviving version's content and reassigned to one that still references it rather than deleted; only genuinely-unreferenced resources are hard-deleted (storage object + row)
 
 ## 15. Learning Objective Block — SUSPENDED
 
@@ -297,6 +297,13 @@ Not present. New build — Polls, Quick questions, Reflection prompts, Classroom
 - Still not present: full keyboard navigation beyond this one gap, screen reader compatibility audit, high-contrast mode, adjustable font sizes, dyslexia-friendly font option.
 
 - Full keyboard navigation, Screen reader compatibility, High-contrast mode, Adjustable font sizes, Dyslexia-friendly font option
+
+## 38. Lesson Plan Review UI — DONE
+
+Not really an editor feature (no TipTap/node-view work involved) — logged here mainly for cross-reference, since the review action operates on the same `topic_notes` rows this whole file is about. Full detail lives in `todo.md`'s "Lesson Plan approval (HOD workflow)" entry, follow-up note.
+
+- ✅ Note editor page (`/dashboard/teacher/notes/[topicId]`) previously only showed a moderation-status badge (pending/approved/rejected) with no way to act on it — an eligible reviewer had to trust the list page and click back and forth. `LessonPlanReviewButtons` now renders inline next to that badge, gated server-side by the same eligibility check as the list page (admin, or the HOD of that topic's subject).
+- ✅ Admins could already approve/reject anything server-side (`assertCanModerateTopicNote` bypasses the HOD/subject check for `role === "admin"`) but had no reachable UI for it — the only review surfaces lived on teacher-facing routes. New `/dashboard/admin/lesson-plans` page: school-wide pending queue, same list/pagination pattern as the existing Grade Moderation admin page, added to the admin nav.
 
 ---
 

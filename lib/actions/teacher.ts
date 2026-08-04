@@ -672,7 +672,8 @@ export async function deleteTopicNoteVersion(topicId: string, versionNoteId: str
     .select("id, file_url")
     .eq("note_id", versionNoteId);
 
-  if (attachedResources && attachedResources.length > 0) {    // `note_id` on a resource records whichever version was *current at
+  if (attachedResources && attachedResources.length > 0) {
+    // `note_id` on a resource records whichever version was *current at
     // upload time* and is never updated afterward -- it does NOT track
     // every version whose content actually renders that resource. A
     // save carries the editor's full content (including any

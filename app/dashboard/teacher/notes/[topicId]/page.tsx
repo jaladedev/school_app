@@ -7,6 +7,7 @@ import { TopicResourceList } from "@/components/TopicResourceList";
 import { NoteVersionDiff } from "@/components/NoteVersionDiff";
 import { RestoreVersionButton } from "@/components/RestoreVersionButton";
 import { DeleteVersionButton } from "@/components/DeleteVersionButton";
+import { LessonPlanReviewButtons } from "@/components/LessonPlanReviewButtons";
 import { formatLevel } from "@/types/database";
 
 export default async function TeacherNoteEditPage({
@@ -96,6 +97,28 @@ export default async function TeacherNoteEditPage({
         .order("period_number", { ascending: true })
     : { data: [] };
 
+  // Same eligibility check as the notes list page's "awaiting your
+  // review" panel (see lessonPlanModeration.ts's assertCanModerateTopicNote):
+  // admins can review anything, an HOD can only review notes in a
+  // subject they're the HOD for. Without this, a teacher who isn't the
+  // reviewing HOD would see Approve/Reject buttons here that
+  // lessonPlanModeration's own server-side check would just reject
+  // anyway -- worse, showing them at all implies to a non-HOD teacher
+  // that they has this authority, when they don't.
+  let canReview = false;
+  if (profile) {
+    const { data: viewerTeacherProfile } = await supabase
+      .from("teacher_profiles")
+      .select("staff_role, subjects_taught")
+      .eq("id", profile.id)
+      .maybeSingle();
+    canReview =
+      profile.role === "admin" ||
+      (viewerTeacherProfile?.staff_role === "hod" &&
+        !!topic &&
+        !!viewerTeacherProfile.subjects_taught?.includes(topic.subject_id));
+  }
+
   return (
     <div>
       <Link
@@ -111,23 +134,33 @@ export default async function TeacherNoteEditPage({
       <h1 className="mb-6 font-display text-2xl font-semibold text-ink">{topic?.title}</h1>
 
       {note?.status === "published" && (
-        <p className="mb-4 text-xs font-medium">
-          {note.moderation_status === "pending" && (
-            <span className="rounded-full bg-marigold/20 px-2.5 py-1 text-marigold-dark">
-              Awaiting HOD review — not visible to students yet
-            </span>
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <p className="text-xs font-medium">
+            {note.moderation_status === "pending" && (
+              <span className="rounded-full bg-marigold/20 px-2.5 py-1 text-marigold-dark">
+                Awaiting HOD review — not visible to students yet
+              </span>
+            )}
+            {note.moderation_status === "approved" && (
+              <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-leaf">
+                Approved — visible to students
+              </span>
+            )}
+            {note.moderation_status === "rejected" && (
+              <span className="rounded-full bg-clay/20 px-2.5 py-1 text-clay">
+                Rejected by HOD — edit and republish to resubmit
+              </span>
+            )}
+          </p>
+          {/* Same review action already available from the notes list
+          page's "awaiting your review" panel -- added here too so an
+          HOD reading the actual note content can decide right where
+          they're reading it, instead of having to trust a title/
+          version/timestamp on the list and click back and forth. */}
+          {canReview && note.moderation_status === "pending" && (
+            <LessonPlanReviewButtons noteId={note.id} />
           )}
-          {note.moderation_status === "approved" && (
-            <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-leaf">
-              Approved — visible to students
-            </span>
-          )}
-          {note.moderation_status === "rejected" && (
-            <span className="rounded-full bg-clay/20 px-2.5 py-1 text-clay">
-              Rejected by HOD — edit and republish to resubmit
-            </span>
-          )}
-        </p>
+        </div>
       )}
 
       <NoteWorkspace
