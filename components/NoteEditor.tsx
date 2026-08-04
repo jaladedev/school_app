@@ -41,6 +41,7 @@ import "katex/dist/katex.min.css";
 import {
   saveTopicNote,
   createMermaidResource,
+  createVideoEmbedResource,
   uploadTopicResource,
   saveTopicNoteDraft,
   getTopicNoteDraft,
@@ -156,6 +157,10 @@ export function NoteEditor({
   // just clicked it, so it's already where you're looking).
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ top: number; left: number } | null>(null);
   const [diagramPanelOpen, setDiagramPanelOpen] = useState(false);
+  const [videoEmbedOpen, setVideoEmbedOpen] = useState(false);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [videoTitle, setVideoTitle] = useState("");
+  const [isSavingVideoEmbed, setIsSavingVideoEmbed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [replaceTerm, setReplaceTerm] = useState("");
@@ -352,6 +357,7 @@ export function NoteEditor({
     setPickerOpen(false);
     setEmojiPickerOpen(false);
     setDiagramPanelOpen(false);
+    setVideoEmbedOpen(false);
     setFocusMode(true);
     requestAnimationFrame(() => editor?.commands.focus());
   }
@@ -605,6 +611,28 @@ export function NoteEditor({
     setIsDirty(false);
     router.refresh();
     return note.id;
+  }
+
+  async function handleInsertVideoEmbed() {
+    if (!videoUrl.trim()) {
+      emitToast("Paste a YouTube or Vimeo URL first.", "error");
+      return;
+    }
+    setIsSavingVideoEmbed(true);
+    try {
+      const savedNoteId = await ensureNoteId();
+      const resource = await createVideoEmbedResource(topicId, savedNoteId, videoUrl, videoTitle);
+      setLocalResources((previous) => [...previous, resource]);
+      insertResourceMarker(resource);
+      setVideoUrl("");
+      setVideoTitle("");
+      setVideoEmbedOpen(false);
+      emitToast("Video embedded.");
+    } catch (err: unknown) {
+      emitToast(err instanceof Error ? err.message : "Unable to embed the video.", "error");
+    } finally {
+      setIsSavingVideoEmbed(false);
+    }
   }
 
   useEffect(() => {
@@ -986,6 +1014,14 @@ export function NoteEditor({
                 >
                   Generate Mermaid diagram
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setVideoEmbedOpen((open) => !open)}
+                  disabled={isPending}
+                  className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
+                >
+                  Embed video
+                </button>
 
                 <button
                   onClick={() => handleSave("draft")}
@@ -1005,6 +1041,48 @@ export function NoteEditor({
                 </button>
               </div>
             </div>
+          )}
+
+          {!focusMode && videoEmbedOpen && (
+            <section className="mb-4 rounded-xl border border-rule bg-white p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-display text-sm font-semibold text-ink">Embed video</h3>
+                <button
+                  type="button"
+                  onClick={() => setVideoEmbedOpen(false)}
+                  className="text-xs text-ink-soft hover:underline"
+                >
+                  Close
+                </button>
+              </div>
+              <p className="mb-3 text-sm text-ink-soft">
+                Paste a YouTube or Vimeo link. Uploaded video files remain available through Insert
+                resource.
+              </p>
+              <input
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=…"
+                type="url"
+                className="mb-2 w-full rounded-lg border border-rule p-2 text-sm outline-none focus-visible:border-marigold"
+              />
+              <input
+                value={videoTitle}
+                onChange={(e) => setVideoTitle(e.target.value)}
+                placeholder="Video title (optional)"
+                className="w-full rounded-lg border border-rule p-2 text-sm outline-none focus-visible:border-marigold"
+              />
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleInsertVideoEmbed}
+                  disabled={isSavingVideoEmbed}
+                  className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
+                >
+                  {isSavingVideoEmbed ? "Embedding…" : "Insert video"}
+                </button>
+              </div>
+            </section>
           )}
 
           {!focusMode && diagramPanelOpen && (

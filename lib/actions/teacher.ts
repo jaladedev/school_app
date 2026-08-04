@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
+import { videoEmbedUrl } from "@/lib/video-embed";
 import type {
   AssessmentType,
   AttendanceStatus,
@@ -848,6 +849,43 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
 // diagram source itself — so unlike uploadTopicResource this writes
 // straight to topic_resources with file_url left null (matching the
 // assumption already baked into deleteTopicResource's cleanup logic).
+export async function createVideoEmbedResource(
+  topicId: string,
+  noteId: string,
+  url: string,
+  title: string
+) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can add video embeds.");
+  const trimmedUrl = url.trim();
+  if (!videoEmbedUrl(trimmedUrl)) throw new Error("Use a valid YouTube or Vimeo HTTPS URL.");
+  const supabase = createClient();
+  await assertTeacherOwnsTopic(supabase, teacherId, topicId);
+  const { data: latest } = await supabase
+    .from("topic_resources")
+    .select("sequence_order")
+    .eq("topic_id", topicId)
+    .order("sequence_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { data, error } = await supabase
+    .from("topic_resources")
+    .insert({
+      topic_id: topicId,
+      note_id: noteId,
+      resource_type: "link",
+      title: title.trim() || "Embedded video",
+      content: trimmedUrl,
+      sequence_order: (latest?.sequence_order ?? 0) + 1,
+      uploaded_by: teacherId,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  revalidatePath(`/dashboard/teacher/notes/${topicId}`);
+  revalidatePath(`/dashboard/student/topics/${topicId}`);
+  return data;
+}
+
 export async function createMermaidResource(
   topicId: string,
   noteId: string,

@@ -205,18 +205,13 @@ Not present. New build — Mathematics, Science, Greek letters.
 
 Not present. New build — title, thumbnail, description on paste/insert.
 
-## 23. Video Embedding
+## 23. Video Embedding — DONE
 
-Currently: video files upload as a resource type, no embed-by-URL.
+YouTube and Vimeo HTTPS links can now be embedded from the note editor. They are stored as regular link resources and rendered through allowlisted provider iframe URLs; uploaded MP4/WebM videos remain available through the existing resource upload path.
 
-- Add YouTube/Vimeo URL embedding
-- Keep existing uploaded-video resource path
+## 24. Audio Embedding — DONE
 
-## 24. Audio Embedding
-
-Currently: audio files upload as a resource type already (voice notes, lessons, podcasts covered by existing upload).
-
-- Mostly done — confirm playback UI is adequate, otherwise no major new work
+Confirmed adequate: uploaded MP3/WAV/OGG resources render as lazy-loaded native audio players in editing, presentation, and published views, with a title and a failure state. No separate URL-embed route is needed for this resource type.
 
 ## 25. Code Blocks — DONE
 
@@ -269,7 +264,7 @@ Currently: resources listed via `TopicResourceList`, inserted via a dropdown pic
 
 - Convert to persistent sidebar with one-click insertion (ties into #6 Resource Node)
 
-## 34. Drag-and-Drop Reordering — DONE (correcting a second stale pass)
+## 34. Drag-and-Drop Reordering — DONE
 
 This entry was stale twice over — it originally said "not present, depends on #10" for all four (sections/images/activities/resources), which was already wrong; a later pass narrowed the gap to just Activities, which is now also done:
 

@@ -9,6 +9,7 @@ import rehypeHighlight from "rehype-highlight";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/github-dark.css";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
+import { videoEmbedUrl } from "@/lib/video-embed";
 import type { ImageAlign, ImageSize } from "@/lib/tiptap/resource-node";
 import type { TopicResource } from "@/types/database";
 
@@ -267,6 +268,25 @@ export function TopicResourceItem({
       );
 
     case "link":
+      {
+        const embedUrl = resource.content ? videoEmbedUrl(resource.content) : null;
+        if (embedUrl) {
+          return (
+            <section
+              ref={ref}
+              className="my-4 overflow-hidden rounded-xl border border-rule bg-black"
+            >
+              <iframe
+                title={resource.title ?? "Embedded video"}
+                src={embedUrl}
+                className="aspect-video w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </section>
+          );
+        }
+      }
       return (
         <a
           href={resource.content ?? "#"}
