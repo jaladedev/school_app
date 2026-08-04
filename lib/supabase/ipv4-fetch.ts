@@ -1,4 +1,4 @@
-import { Agent } from "undici";
+import { Agent, fetch as undiciFetch } from "undici";
 
 // Node's global fetch is undici under the hood, and undici does its own DNS
 // resolution -- it does NOT respect the --dns-result-order Node flag (a
@@ -13,9 +13,10 @@ import { Agent } from "undici";
 // for these calls in the first place.
 const ipv4Agent = new Agent({ connect: { family: 4 } });
 
-// Also opts out of Next.js's patched global fetch / Data Cache layer,
-// which has separately been observed to make supabase-js's internal calls
-// fail when running inside proxy.ts or Server Components.
 export function ipv4Fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  return fetch(input, { ...init, cache: "no-store", dispatcher: ipv4Agent } as RequestInit);
+  return undiciFetch(input as any, {
+    ...(init as any),
+    cache: "no-store",
+    dispatcher: ipv4Agent,
+  }) as unknown as Promise<Response>;
 }

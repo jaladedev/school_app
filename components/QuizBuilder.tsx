@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createQuiz } from "@/lib/actions/quiz";
 import { emitToast } from "@/lib/toast";
+import { QuestionText } from "@/components/QuestionText";
 
 type QuestionType = "mcq" | "true_false" | "fill_blank" | "matching" | "essay";
 type OptionDraft = { text: string; isCorrect: boolean; matchPrompt?: string };
@@ -237,8 +238,20 @@ export function QuizBuilder({
               value={q.questionText}
               onChange={(e) => updateQuestion(qIndex, { questionText: e.target.value })}
               rows={2}
-              className="mb-3 w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+              className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
             />
+            {/* Live preview -- the textarea itself  show the
+                raw "$x^2$" source, so without this a teacher has no way to
+                tell superscripts/subscripts/fractions/etc. are actually
+                well-formed until a student hits the quiz. Same
+                markdown+KaTeX pipeline QuizAttemptRunner uses to render
+                this exact question_text to students, so what's previewed
+                here is exactly what they'll see. */}
+            {q.questionText.trim() && (
+              <div className="mb-3 mt-1.5 rounded-lg border border-dashed border-rule bg-paper px-3 py-2">
+                <QuestionText text={q.questionText} />
+              </div>
+            )}
 
             <div className="mb-3 flex flex-wrap items-center gap-3">
               <select

@@ -65,6 +65,22 @@ export async function getCurrentProfile() {
   // by Next's nearest error.tsx, which has a built-in retry), rather than
   // masquerading as a logout.
   if (getUserError && isAuthRetryableFetchError(getUserError)) {
+    // The thrown Error's [cause] only ever showed
+    // `AuthRetryableFetchError: fetch failed` -- that's supabase-js's own
+    // wrapper, not the actual network error underneath it. Logging the
+    // full cause chain here (server-side, so it lands in the terminal,
+    // not the browser) surfaces what undici/fetch actually failed with
+    // (ECONNRESET, a TLS error, a timeout, etc.) instead of the opaque
+    // one-line message the error screen shows.
+    console.error(
+      "[getCurrentProfile] Supabase auth fetch failed. Full cause chain:",
+      getUserError,
+      "\nunderlying cause:",
+      (getUserError as { cause?: unknown }).cause,
+      "\ndeeper cause:",
+      ((getUserError as { cause?: { cause?: unknown } }).cause as { cause?: unknown } | undefined)
+        ?.cause
+    );
     throw new Error("Couldn't verify your session right now — check your connection and retry.", {
       cause: getUserError,
     });

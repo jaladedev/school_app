@@ -49,13 +49,65 @@ function renderKatex(latex: string, displayMode: boolean) {
   }
 }
 
-const MATH_SYMBOLS = [
-  { label: "x²", insert: "^{}", caret: 2, title: "Superscript" },
-  { label: "x₂", insert: "_{}", caret: 2, title: "Subscript" },
-  { label: "√", insert: "\\sqrt{}", caret: 6, title: "Square root" },
-  { label: "a/b", insert: "\\frac{}{}", caret: 6, title: "Fraction" },
-  { label: "∑", insert: "\\sum_{}^{}", caret: 6, title: "Summation" },
-  { label: "∫", insert: "\\int_{}^{}", caret: 6, title: "Integral" },
+// `mathliveInsert`, where present, is what's sent to the mathlive
+// `<math-field>` in Visual mode instead of `insert` -- it wraps each empty
+// argument slot in `\placeholder{}`, mathlive's own construct for a
+// persistently-visible dashed box (rendered regardless of cursor
+// position, unlike a genuinely empty `{}` group, which mathlive only
+// shows *something* for while the caret is actually sitting in it).
+// `insert` (plain `{}`) is still what's typed in LaTeX mode, since
+// `\placeholder` isn't a real LaTeX/KaTeX command -- inserting it into
+// the raw-text field would render as "Invalid LaTeX" in that mode's own
+// preview.
+const MATH_SYMBOLS: {
+  label: string;
+  insert: string;
+  mathliveInsert?: string;
+  caret: number;
+  title: string;
+}[] = [
+  {
+    label: "x²",
+    insert: "^{}",
+    mathliveInsert: "^{\\placeholder{}}",
+    caret: 2,
+    title: "Superscript",
+  },
+  {
+    label: "x₂",
+    insert: "_{}",
+    mathliveInsert: "_{\\placeholder{}}",
+    caret: 2,
+    title: "Subscript",
+  },
+  {
+    label: "√",
+    insert: "\\sqrt{}",
+    mathliveInsert: "\\sqrt{\\placeholder{}}",
+    caret: 6,
+    title: "Square root",
+  },
+  {
+    label: "a/b",
+    insert: "\\frac{}{}",
+    mathliveInsert: "\\frac{\\placeholder{}}{\\placeholder{}}",
+    caret: 6,
+    title: "Fraction",
+  },
+  {
+    label: "∑",
+    insert: "\\sum_{}^{}",
+    mathliveInsert: "\\sum_{\\placeholder{}}^{\\placeholder{}}",
+    caret: 6,
+    title: "Summation",
+  },
+  {
+    label: "∫",
+    insert: "\\int_{}^{}",
+    mathliveInsert: "\\int_{\\placeholder{}}^{\\placeholder{}}",
+    caret: 6,
+    title: "Integral",
+  },
   { label: "π", insert: "\\pi", caret: 3, title: "Pi" },
   { label: "θ", insert: "\\theta", caret: 6, title: "Theta" },
   { label: "α", insert: "\\alpha", caret: 6, title: "Alpha" },
@@ -258,9 +310,9 @@ function makeMathView(displayMode: boolean) {
         el?.setSelectionRange(cursor, cursor);
       });
     }
-    function insertSymbol(insert: string, caret: number) {
-      if (mode === "visual") mathFieldRef.current?.insert(insert);
-      else insertSymbolLatex(insert, caret);
+    function insertSymbol(sym: { insert: string; mathliveInsert?: string; caret: number }) {
+      if (mode === "visual") mathFieldRef.current?.insert(sym.mathliveInsert ?? sym.insert);
+      else insertSymbolLatex(sym.insert, sym.caret);
     }
 
     const popup =
@@ -281,7 +333,7 @@ function makeMathView(displayMode: boolean) {
                       type="button"
                       title={sym.title}
                       onMouseDown={(e: React.MouseEvent) => e.preventDefault()}
-                      onClick={() => insertSymbol(sym.insert, sym.caret)}
+                      onClick={() => insertSymbol(sym)}
                       className="min-w-[1.75rem] rounded px-1 py-0.5 font-serif text-sm text-ink hover:bg-paper"
                     >
                       {sym.label}
@@ -314,19 +366,42 @@ function makeMathView(displayMode: boolean) {
                 </div>
               </div>
               {mode === "visual" ? (
-                <MathFieldInput
-                  ref={mathFieldRef}
-                  initialValue={draftRef.current}
-                  onValueChange={(v) => {
-                    draftRef.current = v;
-                  }}
-                  autoFocusToken={mode + String(editing)}
-                  onCommit={(l) => {
-                    draftRef.current = l;
-                    handleCommit();
-                  }}
-                  onCancel={handleCancel}
-                />
+                <>
+                  <MathFieldInput
+                    ref={mathFieldRef}
+                    initialValue={draftRef.current}
+                    onValueChange={(v) => {
+                      draftRef.current = v;
+                      // Mirrored into React state (not just the ref) so the
+                      // KaTeX preview below re-renders on every keystroke --
+                      // previously this only updated the ref, so the shared
+                      // preview (added below) would have stayed frozen at
+                      // whatever was typed before switching into Visual mode.
+                      setLatexDraft(v);
+                    }}
+                    autoFocusToken={mode + String(editing)}
+                    onCommit={(l) => {
+                      draftRef.current = l;
+                      setLatexDraft(l);
+                      handleCommit();
+                    }}
+                    onCancel={handleCancel}
+                  />
+                  {/* mathlive's own in-field rendering is the primary
+                      visual feedback, but it renders inside a Shadow DOM
+                      whose fonts/layout depend on mathlive's own asset
+                      pipeline loading correctly -- this second, independent
+                      KaTeX render (same engine/CSS already used everywhere
+                      else notes render math) is a guaranteed-correct
+                      fallback so superscripts/subscripts/fractions are
+                      always confirmable here even if that pipeline hiccups. */}
+                  {latexDraft.trim() && (
+                    <div
+                      className="mt-1.5 border-t border-rule pt-1.5 text-sm"
+                      dangerouslySetInnerHTML={{ __html: renderKatex(latexDraft, displayMode) }}
+                    />
+                  )}
+                </>
               ) : (
                 <>
                   <input
@@ -371,11 +446,13 @@ function makeMathView(displayMode: boolean) {
           >
             {!displayMode && (
               <span className="rounded bg-marigold/20 px-1 font-mono text-sm text-ink">
-                {draftRef.current.trim() ? "∑" : "$…$"}
+                {draftRef.current.trim() ? "∑" : "+ Add equation"}
               </span>
             )}
             {displayMode && (
-              <span className="rounded bg-marigold/20 px-1 font-mono text-sm text-ink">$$…$$</span>
+              <span className="rounded bg-marigold/20 px-1 font-mono text-sm text-ink">
+                {draftRef.current.trim() ? "∑" : "+ Add equation"}
+              </span>
             )}
           </NodeViewWrapper>
           {popup}
@@ -396,7 +473,7 @@ function makeMathView(displayMode: boolean) {
             }}
             contentEditable={false}
           >
-            $…$
+            + Add equation
           </NodeViewWrapper>
         );
       return (
@@ -407,6 +484,43 @@ function makeMathView(displayMode: boolean) {
           contentEditable={false}
           dangerouslySetInnerHTML={{ __html: renderKatex(node.attrs.latex, displayMode) }}
         />
+      );
+    }
+
+    if (displayMode && !node.attrs.latex?.trim()) {
+      // Previously fed the literal string "$$…$$" straight into
+      // katex.renderToString() as a "placeholder" -- KaTeX has no concept
+      // of that syntax, so it just rendered the raw characters in math
+      // font (a garbled "$$…$$" glued together) instead of a real empty
+      // state. A plain, non-KaTeX-rendered box reads far more clearly as
+      // "nothing here yet, click to add" -- same idea as the inline case
+      // just above, sized for a block-level equation instead of a chip.
+      return (
+        <NodeViewWrapper
+          as="div"
+          className="group relative my-2 rounded-lg border border-dashed border-rule p-2 hover:border-marigold"
+          draggable={dragArmed}
+          onDragEnd={() => setDragArmed(false)}
+        >
+          <button
+            type="button"
+            onMouseDown={() => setDragArmed(true)}
+            onMouseUp={() => setDragArmed(false)}
+            data-drag-handle
+            className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab select-none items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
+          >
+            ⠿
+          </button>
+          <div
+            ref={anchorRef as any}
+            onClick={() => setEditing(true)}
+            contentEditable={false}
+            className="cursor-pointer py-1 text-center font-mono text-sm text-ink-soft"
+          >
+            + Add equation
+          </div>
+          {popup}
+        </NodeViewWrapper>
       );
     }
 
@@ -432,7 +546,7 @@ function makeMathView(displayMode: boolean) {
           contentEditable={false}
           className="cursor-pointer"
           dangerouslySetInnerHTML={{
-            __html: renderKatex(node.attrs.latex || "$$…$$", displayMode),
+            __html: renderKatex(node.attrs.latex, displayMode),
           }}
         />
         {popup}

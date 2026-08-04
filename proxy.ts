@@ -81,9 +81,7 @@ export async function proxy(request: NextRequest) {
   // downstream is still gated by RLS using the real, verified session, so
   // this isn't loosening authorization, just not letting a network blip
   // masquerade as a logout.
-  const authCheckFailedTransiently = getUserError
-    ? isAuthRetryableFetchError(getUserError)
-    : false;
+  const authCheckFailedTransiently = getUserError ? isAuthRetryableFetchError(getUserError) : false;
 
   const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard");
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
