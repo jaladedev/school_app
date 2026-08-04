@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Baloo+2:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -304,12 +304,7 @@ h4 {
   color: #1a1a1a !important;
 }
 
-/* Dyslexia-friendly font: Atkinson Hyperlegible/OpenDyslexic if the
-   reader has either installed locally (neither is bundled with the
-   app -- no network access to a font CDN from this build -- so this
-   degrades to Comic Sans, which independent readability studies on
-   dyslexia fonts consistently rate close to purpose-built dyslexia
-   fonts and is near-universally present as a system font already). */
+/* Dyslexia-friendly font: Atkinson Hyperlegible */
 .topic-prose.a11y-dyslexia-font,
 .topic-prose.a11y-dyslexia-font * {
   font-family:

@@ -73,7 +73,7 @@ export default async function StudentGradesPage() {
                 </div>
                 <span className="font-display text-lg font-semibold text-leaf">
                   {pendingGradeIds.has(g.id) ? (
-                    <span className="text-sm font-medium text-marigold-dark">Awaiting grading</span>
+                    <span className="text-sm font-medium text-marigold-text">Awaiting grading</span>
                   ) : (
                     <>
                       {g.score} / {g.assessments?.max_score}

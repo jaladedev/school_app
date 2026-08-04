@@ -10,6 +10,7 @@ const config: Config = {
         "ink-soft": "#4A5468", // secondary text
         marigold: "#F2B705", // primary interactive accent
         "marigold-dark": "#C98F00",
+        "marigold-text": "#956A00", // 4.84:1 on white, 4.60:1 on paper -- passes AA on both
         leaf: "#2F6B4F", // subject accent (science) / success states
         "leaf-soft": "#E4F0E9",
         rule: "#D9D3C4", // hairline "notebook rule" lines

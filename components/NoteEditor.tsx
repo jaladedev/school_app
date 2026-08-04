@@ -1198,7 +1198,7 @@ export function NoteEditor({
                   {initialStatus}
                 </span>
                 {isDirty && (
-                  <span className="ml-2 normal-case text-marigold-dark">Unsaved changes</span>
+                  <span className="ml-2 normal-case text-marigold-text">Unsaved changes</span>
                 )}
                 {isSavingDraft && <span className="ml-2 normal-case">Saving…</span>}
                 {!isSavingDraft && lastSavedAt && (
