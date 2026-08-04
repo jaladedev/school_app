@@ -154,7 +154,13 @@ const MathFieldInput = forwardRef<
   // `MathfieldElement` type above).
   useEffect(() => {
     let cancelled = false;
-    import("mathlive").then(() => {
+    import("mathlive").then(({ MathfieldElement }) => {
+      // MathLive's default fontsDirectory is resolved relative to its own
+      // JS chunk, which doesn't line up with Next's webpack output --
+      // point it at a copy served from /public instead (see
+      // `public/mathlive-fonts`) so the "math fonts could not be loaded"
+      // console warning goes away and glyphs render correctly.
+      MathfieldElement.fontsDirectory = "/mathlive-fonts";
       if (!cancelled) setReady(true);
     });
     return () => {
