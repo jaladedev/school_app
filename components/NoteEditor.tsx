@@ -53,6 +53,18 @@ import { ResourceChip } from "@/lib/tiptap/resource-node";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { SymbolPicker } from "@/components/SymbolPicker";
 import { clampPopoverToEditor } from "@/lib/tiptap/popover-position";
+import {
+  AddRowAboveIcon,
+  AddRowBelowIcon,
+  DeleteRowIcon,
+  AddColLeftIcon,
+  AddColRightIcon,
+  DeleteColIcon,
+  MergeCellsIcon,
+  SplitCellIcon,
+  HeaderRowIcon,
+  DeleteTableIcon,
+} from "@/components/TableIcons";
 import { MathInline, MathBlock } from "@/lib/tiptap/math-nodes";
 import type { TopicResource } from "@/types/database";
 
@@ -1660,26 +1672,29 @@ export function NoteEditor({
                   <button
                     type="button"
                     title="Add row above"
+                    aria-label="Add row above"
                     onClick={() => editor.chain().focus().addRowBefore().run()}
-                    className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30"
+                    className="rounded-md p-1.5 text-ink transition-colors hover:bg-paper active:bg-rule/30"
                   >
-                    <span aria-hidden="true">↑</span> Row
+                    <AddRowAboveIcon />
                   </button>
                   <button
                     type="button"
                     title="Add row below"
+                    aria-label="Add row below"
                     onClick={() => editor.chain().focus().addRowAfter().run()}
-                    className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30"
+                    className="rounded-md p-1.5 text-ink transition-colors hover:bg-paper active:bg-rule/30"
                   >
-                    <span aria-hidden="true">↓</span> Row
+                    <AddRowBelowIcon />
                   </button>
                   <button
                     type="button"
                     title="Delete row"
+                    aria-label="Delete row"
                     onClick={() => editor.chain().focus().deleteRow().run()}
-                    className="rounded-md px-2 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 active:bg-red-100"
+                    className="rounded-md p-1.5 text-red-600 transition-colors hover:bg-red-50 active:bg-red-100"
                   >
-                    Delete row
+                    <DeleteRowIcon />
                   </button>
                 </div>
 
@@ -1689,26 +1704,29 @@ export function NoteEditor({
                   <button
                     type="button"
                     title="Add column left"
+                    aria-label="Add column left"
                     onClick={() => editor.chain().focus().addColumnBefore().run()}
-                    className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30"
+                    className="rounded-md p-1.5 text-ink transition-colors hover:bg-paper active:bg-rule/30"
                   >
-                    <span aria-hidden="true">←</span> Col
+                    <AddColLeftIcon />
                   </button>
                   <button
                     type="button"
                     title="Add column right"
+                    aria-label="Add column right"
                     onClick={() => editor.chain().focus().addColumnAfter().run()}
-                    className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30"
+                    className="rounded-md p-1.5 text-ink transition-colors hover:bg-paper active:bg-rule/30"
                   >
-                    <span aria-hidden="true">→</span> Col
+                    <AddColRightIcon />
                   </button>
                   <button
                     type="button"
                     title="Delete column"
+                    aria-label="Delete column"
                     onClick={() => editor.chain().focus().deleteColumn().run()}
-                    className="rounded-md px-2 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 active:bg-red-100"
+                    className="rounded-md p-1.5 text-red-600 transition-colors hover:bg-red-50 active:bg-red-100"
                   >
-                    Delete col
+                    <DeleteColIcon />
                   </button>
                 </div>
 
@@ -1718,30 +1736,33 @@ export function NoteEditor({
                   <button
                     type="button"
                     title="Merge cells"
+                    aria-label="Merge cells"
                     disabled={!editor.can().mergeCells()}
                     onClick={() => editor.chain().focus().mergeCells().run()}
-                    className="rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30 disabled:opacity-30 disabled:hover:bg-transparent"
+                    className="rounded-md p-1.5 text-ink transition-colors hover:bg-paper active:bg-rule/30 disabled:opacity-30 disabled:hover:bg-transparent"
                   >
-                    Merge
+                    <MergeCellsIcon />
                   </button>
                   <button
                     type="button"
                     title="Split cell"
+                    aria-label="Split cell"
                     disabled={!editor.can().splitCell()}
                     onClick={() => editor.chain().focus().splitCell().run()}
-                    className="rounded-md px-2 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-paper active:bg-rule/30 disabled:opacity-30 disabled:hover:bg-transparent"
+                    className="rounded-md p-1.5 text-ink transition-colors hover:bg-paper active:bg-rule/30 disabled:opacity-30 disabled:hover:bg-transparent"
                   >
-                    Split
+                    <SplitCellIcon />
                   </button>
                   <button
                     type="button"
                     title="Toggle header row"
+                    aria-label="Toggle header row"
                     onClick={() => editor.chain().focus().toggleHeaderRow().run()}
-                    className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors hover:bg-paper active:bg-rule/30 ${
+                    className={`rounded-md p-1.5 transition-colors hover:bg-paper active:bg-rule/30 ${
                       editor.isActive("tableHeader") ? "bg-marigold/15 text-ink" : "text-ink"
                     }`}
                   >
-                    Header row
+                    <HeaderRowIcon />
                   </button>
                 </div>
 
@@ -1750,10 +1771,11 @@ export function NoteEditor({
                 <button
                   type="button"
                   title="Delete table"
+                  aria-label="Delete table"
                   onClick={() => editor.chain().focus().deleteTable().run()}
-                  className="rounded-md px-2 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 active:bg-red-100"
+                  className="rounded-md p-1.5 text-red-600 transition-colors hover:bg-red-50 active:bg-red-100"
                 >
-                  Delete table
+                  <DeleteTableIcon />
                 </button>
               </div>
             </BubbleMenu>

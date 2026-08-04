@@ -96,11 +96,56 @@ h4 {
   text-align: left;
   padding: 0.5rem 0.75rem;
   border: 1px solid #d9d3c4;
+  position: relative;
 }
 
 .topic-prose td {
   padding: 0.5rem 0.75rem;
   border: 1px solid #d9d3c4;
+  position: relative;
+}
+
+/* prosemirror-tables ships zero default styling of its own for these --
+   without this, a multi-cell drag-selection (the thing you're looking at
+   right before hitting Merge/Delete row/col) gives no visual feedback at
+   all, and the resize handle either doesn't render or renders as an
+   unstyled sliver. Only relevant in the editor (.ProseMirror), not the
+   published read-only view, since neither exists there. */
+.topic-prose .ProseMirror td.selectedCell::after,
+.topic-prose .ProseMirror th.selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(58, 125, 68, 0.15); /* leaf, at low opacity */
+  pointer-events: none;
+}
+.topic-prose .ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  z-index: 20;
+  background-color: #3a7d44; /* leaf */
+  opacity: 0;
+  transition: opacity 120ms ease;
+  pointer-events: none;
+}
+.topic-prose .ProseMirror td:hover > .column-resize-handle,
+.topic-prose .ProseMirror th:hover > .column-resize-handle,
+.topic-prose .ProseMirror .column-resize-handle.dragging {
+  opacity: 1;
+}
+.topic-prose .ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+/* Row/column hover cue -- a light tint on whichever cell the pointer is
+   over, so it's clear what "add row above" etc. in the table popover
+   would apply to before you click. Purely a while-typing affordance;
+   :hover already no-ops in the read-only view. */
+.topic-prose .ProseMirror table td:hover,
+.topic-prose .ProseMirror table th:hover {
+  background-color: rgba(58, 125, 68, 0.06);
 }
 
 /* Keep dense admin/report tables usable on phones instead of forcing
