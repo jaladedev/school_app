@@ -54,6 +54,8 @@ import { clampPopoverToEditor } from "@/lib/tiptap/popover-position";
 import { MathInline, MathBlock } from "@/lib/tiptap/math-nodes";
 import type { TopicResource } from "@/types/database";
 
+type SearchMatch = { from: number; to: number };
+
 const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
   image: "Image",
   diagram_mermaid: "Diagram",
@@ -154,6 +156,10 @@ export function NoteEditor({
   // just clicked it, so it's already where you're looking).
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ top: number; left: number } | null>(null);
   const [diagramPanelOpen, setDiagramPanelOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [replaceTerm, setReplaceTerm] = useState("");
+  const [matchCase, setMatchCase] = useState(false);
 
   useEffect(() => {
     slashCommandBridge.openResourcePicker = () => setPickerOpen(true);
@@ -173,6 +179,7 @@ export function NoteEditor({
   const emojiPopupRef = useRef<HTMLDivElement | null>(null);
   const diagramSectionRef = useRef<HTMLDivElement | null>(null);
   const noteContainerRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // The resource picker still needs the old scroll-to-toolbar treatment --
   // it has no cursor-relative anchor point the way emoji insertion does
@@ -275,6 +282,73 @@ export function NoteEditor({
     editor,
     selector: ({ editor }) => editor?.state,
   });
+
+  // Keep positions rather than decorating every result: a selection is
+  // enough to show the active match, and it avoids modifying a teacher's
+  // document merely to display search results.
+  function getSearchMatches(): SearchMatch[] {
+    if (!editor || !searchTerm) return [];
+    const needle = matchCase ? searchTerm : searchTerm.toLocaleLowerCase();
+    const matches: SearchMatch[] = [];
+
+    editor.state.doc.descendants((node, pos) => {
+      if (!node.isText || !node.text) return true;
+      const haystack = matchCase ? node.text : node.text.toLocaleLowerCase();
+      let index = haystack.indexOf(needle);
+      while (index !== -1) {
+        matches.push({ from: pos + index, to: pos + index + searchTerm.length });
+        index = haystack.indexOf(needle, index + searchTerm.length);
+      }
+      return true;
+    });
+    return matches;
+  }
+
+  const searchMatches = getSearchMatches();
+
+  function selectSearchMatch(direction: 1 | -1 = 1) {
+    if (!editor || searchMatches.length === 0) return;
+    const { from, to } = editor.state.selection;
+    const selectedIndex = searchMatches.findIndex(
+      (match) => match.from === from && match.to === to
+    );
+    const nextIndex =
+      selectedIndex === -1
+        ? direction === 1
+          ? 0
+          : searchMatches.length - 1
+        : (selectedIndex + direction + searchMatches.length) % searchMatches.length;
+    const match = searchMatches[nextIndex];
+    editor.chain().focus().setTextSelection(match).scrollIntoView().run();
+  }
+
+  function replaceSearchMatch() {
+    if (!editor || searchMatches.length === 0) return;
+    const { from, to } = editor.state.selection;
+    const match =
+      searchMatches.find((candidate) => candidate.from === from && candidate.to === to) ??
+      searchMatches[0];
+    const chain = editor.chain().focus().setTextSelection(match);
+    if (replaceTerm) chain.insertContent(replaceTerm);
+    else chain.deleteSelection();
+    chain.scrollIntoView().run();
+  }
+
+  function replaceAllSearchMatches() {
+    if (!editor || searchMatches.length === 0) return;
+    // Work backwards so each replacement leaves the positions of earlier
+    // matches valid. One transaction also makes Replace all one undo step.
+    let transaction = editor.state.tr;
+    for (const match of [...searchMatches].reverse()) {
+      transaction = transaction.insertText(replaceTerm, match.from, match.to);
+    }
+    editor.view.dispatch(transaction);
+    editor.commands.focus();
+  }
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   useEffect(() => {
     slashCommandBridge.openEmojiPicker = () => {
@@ -570,10 +644,10 @@ export function NoteEditor({
     if (url) editor.chain().focus().setLink({ href: url }).run();
   }
 
-  // Ctrl/Cmd+S still saves a draft. Ctrl/Cmd+K opens the link prompt
-  // (same logic the BubbleMenu's link button uses). Ctrl/Cmd+B and +I are
-  // handled natively by StarterKit's keymap, so only these two
-  // app-specific shortcuts need wiring here.
+  // Ctrl/Cmd+S still saves a draft. Ctrl/Cmd+K opens the link prompt,
+  // and Ctrl/Cmd+F opens the editor's own search panel instead of the
+  // browser-wide page search. Ctrl/Cmd+B and +I are handled natively by
+  // StarterKit's keymap, so only the app-specific shortcuts are wired here.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey)) return;
@@ -583,6 +657,9 @@ export function NoteEditor({
       } else if (e.key === "k") {
         e.preventDefault();
         promptForLink();
+      } else if (e.key === "f") {
+        e.preventDefault();
+        setSearchOpen(true);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -975,6 +1052,109 @@ export function NoteEditor({
           )}
 
           {/* Mobile write/preview toggle — md:hidden, desktop always shows toolbar + editable view */}
+          {searchOpen && (
+            <section
+              className="mb-3 rounded-lg border border-rule bg-paper p-3"
+              aria-label="Search and replace"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="sr-only" htmlFor="note-search">
+                  Find text
+                </label>
+                <input
+                  ref={searchInputRef}
+                  id="note-search"
+                  type="search"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      selectSearchMatch(e.shiftKey ? -1 : 1);
+                    } else if (e.key === "Escape") {
+                      setSearchOpen(false);
+                      editor.commands.focus();
+                    }
+                  }}
+                  placeholder="Find"
+                  className="min-w-40 flex-1 rounded-md border border-rule bg-white px-2.5 py-1.5 text-sm text-ink outline-none focus-visible:border-marigold"
+                />
+                <span className="min-w-16 text-center text-xs text-ink-soft" aria-live="polite">
+                  {searchTerm
+                    ? `${searchMatches.length} match${searchMatches.length === 1 ? "" : "es"}`
+                    : "Find text"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => selectSearchMatch(-1)}
+                  disabled={searchMatches.length === 0}
+                  className="rounded-md border border-rule bg-white px-2.5 py-1.5 text-sm text-ink hover:bg-white/70 disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectSearchMatch(1)}
+                  disabled={searchMatches.length === 0}
+                  className="rounded-md border border-rule bg-white px-2.5 py-1.5 text-sm text-ink hover:bg-white/70 disabled:opacity-40"
+                >
+                  Next
+                </button>
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-ink-soft">
+                  <input
+                    type="checkbox"
+                    checked={matchCase}
+                    onChange={(e) => setMatchCase(e.target.checked)}
+                    className="accent-marigold"
+                  />
+                  Match case
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(false)}
+                  className="ml-auto rounded-md px-2 py-1.5 text-xs text-ink-soft hover:bg-white hover:text-ink"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <label className="sr-only" htmlFor="note-replace">
+                  Replace with
+                </label>
+                <input
+                  id="note-replace"
+                  type="text"
+                  value={replaceTerm}
+                  onChange={(e) => setReplaceTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setSearchOpen(false);
+                      editor.commands.focus();
+                    }
+                  }}
+                  placeholder="Replace with"
+                  className="min-w-40 flex-1 rounded-md border border-rule bg-white px-2.5 py-1.5 text-sm text-ink outline-none focus-visible:border-marigold"
+                />
+                <button
+                  type="button"
+                  onClick={replaceSearchMatch}
+                  disabled={searchMatches.length === 0}
+                  className="rounded-md border border-rule bg-white px-2.5 py-1.5 text-sm text-ink hover:bg-white/70 disabled:opacity-40"
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={replaceAllSearchMatches}
+                  disabled={searchMatches.length === 0}
+                  className="rounded-md bg-marigold px-2.5 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-40"
+                >
+                  Replace all
+                </button>
+              </div>
+            </section>
+          )}
+
           <div className="mb-2 flex gap-1 rounded-lg border border-rule bg-paper p-1 md:hidden">
             <button
               type="button"
@@ -1013,6 +1193,15 @@ export function NoteEditor({
               ↻
             </button>
             <span className="mx-1 h-4 w-px bg-rule" />
+            <button
+              type="button"
+              title="Search and replace (Ctrl/Cmd+F)"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search and replace"
+              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${searchOpen ? "bg-white" : ""}`}
+            >
+              <span aria-hidden="true"> Find ⌕</span>
+            </button>
             <button
               type="button"
               title="Bold (Ctrl/Cmd+B)"

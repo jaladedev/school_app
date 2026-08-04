@@ -226,9 +226,9 @@ Registered by disabling StarterKit's built-in `codeBlock: false` and adding the 
 
 **Published-view parity, done as a follow-up:** the published note (`TopicContent.tsx`) and Presentation Mode (`NoteSlideView.tsx`, both render paths) previously fell back to `react-markdown`'s unstyled default `<pre><code>` for fenced blocks — a teacher's code block looked different once published than it did while writing. Fixed by wiring `rehype-highlight` + the same `github-dark` theme into both, and adding matching `.topic-prose pre`/`code` CSS (same dark background/radius/padding as the editor's node view) in `globals.css` so editing, presenting, and the published/student view all render identically.
 
-## 26. Search & Replace
+## 26. Search & Replace — DONE
 
-Not present. New build.
+Built directly into `NoteEditor.tsx`: the toolbar's **Find** button (or Ctrl/Cmd+F) opens a compact find/replace panel with case-sensitive matching, a live match count, previous/next navigation with wraparound, single replacement, and replace-all. Matches are selected in the TipTap document without adding persistent marks or changing the note merely to display search results; replace-all runs in one backward-order ProseMirror transaction, so position changes are safe and the operation is one undo step. Escape closes the panel and returns focus to the editor. `tsc --noEmit` and `eslint` pass.
 
 ## 27. Spell Check
 
