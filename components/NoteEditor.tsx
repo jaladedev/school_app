@@ -849,7 +849,7 @@ export function NoteEditor({
       // toolbar wrapper's DOM subtree via `position: fixed`, so a click
       // inside it wouldn't register as "inside emojiPickerRef" -- check
       // both, or picking an emoji from the floating popup would
-      // immediately close itself before onSelect's own close ever ran.
+      // immediately close itself before onSelectAction's own close ever ran.
       const insideToolbarAnchor = emojiPickerRef.current?.contains(target);
       const insideFloatingPopup = emojiPopupRef.current?.contains(target);
       if (!insideToolbarAnchor && !insideFloatingPopup) {
@@ -1993,7 +1993,7 @@ export function NoteEditor({
                 </button>
                 {emojiPickerOpen && !emojiPickerPos && (
                   <div className="absolute left-0 top-full z-20 mt-1">
-                    <EmojiPicker onSelect={insertEmoji} />
+                    <EmojiPicker onSelectAction={insertEmoji} />
                   </div>
                 )}
               </div>
@@ -2008,7 +2008,7 @@ export function NoteEditor({
                 </button>
                 {symbolPickerOpen && (
                   <div className="absolute right-0 top-full z-20 mt-1">
-                    <SymbolPicker onSelect={insertSymbol} />
+                    <SymbolPicker onSelectAction={insertSymbol} />
                   </div>
                 )}
               </div>
@@ -2106,7 +2106,7 @@ export function NoteEditor({
               style={{ position: "fixed", left: emojiPickerPos.left, top: emojiPickerPos.top }}
               className="z-20"
             >
-              <EmojiPicker onSelect={insertEmoji} />
+              <EmojiPicker onSelectAction={insertEmoji} />
             </div>
           )}
 

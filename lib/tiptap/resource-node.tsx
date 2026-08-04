@@ -309,8 +309,8 @@ function MermaidNodeView({
       <div
         onMouseDown={() => setDragArmed(true)}
         onMouseUp={() => setDragArmed(false)}
-        title="Drag to reorder"
-        aria-label="Drag to reorder this resource. Keyboard reordering isn't available for resources yet."
+        title="Drag to reorder (or select it and press Alt+Left/Right)"
+        aria-label="Drag to reorder this resource, or select it and press Alt+Left or Alt+Right"
         role="button"
         data-drag-handle
         className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
@@ -436,8 +436,8 @@ function ImageNodeView({
         <span
           onMouseDown={() => setDragArmed(true)}
           onMouseUp={() => setDragArmed(false)}
-          title="Drag to reorder"
-          aria-label="Drag to reorder this resource. Keyboard reordering isn't available for resources yet."
+          title="Drag to reorder (or select it and press Alt+Left/Right)"
+          aria-label="Drag to reorder this resource, or select it and press Alt+Left or Alt+Right"
           role="button"
           data-drag-handle
           className="pointer-events-auto ml-1 inline-flex cursor-grab select-none items-center rounded-full border border-rule bg-white px-1.5 py-0.5 text-xs text-ink-soft shadow active:cursor-grabbing"
@@ -630,8 +630,8 @@ function ResourceChipDefaultView({
         onMouseDown={() => setDragArmed(true)}
         onMouseUp={() => setDragArmed(false)}
         contentEditable={false}
-        title="Drag to reorder"
-        aria-label="Drag to reorder this resource. Keyboard reordering isn't available for resources yet."
+        title="Drag to reorder (or select it and press Alt+Left/Right)"
+        aria-label="Drag to reorder this resource, or select it and press Alt+Left or Alt+Right"
         role="button"
         data-drag-handle
         className="mr-0.5 inline-flex cursor-grab select-none items-center text-xs text-ink-soft/60 hover:text-ink-soft active:cursor-grabbing"
