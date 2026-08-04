@@ -175,16 +175,27 @@ export function QuizAttemptRunner({
   if (loadError) return <p className="text-sm text-clay">{loadError}</p>;
 
   if (result) {
-    const hasEssayQuestions = questions.some((q) => q.type === "essay");
+    const hasEssay = questions.some((q) => q.type === "essay");
     return (
       <div className="max-w-lg rounded-xl border border-rule bg-white p-6 text-center">
         <p className="mb-1 font-display text-xl font-semibold text-ink">Submitted</p>
         <p className="mb-4 text-sm text-ink-soft">
-          {hasEssayQuestions ? (
-            "Your teacher still needs to grade one or more written answers before your final score is ready."
+          {hasEssay ? (
+            // Essay questions score 0 at submit time (submit_quiz_attempt
+            // never auto-grades them) -- showing the raw result.score/
+            // total_points here would understate the real total and read
+            // as final when it isn't. The actual updated score is visible
+            // on the quizzes list once a teacher grades the essay
+            // question(s) and it clears moderation.
+            <>
+              This quiz includes essay questions, which your teacher grades separately. Your final
+              score will appear on the quizzes list once that&apos;s done and your teacher approves
+              it.
+            </>
           ) : (
             <>
-              {result.score}/{result.total_points}
+              {result.score}/{result.total_points} — your score is pending your teacher&apos;s
+              approval.
             </>
           )}
         </p>

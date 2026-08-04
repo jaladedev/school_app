@@ -20,27 +20,28 @@ export default async function StudentQuizzesPage() {
         .eq("student_id", profile.id)
     : { data: [] };
 
-  const attemptByQuiz = new Map((attempts ?? []).map((a) => [a.quiz_id, a]));
-
-  // Essay questions score 0 at submit time and only get real points once a
-  // teacher grades them (grade_quiz_essay_answers) -- until then, `score`
-  // on the attempt row is a misleadingly low partial total, not a final
-  // grade. Find which submitted attempts still have an ungraded essay
-  // answer so we can hide the score for those instead of showing it early.
-  const submittedAttemptIds = (attempts ?? []).filter((a) => a.submitted_at).map((a) => a.id);
-
-  const { data: pendingEssayAnswers } = submittedAttemptIds.length
+  // Essay questions don't get scored at submit time (submit_quiz_attempt
+  // deliberately leaves them at 0 -- see the quiz_question_types
+  // migration) -- a teacher grades them afterward via
+  // grade_quiz_essay_answers, which sets quiz_answers.points_awarded and
+  // updates quiz_attempts.score. Until that happens, the score already on
+  // the attempt understates the real total, so showing it plainly as
+  // "Submitted — 3/10" would read as final when it isn't. Flag any
+  // attempt with at least one essay answer still awaiting a score so we
+  // can show that instead; once points_awarded is set, this list is
+  // empty for that attempt and the badge below reverts to the real score
+  // on the student's next visit (RLS already scopes this to the
+  // student's own attempts, same as quiz_attempts_select).
+  const { data: pendingEssays } = profile
     ? await supabase
         .from("quiz_answers")
         .select("attempt_id, quiz_questions!inner(question_type)")
-        .in("attempt_id", submittedAttemptIds)
         .eq("quiz_questions.question_type", "essay")
         .is("points_awarded", null)
     : { data: [] };
+  const attemptsPendingGrading = new Set((pendingEssays ?? []).map((r) => r.attempt_id));
 
-  const pendingGradingAttemptIds = new Set(
-    (pendingEssayAnswers ?? []).map((row) => row.attempt_id)
-  );
+  const attemptByQuiz = new Map((attempts ?? []).map((a) => [a.quiz_id, a]));
 
   return (
     <div className="max-w-2xl">
@@ -51,6 +52,7 @@ export default async function StudentQuizzesPage() {
         {(quizzes ?? []).map((q) => {
           const attempt = attemptByQuiz.get(q.id);
           const submitted = !!attempt?.submitted_at;
+          const pendingGrading = !!attempt && attemptsPendingGrading.has(attempt.id);
           const closed = q.closes_at ? new Date(q.closes_at) < new Date() : false;
 
           return (
@@ -65,9 +67,12 @@ export default async function StudentQuizzesPage() {
                 </p>
               </div>
               {submitted ? (
-                pendingGradingAttemptIds.has(attempt!.id) ? (
-                  <span className="rounded-full bg-marigold/15 px-2.5 py-1 text-xs font-medium text-marigold-dark">
-                    Submitted — awaiting grading
+                pendingGrading ? (
+                  <span
+                    title="This quiz includes essay questions your teacher hasn't scored yet — your final score will update once grading is complete."
+                    className="rounded-full bg-marigold/20 px-2.5 py-1 text-xs font-medium text-ink"
+                  >
+                    Submitted — grading in progress
                   </span>
                 ) : (
                   <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-xs font-medium text-leaf">
