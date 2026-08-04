@@ -51,6 +51,7 @@ import { emitToast } from "@/lib/toast";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { ResourceChip } from "@/lib/tiptap/resource-node";
 import { EmojiPicker } from "@/components/EmojiPicker";
+import { SymbolPicker } from "@/components/SymbolPicker";
 import { clampPopoverToEditor } from "@/lib/tiptap/popover-position";
 import { MathInline, MathBlock } from "@/lib/tiptap/math-nodes";
 import type { TopicResource } from "@/types/database";
@@ -149,6 +150,7 @@ export function NoteEditor({
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [symbolPickerOpen, setSymbolPickerOpen] = useState(false);
   // Set only when the picker is opened via the slash command -- gives it a
   // cursor-anchored `position: fixed` spot instead of the toolbar-anchored
   // dropdown, so picking an emoji while typing deep in a long note doesn't
@@ -182,6 +184,7 @@ export function NoteEditor({
   const dragDepthRef = useRef(0);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+  const symbolPickerRef = useRef<HTMLDivElement | null>(null);
   const emojiPopupRef = useRef<HTMLDivElement | null>(null);
   const diagramSectionRef = useRef<HTMLDivElement | null>(null);
   const noteContainerRef = useRef<HTMLDivElement | null>(null);
@@ -356,6 +359,7 @@ export function NoteEditor({
     setSearchOpen(false);
     setPickerOpen(false);
     setEmojiPickerOpen(false);
+    setSymbolPickerOpen(false);
     setDiagramPanelOpen(false);
     setVideoEmbedOpen(false);
     setFocusMode(true);
@@ -667,6 +671,16 @@ export function NoteEditor({
   }, [emojiPickerOpen]);
 
   useEffect(() => {
+    if (!symbolPickerOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (symbolPickerRef.current && !symbolPickerRef.current.contains(e.target as Node))
+        setSymbolPickerOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [symbolPickerOpen]);
+
+  useEffect(() => {
     if (!isDirty) return;
     function handleBeforeUnload(e: BeforeUnloadEvent) {
       e.preventDefault();
@@ -737,6 +751,11 @@ export function NoteEditor({
     editor?.chain().focus().insertContent(emoji).run();
     setEmojiPickerOpen(false);
     setEmojiPickerPos(null);
+  }
+
+  function insertSymbol(symbol: string) {
+    editor?.chain().focus().insertContent(symbol).run();
+    setSymbolPickerOpen(false);
   }
 
   function insertMath(displayMode: boolean) {
@@ -1588,6 +1607,21 @@ export function NoteEditor({
                 {emojiPickerOpen && !emojiPickerPos && (
                   <div className="absolute left-0 top-full z-20 mt-1">
                     <EmojiPicker onSelect={insertEmoji} />
+                  </div>
+                )}
+              </div>
+              <div className="relative" ref={symbolPickerRef}>
+                <button
+                  type="button"
+                  title="Insert maths, science, or Greek symbol"
+                  onClick={() => setSymbolPickerOpen((open) => !open)}
+                  className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${symbolPickerOpen ? "bg-white" : ""}`}
+                >
+                  Ω
+                </button>
+                {symbolPickerOpen && (
+                  <div className="absolute right-0 top-full z-20 mt-1">
+                    <SymbolPicker onSelect={insertSymbol} />
                   </div>
                 )}
               </div>

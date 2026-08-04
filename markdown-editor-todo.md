@@ -197,9 +197,9 @@ Built as `components/EmojiPicker.tsx`: 8 curated categories (Smileys, Gestures, 
 - Also reachable via slash command (`/emoji`), wired through `slashCommandBridge` same as Image/Video/Diagram
 - Inserts as plain Unicode text (`insertContent`), not a custom node — round-trips through markdown with zero extra serialize/parse code needed
 
-## 21. Symbol Picker
+## 21. Symbol Picker — DONE
 
-Not present. New build — Mathematics, Science, Greek letters.
+Built as `components/SymbolPicker.tsx`: a compact toolbar popover with curated Mathematics, Science, and Greek-letter tabs. Symbols insert directly at the cursor as Unicode text, so they round-trip through Markdown without a custom node or serializer.
 
 ## 22. Link Preview
 
