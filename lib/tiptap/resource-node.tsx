@@ -26,11 +26,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { clampPopoverToEditor } from "./popover-position";
 import { TopicResourceItem } from "@/components/TopicContent";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
-import {
-  updateMermaidResource,
-  updateTopicResource,
-  refreshLinkPreview,
-} from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import type { TopicResource } from "@/types/database";
 import { dragAwareStopEvent } from "./drag-utils";
@@ -191,6 +186,7 @@ function MermaidNodeView({
     }
     setIsSaving(true);
     try {
+      const { updateMermaidResource } = await import("@/lib/actions/teacher");
       const updated = await updateMermaidResource(resource.id, title, code);
       const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
       storage.onResourceUpdated?.(updated);
@@ -581,6 +577,7 @@ function ResourceChipDefaultView({
     if (replaceFile) formData.set("file", replaceFile);
     setIsSaving(true);
     try {
+      const { updateTopicResource } = await import("@/lib/actions/teacher");
       const updated = await updateTopicResource(resource.id, formData);
       const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
       storage.onResourceUpdated?.(updated);
@@ -604,6 +601,7 @@ function ResourceChipDefaultView({
     if (!resource) return;
     setIsRefreshingPreview(true);
     try {
+      const { refreshLinkPreview } = await import("@/lib/actions/teacher");
       const updated = await refreshLinkPreview(resource.id);
       const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
       storage.onResourceUpdated?.(updated);

@@ -386,6 +386,7 @@ function makeMathView(displayMode: boolean) {
           <NodeViewWrapper
             as="div"
             ref={anchorRef as any}
+            draggable={false}
             className={displayMode ? "relative my-2" : "relative inline-block align-middle"}
             contentEditable={false}
           >
