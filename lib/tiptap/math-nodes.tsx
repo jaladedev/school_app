@@ -118,6 +118,27 @@ function makeMathView(displayMode: boolean) {
           className={
             displayMode ? "inline-block align-middle" : "relative inline-block align-middle"
           }
+          contentEditable={false}
+          // See resource-node.tsx's MermaidNodeView for the full
+          // explanation: this atom has no contentDOM ProseMirror
+          // expects to be interactive, so without this, a click
+          // anywhere in here (the LaTeX input included) would bubble to
+          // PM's own view-level click handling, which resolves it to
+          // "click on this atom" and sets a NodeSelection over the
+          // whole node -- painting the selected-node highlight and
+          // potentially knocking this back out of its editing render.
+          onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+          // The more serious half: `contentEditable={false}` doesn't
+          // stop DOM event bubbling, so typing in the LaTeX input still
+          // reaches PM's own view-level key handler. If PM's selection
+          // is still resting on this atom, it can treat a keystroke as
+          // "replace the current selection" -- deleting the whole
+          // equation node from the real document and replacing it with
+          // one character of plain text. Fires after the input's own
+          // Enter/Escape onKeyDown below (bubble phase runs child
+          // first), so it doesn't interfere with those.
+          onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
+          onKeyUp={(e: React.KeyboardEvent) => e.stopPropagation()}
         >
           {!displayMode && (
             <span
@@ -156,6 +177,7 @@ function makeMathView(displayMode: boolean) {
             <input
               ref={inputRef}
               autoFocus
+              onMouseDownCapture={(e) => e.stopPropagation()}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onBlur={() => {

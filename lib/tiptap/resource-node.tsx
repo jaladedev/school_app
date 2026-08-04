@@ -210,9 +210,45 @@ function MermaidNodeView({
         as="div"
         className="my-3 rounded-xl border border-marigold bg-white p-4"
         contentEditable={false}
+        // `contentEditable={false}` alone stops PM from treating this
+        // as editable text, but it does NOT stop ProseMirror's own
+        // view-level mousedown/click handling from seeing the event --
+        // this node is an *atom* (no contentDOM at all), so PM assumes
+        // nothing inside it is genuinely interactive, and resolves any
+        // click landing anywhere in its DOM to "click on this atom",
+        // setting a NodeSelection over the whole node. Our `stopEvent`
+        // (see dragAwareStopEvent) only governs how *this* NodeView
+        // reacts after that has already happened -- it can't undo the
+        // selection PM already set. The actual fix is to stop the
+        // mousedown from ever bubbling up to PM's view in the first
+        // place, so it never gets a chance to resolve a selection here.
+        // Without this, clicking into the code textarea (or the title
+        // input) painted the atom's `.ProseMirror-selectednode`
+        // highlight and could knock the component back out of its
+        // editing render.
+        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+        // The far more serious half of the same gap: `contentEditable`
+        // only affects the *browser's* native rich-editing, not DOM
+        // event bubbling -- a keydown fired while typing in the
+        // textarea below still bubbles straight up through this div to
+        // ProseMirror's own view-level key handler, same as any other
+        // DOM event. If PM's selection was still resting on this atom
+        // (a NodeSelection covering the whole node, from a click that
+        // landed on it before -- e.g. the "Edit" button itself, which
+        // sits outside this guard), PM's key handler treats a printable
+        // keystroke as "replace the current selection with this
+        // character," deleting the whole diagram node from the actual
+        // document and replacing it with a single character of plain
+        // text. That's real data loss in the saved note, not just a
+        // rendering glitch -- this typed character never touches
+        // ProseMirror's document at all when it's meant for our own
+        // plain `code`/`title` React state.
+        onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
+        onKeyUp={(e: React.KeyboardEvent) => e.stopPropagation()}
       >
         <input
           type="text"
+          onMouseDownCapture={(e) => e.stopPropagation()}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Diagram title (optional)"
@@ -224,6 +260,7 @@ function MermaidNodeView({
               Mermaid code
             </p>
             <textarea
+              onMouseDownCapture={(e) => e.stopPropagation()}
               value={code}
               onChange={(e) => setCode(e.target.value)}
               rows={8}
@@ -305,6 +342,10 @@ function MermaidNodeView({
           <>
             <button
               type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               onClick={startEditing}
               title="Edit this diagram's code"
               aria-label="Edit this diagram's code"
@@ -624,6 +665,30 @@ function ResourceChipDefaultView({
           ref={popoverRef}
           contentEditable={false}
           className="absolute left-0 top-full z-20 mt-1 w-[28rem] max-w-[90vw] rounded-lg border border-rule bg-white p-4 shadow-xl"
+          // See MermaidNodeView (same file) for the full explanation:
+          // this atom has no contentDOM ProseMirror expects to be
+          // interactive, so without this, clicking the title/replace-
+          // file inputs below would bubble to PM's own view-level click
+          // handling and set a NodeSelection over the whole node.
+          // Scoped to just the popover, not the whole chip -- the
+          // collapsed pill button (outside this span) has no real form
+          // in it, and stopping propagation there too would also stop a
+          // plain click on the chip from ever closing some *other*,
+          // unrelated open popover (the a11y menu, etc) via their own
+          // document-level outside-click listeners.
+          onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+          // The keydown half matters more: `contentEditable={false}`
+          // doesn't stop DOM event bubbling, so a keystroke typed into
+          // the title input still reaches PM's own view-level key
+          // handler. If PM's selection is still resting on this atom
+          // (a NodeSelection from a click that landed before this
+          // guard existed, e.g. the pill button itself), it would
+          // treat the keystroke as "replace the current selection,"
+          // deleting this resource's chip from the real document and
+          // replacing it with one character of plain text -- genuine
+          // data loss, not just a rendering glitch.
+          onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
+          onKeyUp={(e: React.KeyboardEvent) => e.stopPropagation()}
         >
           {editing && resource ? (
             <span className="block">
@@ -719,6 +784,10 @@ function ResourceChipDefaultView({
                   {resource && (
                     <button
                       type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
                       onClick={startEditing}
                       className="text-xs font-medium text-ink hover:underline"
                     >
