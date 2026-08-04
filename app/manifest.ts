@@ -5,13 +5,25 @@ import { createClient } from "@/lib/supabase/server";
 // public/manifest.json — this lets the manifest reflect the actual
 // school's name and logo instead of a generic placeholder, since that
 // data already lives in school_settings.
+
+export const revalidate = 3600;
+
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
-  const supabase = createClient();
-  const { data: settings } = await supabase
-    .from("school_settings")
-    .select("name, logo_url")
-    .eq("id", 1)
-    .single();
+  // Falls back to the generic name/icons below if this fails -- a slow or
+  // failed settings fetch shouldn't be able to break the manifest (and by
+  // extension, "Add to Home Screen") entirely.
+  let settings: { name: string | null; logo_url: string | null } | null = null;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("school_settings")
+      .select("name, logo_url")
+      .eq("id", 1)
+      .single();
+    settings = data;
+  } catch {
+    settings = null;
+  }
 
   const name = settings?.name ?? "School Management";
 

@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { edgeEnv } from "@/lib/env.edge";
 
@@ -25,6 +26,18 @@ export async function proxy(request: NextRequest) {
     edgeEnv.NEXT_PUBLIC_SUPABASE_URL,
     edgeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
+      // Next.js patches the global `fetch` to route through its Data Cache
+      // layer. supabase-js's internal auth calls (getUser(), etc.) can fail
+      // against that patched fetch when run inside proxy.ts -- surfacing as
+      // a bare "fetch failed" with no useful cause, even though the exact
+      // same request succeeds from a plain Node script or from the browser.
+      // Passing an explicit fetch here that forces `cache: "no-store"`
+      // opts these specific calls out of Next's caching layer, which is
+      // the documented workaround for this failure mode.
+      global: {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+          fetch(input, { ...init, cache: "no-store" }),
+      },
       cookies: {
         get(name: string) {
           return request.cookies.get(name)?.value;
@@ -43,16 +56,45 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Same reasoning as getCurrentProfile() in lib/supabase/server.ts: a cold
+  // connection right after the dev server starts (or after any idle
+  // period) is the most common cause of a transient failure here, so one
+  // short retry resolves that case silently instead of needlessly falling
+  // through to the "couldn't verify, but not forcing a logout" path below.
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] = null;
+  let getUserError: Awaited<ReturnType<typeof supabase.auth.getUser>>["error"] = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+    getUserError = result.error;
+    if (!getUserError || !isAuthRetryableFetchError(getUserError)) break;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+
+  // getUser() can fail two very different ways: the session is actually
+  // invalid/expired (a real "not logged in"), or the request to Supabase's
+  // Auth server itself failed (network blip, DNS hiccup, etc). Only the
+  // first should force a logout -- treating a transient network failure
+  // the same way means one flaky request kicks a legitimately signed-in
+  // person back to /login. On a retryable failure we fall through and let
+  // the request continue as if this check hadn't run; actual data access
+  // downstream is still gated by RLS using the real, verified session, so
+  // this isn't loosening authorization, just not letting a network blip
+  // masquerade as a logout.
+  const authCheckFailedTransiently = getUserError
+    ? isAuthRetryableFetchError(getUserError)
+    : false;
 
   const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard");
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
   const isChangePasswordRoute = request.nextUrl.pathname.startsWith("/change-password");
 
-  if ((isDashboardRoute || isChangePasswordRoute) && !user) {
+  if ((isDashboardRoute || isChangePasswordRoute) && !user && !authCheckFailedTransiently) {
     return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  if (authCheckFailedTransiently) {
+    return response;
   }
 
   let mustChangePassword = false;
