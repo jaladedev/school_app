@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  forwardRef,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -172,21 +174,41 @@ function applySectionGrouping(editor: Editor) {
   editor.view.dispatch(tr);
 }
 
-export function NoteEditor({
-  topicId,
-  noteId,
-  initialContent,
-  initialStatus,
-  resources = [],
-  placeholder = "Write the topic explanation here. Use tables for summaries, and the ∑ button for math.",
-}: {
+// Imperative surface exposed to parents (namely `ResourceSidebar` via
+// `NoteWorkspace`) so a persistent sidebar living outside this component
+// can insert an existing resource or upload+insert a new one without
+// duplicating `ensureNoteId`/`insertResourceMarker`/`uploadDroppedFiles`'s
+// note-creation and refresh logic here.
+export type NoteEditorHandle = {
+  insertResource: (resource: TopicResource) => void;
+  uploadFiles: (files: File[]) => Promise<void>;
+};
+
+type NoteEditorProps = {
   topicId: string;
   noteId?: string;
   initialContent: string;
   initialStatus: "draft" | "published" | "archived" | "unwritten";
   resources?: TopicResource[];
   placeholder?: string;
-}) {
+  // Fired whenever the live (server + locally-created-this-session)
+  // resource list changes, so a sidebar rendered by the parent can stay
+  // in sync without waiting for a full `router.refresh()` round trip.
+  onResourcesChange?: (resources: TopicResource[]) => void;
+};
+
+export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
+  {
+    topicId,
+    noteId,
+    initialContent,
+    initialStatus,
+    resources = [],
+    placeholder = "Write the topic explanation here. Use tables for summaries, and the ∑ button for math.",
+    onResourcesChange,
+  },
+  ref
+) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -324,6 +346,33 @@ export function NoteEditor({
       return [...resources, ...localOnly];
     });
   }, [resources]);
+
+  // Kept in a ref rather than a `useEffect` dependency -- the callback
+  // itself changes identity on nearly every parent render (it's an inline
+  // closure over `setSidebarResources`), and depending on it directly
+  // would refire this effect on every unrelated re-render. Only an actual
+  // `localResources` change should notify the parent.
+  const onResourcesChangeRef = useRef(onResourcesChange);
+  useEffect(() => {
+    onResourcesChangeRef.current = onResourcesChange;
+  });
+  useEffect(() => {
+    onResourcesChangeRef.current?.(localResources);
+  }, [localResources]);
+
+  // handlePickResource/uploadDroppedFiles are `function` declarations
+  // further down this component and hoisted within scope, so referencing
+  // them here (before their textual definition) is safe.
+  // No dependency array -- handlePickResource/uploadDroppedFiles are
+  // plain function declarations recreated every render (they close over
+  // render-scoped state like `currentNoteId`/`editor`), so memoizing this
+  // against them would just recompute on every render anyway. Cheap
+  // either way; this avoids the exhaustive-deps churn of wrapping both
+  // in their own useCallback just to satisfy the lint rule.
+  useImperativeHandle(ref, () => ({
+    insertResource: handlePickResource,
+    uploadFiles: uploadDroppedFiles,
+  }));
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -2392,4 +2441,4 @@ export function NoteEditor({
       )}
     </div>
   );
-}
+});

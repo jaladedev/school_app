@@ -2,8 +2,6 @@ import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NoteWorkspace } from "@/components/NoteWorkspace";
-import { TopicResourceUpload } from "@/components/TopicResourceUpload";
-import { TopicResourceList } from "@/components/TopicResourceList";
 import { NoteVersionDiff } from "@/components/NoteVersionDiff";
 import { RestoreVersionButton } from "@/components/RestoreVersionButton";
 import { DeleteVersionButton } from "@/components/DeleteVersionButton";
@@ -179,18 +177,6 @@ export default async function TeacherNoteEditPage({
           className: `${entry.classes?.name ?? ""} ${entry.classes?.arm ?? ""}`.trim(),
         }))}
       />
-      {note ? (
-        <section className="mt-4">
-          <TopicResourceUpload topicId={resolvedParams.topicId} noteId={note.id} />
-          <TopicResourceList resources={resources ?? []} />
-        </section>
-      ) : (
-        <p className="mt-4 text-sm text-ink-soft">
-          This list will appear here once you&apos;ve saved at least one draft — but you don&apos;t
-          have to save first: use &quot;Insert resource&quot; or drag a file straight into the
-          editor above, and the first draft will be created for you automatically.
-        </p>
-      )}
       {!!versions?.length && (
         <section className="mt-6 rounded-xl border border-rule bg-white p-4">
           <h2 className="font-display text-lg font-semibold text-ink">Version history</h2>

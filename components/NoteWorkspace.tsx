@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { NoteEditor } from "@/components/NoteEditor";
+import { useRef, useState } from "react";
+import { NoteEditor, type NoteEditorHandle } from "@/components/NoteEditor";
 import { NoteSlideView } from "@/components/NoteSlideView";
 import { BellTimer, type BellTimerEntry } from "@/components/BellTimer";
+import { ResourceSidebar } from "@/components/ResourceSidebar";
 import type { TopicResource } from "@/types/database";
 
 export function NoteWorkspace({
@@ -24,6 +25,12 @@ export function NoteWorkspace({
   todaysEntries?: BellTimerEntry[];
 }) {
   const [mode, setMode] = useState<"edit" | "present">("edit");
+  const editorRef = useRef<NoteEditorHandle>(null);
+  // Seeded from the server-fetched `resources` prop, then kept live by
+  // NoteEditor's `onResourcesChange` callback -- so the sidebar reflects
+  // resources created this session (a dropped file, a saved diagram)
+  // immediately, not just after a `router.refresh()` round trip.
+  const [sidebarResources, setSidebarResources] = useState(resources);
 
   return (
     <div>
@@ -59,14 +66,21 @@ export function NoteWorkspace({
           revalidatePath), rather than introducing a second, editor-only
           notion of "current content". */}
       {mode === "edit" ? (
-        <NoteEditor
-          topicId={topicId}
-          noteId={noteId}
-          initialContent={initialContent}
-          initialStatus={initialStatus}
-          resources={resources}
-          placeholder={placeholder}
-        />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1">
+            <NoteEditor
+              ref={editorRef}
+              topicId={topicId}
+              noteId={noteId}
+              initialContent={initialContent}
+              initialStatus={initialStatus}
+              resources={resources}
+              placeholder={placeholder}
+              onResourcesChange={setSidebarResources}
+            />
+          </div>
+          <ResourceSidebar resources={sidebarResources} editorRef={editorRef} />
+        </div>
       ) : (
         <>
           {/* Bell timer sits above the slide content in Present mode
