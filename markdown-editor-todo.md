@@ -236,15 +236,15 @@ Not present.
 
 Built via `@tiptap/extension-character-count` (words/characters) + custom `computeNoteStats()` in `NoteEditor.tsx` that walks the doc for headings/tables/images/resource chips, plus a rough reading-time estimate (words / 200 wpm).
 
-## 29. Keyboard Shortcuts
+## 29. Keyboard Shortcuts — DONE
 
 TipTap ships common ones (Ctrl+B/I/U) by default — mostly free with migration.
 
 - ✅ Ctrl+S (save draft)
 - ✅ Ctrl+K (link) — opens the same prompt as the BubbleMenu link button
 - ✅ Tab/Shift+Tab (indent) — fixed a real bug: when there's no list item to sink/lift into or table cell to move to, every extension's Tab handler correctly returns false, but nothing was calling preventDefault, so the keydown fell through to the browser's native focus-tabbing and jumped to the next toolbar/chip button. Added a catch-all `TabTrap` extension that absorbs Tab/Shift-Tab as a last resort so focus never escapes the editor.
-- Still need: Ctrl+/ (slash menu, once #8 exists)
-- Add shortcut hints in UI — done for B/I/U toolbar buttons via `title`
+- ✅ Ctrl/Cmd+/ (slash menu) — opens the existing filterable TipTap command menu from inside the editor; the `/` toolbar button provides a discoverable mouse equivalent.
+- ✅ Shortcut hints in UI — toolbar titles now cover Undo/Redo, B/I/U, link, search, and slash commands; the Save draft control also shows Ctrl/Cmd+S.
 
 ## 30. Focus Mode — DONE
 

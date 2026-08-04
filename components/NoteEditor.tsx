@@ -80,6 +80,7 @@ const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
 };
 
 const DEFAULT_MERMAID = "flowchart TD\n  A[Start] --> B[End]";
+const TEXT_COLORS = ["#1f2937", "#475569", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#0891b2", "#2563eb", "#4f46e5", "#7c3aed", "#c026d3", "#db2777"];
 
 // Starter templates for the "Generate Mermaid diagram" panel
 const DIAGRAM_TEMPLATES: { label: string; code: string }[] = [
@@ -163,6 +164,7 @@ export function NoteEditor({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [symbolPickerOpen, setSymbolPickerOpen] = useState(false);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   // Set only when the picker is opened via the slash command -- gives it a
   // cursor-anchored `position: fixed` spot instead of the toolbar-anchored
   // dropdown, so picking an emoji while typing deep in a long note doesn't
@@ -197,6 +199,7 @@ export function NoteEditor({
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const symbolPickerRef = useRef<HTMLDivElement | null>(null);
+  const colorPickerRef = useRef<HTMLDivElement | null>(null);
   const emojiPopupRef = useRef<HTMLDivElement | null>(null);
   const diagramSectionRef = useRef<HTMLDivElement | null>(null);
   const noteContainerRef = useRef<HTMLDivElement | null>(null);
@@ -372,6 +375,7 @@ export function NoteEditor({
     setPickerOpen(false);
     setEmojiPickerOpen(false);
     setSymbolPickerOpen(false);
+    setColorPickerOpen(false);
     setDiagramPanelOpen(false);
     setVideoEmbedOpen(false);
     setFocusMode(true);
@@ -693,6 +697,16 @@ export function NoteEditor({
   }, [symbolPickerOpen]);
 
   useEffect(() => {
+    if (!colorPickerOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node))
+        setColorPickerOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [colorPickerOpen]);
+
+  useEffect(() => {
     if (!isDirty) return;
     function handleBeforeUnload(e: BeforeUnloadEvent) {
       e.preventDefault();
@@ -708,10 +722,9 @@ export function NoteEditor({
     if (url) editor.chain().focus().setLink({ href: url }).run();
   }
 
-  // Ctrl/Cmd+S still saves a draft. Ctrl/Cmd+K opens the link prompt,
-  // and Ctrl/Cmd+F opens the editor's own search panel instead of the
-  // browser-wide page search. Ctrl/Cmd+B and +I are handled natively by
-  // StarterKit's keymap, so only the app-specific shortcuts are wired here.
+  // Ctrl/Cmd+S saves a draft, Ctrl/Cmd+K opens links, Ctrl/Cmd+F opens
+  // search, and Ctrl/Cmd+/ inserts the slash that activates the existing
+  // TipTap suggestion menu. Ctrl/Cmd+B and +I are StarterKit keymaps.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && focusMode && !searchOpen) {
@@ -728,6 +741,10 @@ export function NoteEditor({
       } else if (e.key === "f") {
         e.preventDefault();
         setSearchOpen(true);
+      } else if (e.key === "/" || e.code === "Slash") {
+        if (!editor?.view.dom.contains(e.target as Node)) return;
+        e.preventDefault();
+        editor.chain().focus().insertContent("/").run();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -1057,7 +1074,7 @@ export function NoteEditor({
                 <button
                   onClick={() => handleSave("draft")}
                   disabled={isPending || !isOnline}
-                  title={!isOnline ? "You're offline" : undefined}
+                  title={!isOnline ? "You're offline" : "Save draft (Ctrl/Cmd+S)"}
                   className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
                 >
                   {isSavingDraft ? "Saving…" : "Save draft"}
@@ -1321,7 +1338,7 @@ export function NoteEditor({
             >
               <button
                 type="button"
-                title="Undo"
+                title="Undo (Ctrl/Cmd+Z)"
                 onClick={() => editor.chain().focus().undo().run()}
                 className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
               >
@@ -1329,7 +1346,7 @@ export function NoteEditor({
               </button>
               <button
                 type="button"
-                title="Redo"
+                title="Redo (Ctrl/Cmd+Shift+Z)"
                 onClick={() => editor.chain().focus().redo().run()}
                 className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
               >
@@ -1370,6 +1387,77 @@ export function NoteEditor({
               >
                 I
               </button>
+              <button
+                type="button"
+                title="Underline (Ctrl/Cmd+U)"
+                onClick={() => editor.chain().focus().toggleUnderline().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm underline hover:bg-white ${editor.isActive("underline") ? "bg-white" : ""}`}
+              >
+                U
+              </button>
+              <button
+                type="button"
+                title="Strikethrough"
+                onClick={() => editor.chain().focus().toggleStrike().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm line-through hover:bg-white ${editor.isActive("strike") ? "bg-white" : ""}`}
+              >
+                S
+              </button>
+              <div className="relative" ref={colorPickerRef}>
+                <button
+                  type="button"
+                  title="Text color"
+                  aria-label="Choose text color"
+                  onClick={() => setColorPickerOpen((open) => !open)}
+                  className={`relative min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${colorPickerOpen ? "bg-white" : ""}`}
+                >
+                  A
+                  <span
+                    className="absolute bottom-0.5 left-2 right-2 h-0.5 rounded"
+                    style={{
+                      backgroundColor: editor.getAttributes("textStyle").color || "#1f2937",
+                    }}
+                  />
+                </button>
+                {colorPickerOpen && (
+                  <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-rule bg-white p-2 shadow-lg">
+                    <div className="mb-2 flex items-center justify-between px-0.5"><span className="text-xs font-medium text-ink">Text color</span><button type="button" onClick={() => { editor.chain().focus().unsetColor().run(); setColorPickerOpen(false); }} className="text-xs text-ink-soft hover:text-ink">Reset</button></div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {TEXT_COLORS.map((color) => {
+                        const selected = editor.getAttributes("textStyle").color === color;
+                        return <button key={color} type="button" aria-label={`Set text color to ${color}`} title={color} onClick={() => { editor.chain().focus().setColor(color).run(); setColorPickerOpen(false); }} className={`flex h-7 w-7 items-center justify-center rounded-full border-2 ${selected ? "border-ink ring-2 ring-marigold/40" : "border-white hover:border-rule"}`} style={{ backgroundColor: color }}>
+                          {selected && <span className="text-xs font-bold text-white">✓</span>}
+                        </button>;
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                title="Highlight"
+                onClick={() => editor.chain().focus().toggleHighlight().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("highlight") ? "bg-white" : ""}`}
+              >
+                ▧
+              </button>
+              <button
+                type="button"
+                title="Superscript"
+                onClick={() => editor.chain().focus().toggleSuperscript().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("superscript") ? "bg-white" : ""}`}
+              >
+                x²
+              </button>
+              <button
+                type="button"
+                title="Subscript"
+                onClick={() => editor.chain().focus().toggleSubscript().run()}
+                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("subscript") ? "bg-white" : ""}`}
+              >
+                x₂
+              </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
               <select
                 title="Paragraph style"
                 value={
@@ -1419,58 +1507,64 @@ export function NoteEditor({
               >
                 &ldquo;
               </button>
-              <button
-                type="button"
-                title="Underline (Ctrl/Cmd+U)"
-                onClick={() => editor.chain().focus().toggleUnderline().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm underline hover:bg-white ${editor.isActive("underline") ? "bg-white" : ""}`}
-              >
-                U
-              </button>
-              <button
-                type="button"
-                title="Strikethrough"
-                onClick={() => editor.chain().focus().toggleStrike().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm line-through hover:bg-white ${editor.isActive("strike") ? "bg-white" : ""}`}
-              >
-                S
-              </button>
-              <label
-                title="Text color"
-                className="flex min-w-[2rem] cursor-pointer items-center justify-center rounded-md px-1 py-1 text-sm hover:bg-white"
-              >
-                A
-                <input
-                  type="color"
-                  onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
-                  value={editor.getAttributes("textStyle").color || "#1f2937"}
-                  className="ml-0.5 h-4 w-4 cursor-pointer border-none bg-transparent p-0"
-                />
-              </label>
-              <button
-                type="button"
-                title="Highlight"
-                onClick={() => editor.chain().focus().toggleHighlight().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("highlight") ? "bg-white" : ""}`}
-              >
-                ▧
-              </button>
-              <button
-                type="button"
-                title="Superscript"
-                onClick={() => editor.chain().focus().toggleSuperscript().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("superscript") ? "bg-white" : ""}`}
-              >
-                x²
-              </button>
-              <button
-                type="button"
-                title="Subscript"
-                onClick={() => editor.chain().focus().toggleSubscript().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("subscript") ? "bg-white" : ""}`}
-              >
-                x₂
-              </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              {false && (
+                <>
+                  <button
+                    type="button"
+                    title="Underline (Ctrl/Cmd+U)"
+                    onClick={() => editor.chain().focus().toggleUnderline().run()}
+                    className={`min-w-[2rem] rounded-md px-2 py-1 text-sm underline hover:bg-white ${editor.isActive("underline") ? "bg-white" : ""}`}
+                  >
+                    U
+                  </button>
+                  <button
+                    type="button"
+                    title="Strikethrough"
+                    onClick={() => editor.chain().focus().toggleStrike().run()}
+                    className={`min-w-[2rem] rounded-md px-2 py-1 text-sm line-through hover:bg-white ${editor.isActive("strike") ? "bg-white" : ""}`}
+                  >
+                    S
+                  </button>
+                  <label
+                    title="Text color"
+                    className="flex min-w-[2rem] cursor-pointer items-center justify-center rounded-md px-1 py-1 text-sm hover:bg-white"
+                  >
+                    A
+                    <input
+                      type="color"
+                      onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+                      value={editor.getAttributes("textStyle").color || "#1f2937"}
+                      className="ml-0.5 h-4 w-4 cursor-pointer border-none bg-transparent p-0"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    title="Highlight"
+                    onClick={() => editor.chain().focus().toggleHighlight().run()}
+                    className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("highlight") ? "bg-white" : ""}`}
+                  >
+                    ▧
+                  </button>
+                  <button
+                    type="button"
+                    title="Superscript"
+                    onClick={() => editor.chain().focus().toggleSuperscript().run()}
+                    className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("superscript") ? "bg-white" : ""}`}
+                  >
+                    x²
+                  </button>
+                  <button
+                    type="button"
+                    title="Subscript"
+                    onClick={() => editor.chain().focus().toggleSubscript().run()}
+                    className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("subscript") ? "bg-white" : ""}`}
+                  >
+                    x₂
+                  </button>
+                </>
+              )}
+              <span className="mx-1 h-4 w-px bg-rule" />
               <span className="mx-1 h-4 w-px bg-rule" />
               <button
                 type="button"
@@ -1637,6 +1731,15 @@ export function NoteEditor({
                   </div>
                 )}
               </div>
+              <button
+                type="button"
+                title="Slash commands (Ctrl/Cmd+/)"
+                aria-label="Open slash commands"
+                onClick={() => editor.chain().focus().insertContent("/").run()}
+                className="min-w-[2rem] rounded-md px-2 py-1 font-mono text-sm hover:bg-white"
+              >
+                /
+              </button>
             </div>
           )}
 
