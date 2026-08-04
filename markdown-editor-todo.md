@@ -231,12 +231,11 @@ Registered by disabling StarterKit's built-in `codeBlock: false` and adding the 
 
 Built directly into `NoteEditor.tsx`: the toolbar's **Find** button (or Ctrl/Cmd+F) opens a compact find/replace panel with case-sensitive matching, a live match count, previous/next navigation with wraparound, single replacement, and replace-all. Matches are selected in the TipTap document without adding persistent marks or changing the note merely to display search results; replace-all runs in one backward-order ProseMirror transaction, so position changes are safe and the operation is one undo step. Escape closes the panel and returns focus to the editor. `tsc --noEmit` and `eslint` pass.
 
-## 27. Spell Check
+## 27. Spell Check — DONE (first pass)
 
-Not present.
+Browser-native only, as scoped: `spellcheck` is a plain DOM attribute on the contentEditable node, so this is entirely a browser feature (Chrome/Firefox/Safari's own dictionary + red squiggly underlines, right-click for suggestions) rather than anything TipTap/ProseMirror-aware. Toggle lives in the existing reading & accessibility (Aa) menu (#37) alongside font size/high-contrast/dyslexia font, same localStorage-preference pattern, defaulting on. The one wrinkle: `editorProps.attributes` is only applied once at editor creation, unlike those other three toggles (plain CSS classes on a wrapper, so a re-render is enough) — toggling this after mount needs an explicit `editor.setOptions()` call reaching into the live contentEditable DOM node, careful to spread the existing `editorProps` first so `handlePaste` (image upload / link-preview paste) doesn't get silently dropped.
 
-- Spell checking (can lean on browser-native `spellcheck` attribute as a first pass)
-- Grammar suggestions (bigger lift — likely third-party service)
+- Grammar suggestions (bigger lift — likely third-party service) still not present.
 
 ## 28. Word Statistics — DONE
 

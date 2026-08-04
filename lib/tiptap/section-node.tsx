@@ -23,10 +23,6 @@
  * `addToHistory: false` transaction so it doesn't show up as an undo step.
  *
  * Known v1 limitations (documented rather than silently glossed over):
- * - Every heading level starts a new flat section -- an h3 does not
- *   nest inside its parent h2's section. Nesting is a reasonable v2 if
- *   sub-section dragging turns out to matter; skipped here to keep the
- *   grouping/serialize logic simple and to avoid a second migration.
  * - Typing a new heading inside an existing section's body does NOT
  *   auto-split it into a new section -- there's no input rule watching
  *   for that yet. Use the "Section" slash command / toolbar button to
@@ -34,6 +30,21 @@
  *   follow-up but needs care to avoid fighting mid-typing undo steps.
  * - Content before the first heading (if any) is left ungrouped at the
  *   top level, same as it would render today.
+ *
+ * Heading nesting (h3 under its parent h2, etc.) IS handled -- see
+ * groupIntoSections below. `content: "heading block*"` already
+ * schema-permits a nested `section` as a child (Section itself has
+ * `group: "block"`, so it's already one of the things `block*`
+ * matches) -- the only actual gap was that the original grouping walk
+ * treated every heading as starting a new *top-level* section
+ * regardless of level, flattening a doc's outline instead of nesting
+ * it. `groupIntoSections` now tracks a stack of open sections keyed by
+ * heading level: a heading strictly deeper than the currently-open
+ * section nests inside it; a heading at the same or shallower level
+ * closes sections back up to (and including) that level first. Same
+ * "no markdown fence syntax" property holds either way -- `serialize`
+ * already recurses through `renderContent`, so a nested section
+ * flattens back out through its parent's flattening for free.
  */
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from "@tiptap/react";
@@ -195,38 +206,58 @@ Section.config.addStorage = function () {
 };
 
 /**
- * Groups a flat array of top-level nodes into `section` nodes, one per
- * heading-to-next-heading run. Content before the first heading (if
- * any) is passed through ungrouped. Call once, right after the Markdown
- * extension parses initial content into the schema.
+ * Groups a flat array of top-level nodes into `section` nodes, nested
+ * by heading level -- an h3 run nests inside its parent h2's section,
+ * an h4 inside that h3's, and so on. Content before the first heading
+ * (if any) is passed through ungrouped. Call once, right after the
+ * Markdown extension parses initial content into the schema.
  */
 export function groupIntoSections(schema: Schema, doc: PMNode): PMNode {
   const sectionType = schema.nodes.section;
   const topLevel: PMNode[] = [];
   doc.forEach((child) => topLevel.push(child));
 
+  type Frame = { level: number; content: PMNode[] };
+  // Stack of currently-open sections, outermost first. `content`
+  // accumulates each frame's children (its heading, plus every
+  // following node until something closes it) until the frame closes,
+  // at which point it becomes one `section` node pushed onto whichever
+  // frame is now on top (or onto `result` if the stack is empty).
+  const stack: Frame[] = [];
   const result: PMNode[] = [];
-  let current: PMNode[] | null = null;
 
-  function flushCurrent() {
-    if (current && current.length > 0) {
-      result.push(sectionType.create(null, current));
-    }
-    current = null;
+  function pushNode(node: PMNode) {
+    if (stack.length) stack[stack.length - 1].content.push(node);
+    else result.push(node);
+  }
+
+  function closeTopFrame() {
+    const frame = stack.pop();
+    if (!frame) return;
+    pushNode(sectionType.create(null, frame.content));
   }
 
   for (const node of topLevel) {
     if (node.type.name === "heading") {
-      flushCurrent();
-      current = [node];
-    } else if (current) {
-      current.push(node);
+      const level: number = node.attrs.level;
+      // A heading at the same level or shallower than what's currently
+      // open ends those sections first (e.g. a second h2 closes the
+      // first h2's section -- and any h3/h4 nested inside it -- before
+      // starting its own; an h1 closes everything). A heading strictly
+      // deeper than what's open (h3 while an h2 section is open)
+      // starts a new frame *nested inside* the current one instead.
+      while (stack.length && stack[stack.length - 1].level >= level) {
+        closeTopFrame();
+      }
+      stack.push({ level, content: [node] });
+    } else if (stack.length) {
+      stack[stack.length - 1].content.push(node);
     } else {
       // Content before any heading -- leave it at the top level.
       result.push(node);
     }
   }
-  flushCurrent();
+  while (stack.length) closeTopFrame();
 
   return schema.nodes.doc.create(doc.attrs, result);
 }

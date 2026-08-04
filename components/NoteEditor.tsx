@@ -216,6 +216,18 @@ export function NoteEditor({
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("noteEditor:dyslexiaFont") === "1";
   });
+  // #27 Spell Check, first pass: the browser's own native spellcheck
+  // (red squiggly underlines) rather than anything server-side --
+  // Tiptap/ProseMirror don't touch spelling at all, this is purely the
+  // `spellcheck` attribute on the underlying contentEditable element.
+  // Same per-browser preference reasoning as the three toggles above;
+  // defaults ON (absent localStorage key reads as enabled) since that
+  // matches what a plain contentEditable does with no attribute set.
+  const [spellcheckEnabled, setSpellcheckEnabled] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = window.localStorage.getItem("noteEditor:spellcheck");
+    return saved === null ? true : saved === "1";
+  });
 
   useEffect(() => {
     window.localStorage.setItem("noteEditor:fontScale", String(fontScale));
@@ -226,6 +238,9 @@ export function NoteEditor({
   useEffect(() => {
     window.localStorage.setItem("noteEditor:dyslexiaFont", dyslexiaFont ? "1" : "0");
   }, [dyslexiaFont]);
+  useEffect(() => {
+    window.localStorage.setItem("noteEditor:spellcheck", spellcheckEnabled ? "1" : "0");
+  }, [spellcheckEnabled]);
   // Set only when the picker is opened via the slash command -- gives it a
   // cursor-anchored `position: fixed` spot instead of the toolbar-anchored
   // dropdown, so picking an emoji while typing deep in a long note doesn't
@@ -353,6 +368,7 @@ export function NoteEditor({
         role: "textbox",
         "aria-multiline": "true",
         "aria-label": "Note content",
+        spellcheck: "true",
       },
       handlePaste(_view, event) {
         const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
@@ -392,6 +408,28 @@ export function NoteEditor({
     editor,
     selector: ({ editor }) => editor?.state,
   });
+
+  // editorProps.attributes only gets applied once, at creation -- unlike
+  // fontScale/highContrast/dyslexiaFont (plain CSS classes on a wrapper,
+  // which just re-render), the `spellcheck` attribute lives directly on
+  // ProseMirror's own contentEditable DOM node, so toggling it after
+  // mount needs an explicit setOptions call to actually reach that node.
+  // Spreading the existing editorProps first is required, not optional:
+  // setOptions *replaces* editorProps wholesale, so omitting that spread
+  // would silently drop handlePaste (image upload / link-preview paste
+  // handling) the moment this toggle changes.
+  useEffect(() => {
+    if (!editor) return;
+    editor.setOptions({
+      editorProps: {
+        ...editor.options.editorProps,
+        attributes: {
+          ...(editor.options.editorProps.attributes as Record<string, string> | undefined),
+          spellcheck: spellcheckEnabled ? "true" : "false",
+        },
+      },
+    });
+  }, [editor, spellcheckEnabled]);
 
   // Keep positions rather than decorating every result: a selection is
   // enough to show the active match, and it avoids modifying a teacher's
@@ -1995,13 +2033,22 @@ export function NoteEditor({
                         aria-label="High contrast note text"
                       />
                     </label>
-                    <label className="flex items-center justify-between gap-2">
+                    <label className="mb-2 flex items-center justify-between gap-2">
                       <span>Dyslexia-friendly font</span>
                       <input
                         type="checkbox"
                         checked={dyslexiaFont}
                         onChange={(e) => setDyslexiaFont(e.target.checked)}
                         aria-label="Use dyslexia-friendly font"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between gap-2">
+                      <span>Spell check</span>
+                      <input
+                        type="checkbox"
+                        checked={spellcheckEnabled}
+                        onChange={(e) => setSpellcheckEnabled(e.target.checked)}
+                        aria-label="Underline misspelled words as you type"
                       />
                     </label>
                     <p className="mt-2 text-xs text-ink-soft">
