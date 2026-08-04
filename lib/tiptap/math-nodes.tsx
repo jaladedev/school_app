@@ -224,6 +224,7 @@ function makeMathView(displayMode: boolean) {
           onMouseDown={() => setDragArmed(true)}
           onMouseUp={() => setDragArmed(false)}
           title="Drag to reorder (or click inside and press Alt+Up/Down)"
+          aria-label="Drag to reorder this math block, or click inside it and press Alt+Up or Alt+Down"
           data-drag-handle
           className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab select-none items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
         >

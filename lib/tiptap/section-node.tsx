@@ -92,6 +92,7 @@ function SectionView({
         <button
           type="button"
           title="Drag to reorder section (or click inside and press Alt+Up/Down)"
+          aria-label="Drag to reorder section, or click inside this section and press Alt+Up or Alt+Down"
           data-drag-handle
           onMouseDown={() => setDragArmed(true)}
           onMouseUp={() => setDragArmed(false)}
@@ -113,6 +114,7 @@ function SectionView({
         <button
           type="button"
           title="Duplicate section"
+          aria-label="Duplicate section"
           onClick={duplicate}
           className="min-w-[1.5rem] rounded px-1 py-0.5 text-sm text-ink-soft hover:bg-white"
         >
@@ -121,6 +123,7 @@ function SectionView({
         <button
           type="button"
           title="Delete section"
+          aria-label="Delete section"
           onClick={deleteNode}
           className="min-w-[1.5rem] rounded px-1 py-0.5 text-sm text-ink-soft hover:bg-white"
         >

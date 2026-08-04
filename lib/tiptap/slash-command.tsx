@@ -200,18 +200,27 @@ const SlashMenuList = forwardRef<
 
   if (items.length === 0) {
     return (
-      <div className="w-64 rounded-lg border border-rule bg-white p-3 text-sm text-ink-soft shadow-lg">
+      <div
+        role="status"
+        className="w-64 rounded-lg border border-rule bg-white p-3 text-sm text-ink-soft shadow-lg"
+      >
         No matching blocks
       </div>
     );
   }
 
   return (
-    <div className="max-h-72 w-64 overflow-y-auto rounded-lg border border-rule bg-white py-1 shadow-lg">
+    <div
+      role="listbox"
+      aria-label="Block type"
+      className="max-h-72 w-64 overflow-y-auto rounded-lg border border-rule bg-white py-1 shadow-lg"
+    >
       {items.map((item, i) => (
         <button
           key={item.title}
           type="button"
+          role="option"
+          aria-selected={i === selectedIndex}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onPick(item)}
           className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${

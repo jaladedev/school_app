@@ -80,7 +80,20 @@ const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
 };
 
 const DEFAULT_MERMAID = "flowchart TD\n  A[Start] --> B[End]";
-const TEXT_COLORS = ["#1f2937", "#475569", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#0891b2", "#2563eb", "#4f46e5", "#7c3aed", "#c026d3", "#db2777"];
+const TEXT_COLORS = [
+  "#1f2937",
+  "#475569",
+  "#dc2626",
+  "#ea580c",
+  "#ca8a04",
+  "#16a34a",
+  "#0891b2",
+  "#2563eb",
+  "#4f46e5",
+  "#7c3aed",
+  "#c026d3",
+  "#db2777",
+];
 
 // Starter templates for the "Generate Mermaid diagram" panel
 const DIAGRAM_TEMPLATES: { label: string; code: string }[] = [
@@ -165,6 +178,38 @@ export function NoteEditor({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [symbolPickerOpen, setSymbolPickerOpen] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [a11yMenuOpen, setA11yMenuOpen] = useState(false);
+  const a11yMenuRef = useRef<HTMLDivElement | null>(null);
+  // Note-reading accessibility prefs (#37) -- a per-browser display
+  // preference, not note content, so localStorage (not the DB) is the
+  // right home for it: it should follow "how this teacher likes to
+  // read/write," not travel with the note itself. Read lazily so SSR
+  // and the first client render agree (no window on the server).
+  const [fontScale, setFontScale] = useState<0.9 | 1 | 1.15 | 1.3>(() => {
+    if (typeof window === "undefined") return 1;
+    const saved = Number(window.localStorage.getItem("noteEditor:fontScale"));
+    return ([0.9, 1, 1.15, 1.3] as const).includes(saved as any)
+      ? (saved as 0.9 | 1 | 1.15 | 1.3)
+      : 1;
+  });
+  const [highContrast, setHighContrast] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("noteEditor:highContrast") === "1";
+  });
+  const [dyslexiaFont, setDyslexiaFont] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("noteEditor:dyslexiaFont") === "1";
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem("noteEditor:fontScale", String(fontScale));
+  }, [fontScale]);
+  useEffect(() => {
+    window.localStorage.setItem("noteEditor:highContrast", highContrast ? "1" : "0");
+  }, [highContrast]);
+  useEffect(() => {
+    window.localStorage.setItem("noteEditor:dyslexiaFont", dyslexiaFont ? "1" : "0");
+  }, [dyslexiaFont]);
   // Set only when the picker is opened via the slash command -- gives it a
   // cursor-anchored `position: fixed` spot instead of the toolbar-anchored
   // dropdown, so picking an emoji while typing deep in a long note doesn't
@@ -284,6 +329,11 @@ export function NoteEditor({
     // @ts-expect-error -- provided by the Markdown extension
     contentType: "markdown",
     editorProps: {
+      attributes: {
+        role: "textbox",
+        "aria-multiline": "true",
+        "aria-label": "Note content",
+      },
       handlePaste(_view, event) {
         const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
           f.type.startsWith("image/")
@@ -705,6 +755,17 @@ export function NoteEditor({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [colorPickerOpen]);
+
+  useEffect(() => {
+    if (!a11yMenuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (a11yMenuRef.current && !a11yMenuRef.current.contains(e.target as Node)) {
+        setA11yMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [a11yMenuOpen]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -1334,6 +1395,8 @@ export function NoteEditor({
           {/* Toolbar — hidden on mobile while previewing; always shown on desktop */}
           {!focusMode && (
             <div
+              role="toolbar"
+              aria-label="Note formatting"
               className={`mb-2 ${mobileTab === "preview" ? "hidden md:flex" : "flex"} flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper p-1`}
             >
               <button
@@ -1421,13 +1484,38 @@ export function NoteEditor({
                 </button>
                 {colorPickerOpen && (
                   <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-rule bg-white p-2 shadow-lg">
-                    <div className="mb-2 flex items-center justify-between px-0.5"><span className="text-xs font-medium text-ink">Text color</span><button type="button" onClick={() => { editor.chain().focus().unsetColor().run(); setColorPickerOpen(false); }} className="text-xs text-ink-soft hover:text-ink">Reset</button></div>
+                    <div className="mb-2 flex items-center justify-between px-0.5">
+                      <span className="text-xs font-medium text-ink">Text color</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          editor.chain().focus().unsetColor().run();
+                          setColorPickerOpen(false);
+                        }}
+                        className="text-xs text-ink-soft hover:text-ink"
+                      >
+                        Reset
+                      </button>
+                    </div>
                     <div className="grid grid-cols-4 gap-1.5">
                       {TEXT_COLORS.map((color) => {
                         const selected = editor.getAttributes("textStyle").color === color;
-                        return <button key={color} type="button" aria-label={`Set text color to ${color}`} title={color} onClick={() => { editor.chain().focus().setColor(color).run(); setColorPickerOpen(false); }} className={`flex h-7 w-7 items-center justify-center rounded-full border-2 ${selected ? "border-ink ring-2 ring-marigold/40" : "border-white hover:border-rule"}`} style={{ backgroundColor: color }}>
-                          {selected && <span className="text-xs font-bold text-white">✓</span>}
-                        </button>;
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            aria-label={`Set text color to ${color}`}
+                            title={color}
+                            onClick={() => {
+                              editor.chain().focus().setColor(color).run();
+                              setColorPickerOpen(false);
+                            }}
+                            className={`flex h-7 w-7 items-center justify-center rounded-full border-2 ${selected ? "border-ink ring-2 ring-marigold/40" : "border-white hover:border-rule"}`}
+                            style={{ backgroundColor: color }}
+                          >
+                            {selected && <span className="text-xs font-bold text-white">✓</span>}
+                          </button>
+                        );
                       })}
                     </div>
                   </div>
@@ -1740,6 +1828,73 @@ export function NoteEditor({
               >
                 /
               </button>
+              <span className="mx-1 h-4 w-px bg-rule" />
+              <div className="relative" ref={a11yMenuRef}>
+                <button
+                  type="button"
+                  title="Reading & accessibility options"
+                  aria-label="Reading and accessibility options"
+                  aria-haspopup="true"
+                  aria-expanded={a11yMenuOpen}
+                  onClick={() => setA11yMenuOpen((open) => !open)}
+                  className={`min-w-[2rem] rounded-md px-2 py-1 text-sm font-medium hover:bg-white ${a11yMenuOpen ? "bg-white" : ""}`}
+                >
+                  Aa
+                </button>
+                {a11yMenuOpen && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-lg border border-rule bg-white p-3 text-sm shadow-lg">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                      Text size
+                    </p>
+                    <div
+                      className="mb-3 flex items-center gap-1"
+                      role="group"
+                      aria-label="Text size"
+                    >
+                      {([0.9, 1, 1.15, 1.3] as const).map((scale, i) => (
+                        <button
+                          key={scale}
+                          type="button"
+                          aria-pressed={fontScale === scale}
+                          aria-label={["Small", "Normal", "Large", "Extra large"][i] + " text"}
+                          onClick={() => setFontScale(scale)}
+                          style={{ fontSize: `${0.75 + i * 0.1}rem` }}
+                          className={`flex-1 rounded-md border px-2 py-1 ${
+                            fontScale === scale
+                              ? "border-marigold bg-marigold/15 font-semibold text-ink"
+                              : "border-rule text-ink-soft hover:bg-paper"
+                          }`}
+                        >
+                          A
+                        </button>
+                      ))}
+                    </div>
+
+                    <label className="mb-2 flex items-center justify-between gap-2">
+                      <span>High contrast</span>
+                      <input
+                        type="checkbox"
+                        checked={highContrast}
+                        onChange={(e) => setHighContrast(e.target.checked)}
+                        aria-label="High contrast note text"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between gap-2">
+                      <span>Dyslexia-friendly font</span>
+                      <input
+                        type="checkbox"
+                        checked={dyslexiaFont}
+                        onChange={(e) => setDyslexiaFont(e.target.checked)}
+                        aria-label="Use dyslexia-friendly font"
+                      />
+                    </label>
+                    <p className="mt-2 text-xs text-ink-soft">
+                      These only change how the note looks to you — nothing here is saved into the
+                      note.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1765,7 +1920,11 @@ export function NoteEditor({
                 shift: { boundary: noteContainerRef.current ?? "clippingAncestors", padding: 8 },
               }}
             >
-              <div className="flex flex-wrap items-center gap-0.5 rounded-xl border border-rule/70 bg-white p-1.5 shadow-lg shadow-ink/10 ring-1 ring-ink/5">
+              <div
+                role="toolbar"
+                aria-label="Table formatting"
+                className="flex flex-wrap items-center gap-0.5 rounded-xl border border-rule/70 bg-white p-1.5 shadow-lg shadow-ink/10 ring-1 ring-ink/5"
+              >
                 <span className="px-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
                   Table
                 </span>
@@ -1894,11 +2053,18 @@ export function NoteEditor({
                 shift: { boundary: noteContainerRef.current ?? "clippingAncestors", padding: 8 },
               }}
             >
-              <div className="flex items-center gap-1 rounded-lg border border-rule bg-white px-1 py-1 shadow-lg">
+              <div
+                role="toolbar"
+                aria-label="Text formatting"
+                className="flex items-center gap-1 rounded-lg border border-rule bg-white px-1 py-1 shadow-lg"
+              >
                 <button
                   type="button"
                   onClick={() => editor.chain().focus().toggleBold().run()}
                   className="rounded px-2 py-1 text-sm font-semibold hover:bg-paper"
+                  title="Bold (Ctrl/Cmd+B)"
+                  aria-label="Bold"
+                  aria-pressed={editor.isActive("bold")}
                 >
                   B
                 </button>
@@ -1906,6 +2072,9 @@ export function NoteEditor({
                   type="button"
                   onClick={() => editor.chain().focus().toggleItalic().run()}
                   className="rounded px-2 py-1 text-sm italic hover:bg-paper"
+                  title="Italic (Ctrl/Cmd+I)"
+                  aria-label="Italic"
+                  aria-pressed={editor.isActive("italic")}
                 >
                   I
                 </button>
@@ -1913,6 +2082,9 @@ export function NoteEditor({
                   type="button"
                   onClick={() => editor.chain().focus().toggleUnderline().run()}
                   className="rounded px-2 py-1 text-sm underline hover:bg-paper"
+                  title="Underline (Ctrl/Cmd+U)"
+                  aria-label="Underline"
+                  aria-pressed={editor.isActive("underline")}
                 >
                   U
                 </button>
@@ -1921,6 +2093,7 @@ export function NoteEditor({
                   onClick={() => editor.chain().focus().toggleHighlight().run()}
                   className={`rounded px-2 py-1 text-sm hover:bg-paper ${editor.isActive("highlight") ? "bg-paper" : ""}`}
                   title="Highlight"
+                  aria-label="Highlight"
                 >
                   ▧
                 </button>
@@ -1929,6 +2102,7 @@ export function NoteEditor({
                   onClick={promptForLink}
                   className="rounded px-2 py-1 text-sm hover:bg-paper"
                   title="Link (Ctrl/Cmd+K)"
+                  aria-label="Link (Ctrl/Cmd+K)"
                 >
                   🔗
                 </button>
@@ -1941,7 +2115,10 @@ export function NoteEditor({
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            style={{ "--note-font-size": `${fontScale}rem` } as React.CSSProperties}
             className={`topic-prose relative min-h-[24rem] bg-white p-4 ${
+              highContrast ? "a11y-high-contrast" : ""
+            } ${dyslexiaFont ? "a11y-dyslexia-font" : ""} ${
               focusMode
                 ? "mx-auto mt-10 max-w-4xl rounded-lg border border-rule shadow-sm"
                 : `rounded-lg border ${isDraggingFile ? "border-2 border-dashed border-marigold bg-marigold/10" : "border-rule"}`

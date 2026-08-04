@@ -269,6 +269,8 @@ function MermaidNodeView({
         onMouseDown={() => setDragArmed(true)}
         onMouseUp={() => setDragArmed(false)}
         title="Drag to reorder"
+        aria-label="Drag to reorder this resource. Keyboard reordering isn't available for resources yet."
+        role="button"
         data-drag-handle
         className="absolute -left-6 top-2 hidden h-6 w-6 cursor-grab items-center justify-center rounded text-ink-soft hover:bg-paper active:cursor-grabbing group-hover:flex"
       >
@@ -301,6 +303,7 @@ function MermaidNodeView({
               type="button"
               onClick={startEditing}
               title="Edit this diagram's code"
+              aria-label="Edit this diagram's code"
               className="rounded-full border border-rule bg-white px-2 py-1 text-xs text-ink shadow hover:border-marigold"
             >
               Edit
@@ -309,6 +312,7 @@ function MermaidNodeView({
               type="button"
               onClick={() => setConfirmingRemove(true)}
               title="Remove diagram from note"
+              aria-label="Remove diagram from note"
               className="rounded-full border border-rule bg-white px-2 py-1 text-xs text-clay shadow hover:border-clay/40"
             >
               Remove
@@ -388,6 +392,8 @@ function ImageNodeView({
           onMouseDown={() => setDragArmed(true)}
           onMouseUp={() => setDragArmed(false)}
           title="Drag to reorder"
+          aria-label="Drag to reorder this resource. Keyboard reordering isn't available for resources yet."
+          role="button"
           data-drag-handle
           className="pointer-events-auto ml-1 inline-flex cursor-grab select-none items-center rounded-full border border-rule bg-white px-1.5 py-0.5 text-xs text-ink-soft shadow active:cursor-grabbing"
         >
@@ -441,6 +447,7 @@ function ImageNodeView({
               <button
                 type="button"
                 title="Remove from note"
+                aria-label="Remove from note"
                 onClick={() => setConfirmingRemove(true)}
                 className="rounded px-1.5 py-0.5 text-clay hover:bg-clay/10"
               >
@@ -556,6 +563,8 @@ function ResourceChipDefaultView({
         onMouseUp={() => setDragArmed(false)}
         contentEditable={false}
         title="Drag to reorder"
+        aria-label="Drag to reorder this resource. Keyboard reordering isn't available for resources yet."
+        role="button"
         data-drag-handle
         className="mr-0.5 inline-flex cursor-grab select-none items-center text-xs text-ink-soft/60 hover:text-ink-soft active:cursor-grabbing"
       >

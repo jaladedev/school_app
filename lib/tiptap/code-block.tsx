@@ -97,6 +97,7 @@ function CodeBlockView({
             onMouseDown={() => setDragArmed(true)}
             onMouseUp={() => setDragArmed(false)}
             title="Drag to reorder (or click inside and press Alt+Up/Down)"
+            aria-label="Drag to reorder this code block, or click inside it and press Alt+Up or Alt+Down"
             data-drag-handle
             className="cursor-grab select-none rounded px-0.5 text-sm text-white/50 hover:text-white/80 active:cursor-grabbing"
           >

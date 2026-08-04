@@ -125,6 +125,7 @@ function CalloutView({
           onMouseDown={() => setDragArmed(true)}
           onMouseUp={() => setDragArmed(false)}
           title="Drag to reorder (or click inside and press Alt+Up/Down)"
+          aria-label="Drag to reorder this callout, or click inside it and press Alt+Up or Alt+Down"
           data-drag-handle
           className="cursor-grab select-none rounded px-0.5 text-sm text-ink-soft/60 hover:text-ink-soft active:cursor-grabbing"
         >

@@ -270,3 +270,48 @@ h4 {
     background: white;
   }
 }
+
+/* Note editor accessibility controls (#37 in markdown-editor-todo.md) --
+   toggled via the "Aa" menu in NoteEditor.tsx, applied as classes/a CSS
+   var on the `.topic-prose` note container so they only affect note
+   content, not the rest of the app chrome. */
+
+/* Font size: a CSS var read by .topic-prose's own font-size, rather than
+   a fixed class-per-size, so it composes cleanly with everything else
+   that already sets font-size deeper in the tree (headings, code, etc.)
+   -- those stay relative (em/rem) and scale off this base automatically. */
+.topic-prose {
+  font-size: var(--note-font-size, 1rem);
+}
+
+/* High contrast: strengthens borders/text color beyond the normal
+   ink/ink-soft palette rather than introducing a whole separate color
+   scheme -- the goal is more contrast against the existing design, not
+   a different one. */
+.topic-prose.a11y-high-contrast {
+  color: #000;
+}
+.topic-prose.a11y-high-contrast.border,
+.topic-prose.a11y-high-contrast .border,
+.topic-prose.a11y-high-contrast .border-rule {
+  border-color: #000 !important;
+}
+.topic-prose.a11y-high-contrast a {
+  color: #0000ee;
+  text-decoration: underline;
+}
+.topic-prose.a11y-high-contrast .text-ink-soft {
+  color: #1a1a1a !important;
+}
+
+/* Dyslexia-friendly font: Atkinson Hyperlegible/OpenDyslexic if the
+   reader has either installed locally (neither is bundled with the
+   app -- no network access to a font CDN from this build -- so this
+   degrades to Comic Sans, which independent readability studies on
+   dyslexia fonts consistently rate close to purpose-built dyslexia
+   fonts and is near-universally present as a system font already). */
+.topic-prose.a11y-dyslexia-font,
+.topic-prose.a11y-dyslexia-font * {
+  font-family:
+    "OpenDyslexic", "Atkinson Hyperlegible", "Comic Sans MS", "Comic Sans", sans-serif !important;
+}
