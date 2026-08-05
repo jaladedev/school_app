@@ -217,6 +217,14 @@ type NoteEditorProps = {
   // this up.
   mobileTab?: MobileTab;
   onMobileTabChange?: (tab: MobileTab) => void;
+  // #11 Better Preview: a desktop-visible, always-on read view, distinct
+  // from the mobile-only Write/Preview tab bar above. NoteWorkspace owns
+  // the mode switch (Edit/Preview/Present) and sets this when the
+  // teacher picks "Preview" -- forces the same setEditable(false) the
+  // mobile tab already used, but regardless of breakpoint, and hides the
+  // toolbar/search/mobile-tab-bar chrome that a read-only view has no use
+  // for instead of leaving them clickable over a non-editable doc.
+  forcePreview?: boolean;
 };
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
@@ -231,6 +239,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     onResourcesChange,
     mobileTab: controlledMobileTab,
     onMobileTabChange,
+    forcePreview = false,
   },
   ref
 ) {
@@ -698,8 +707,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   // `topic-prose` div's className below) so the sidebar NoteWorkspace
   // renders alongside this component can take its place on a small screen.
   useEffect(() => {
-    editor?.setEditable(mobileTab !== "preview");
-  }, [editor, mobileTab]);
+    editor?.setEditable(!forcePreview && mobileTab !== "preview");
+  }, [editor, mobileTab, forcePreview]);
 
   function computeNoteStats(ed: NonNullable<typeof editor>) {
     let headings = 0;
@@ -1791,7 +1800,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
             </section>
           )}
 
-          {!focusMode && (
+          {!focusMode && !forcePreview && (
             <div className="mb-2 flex gap-1 rounded-lg border border-rule bg-paper p-1 md:hidden">
               <button
                 type="button"
@@ -1817,8 +1826,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
             </div>
           )}
 
-          {/* Toolbar — hidden on mobile except while actually writing; always shown on desktop */}
-          {!focusMode && (
+          {/* Toolbar — hidden on mobile except while actually writing; always shown on desktop, unless forcePreview (#11) turns this into a pure read view */}
+          {!focusMode && !forcePreview && (
             <div
               role="toolbar"
               aria-label="Note formatting"

@@ -31,7 +31,15 @@ export function NoteWorkspace({
   placeholder?: string;
   todaysEntries?: BellTimerEntry[];
 }) {
-  const [mode, setMode] = useState<"edit" | "present">("edit");
+  // #11 Better Preview: "preview" renders the same live NoteEditor/TipTap
+  // doc as "edit" (so it always reflects the current, possibly-unsaved
+  // draft -- unlike "present", which deliberately shows only the
+  // last-saved version), just with forcePreview turning off editability
+  // and hiding the toolbar/mobile-tab chrome. Kept as a sibling of "edit"
+  // rather than a NoteEditor-internal-only concept so it's a real,
+  // desktop-visible mode in this top pill, not just the mobile-only
+  // Write/Preview tab bar NoteEditor already had.
+  const [mode, setMode] = useState<"edit" | "preview" | "present">("edit");
   const editorRef = useRef<NoteEditorHandle>(null);
   // Seeded from the server-fetched `resources` prop, then kept live by
   // NoteEditor's `onResourcesChange` callback -- so the sidebar reflects
@@ -61,6 +69,15 @@ export function NoteWorkspace({
         </button>
         <button
           type="button"
+          onClick={() => setMode("preview")}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+            mode === "preview" ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"
+          }`}
+        >
+          Preview
+        </button>
+        <button
+          type="button"
           onClick={() => setMode("present")}
           disabled={!noteId}
           title={!noteId ? "Save the note once before presenting" : undefined}
@@ -80,7 +97,7 @@ export function NoteWorkspace({
           (e.g. resource lists only refresh after a save triggers
           revalidatePath), rather than introducing a second, editor-only
           notion of "current content". */}
-      {mode === "edit" ? (
+      {mode === "edit" || mode === "preview" ? (
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className="min-w-0 flex-1">
             <NoteEditor
@@ -95,11 +112,17 @@ export function NoteWorkspace({
               onResourcesChange={setSidebarResources}
               mobileTab={mobileTab}
               onMobileTabChange={setMobileTab}
+              forcePreview={mode === "preview"}
             />
           </div>
-          <div className={mobileTab === "resources" ? "block" : "hidden lg:block"}>
-            <ResourceSidebar resources={sidebarResources} editorRef={editorRef} />
-          </div>
+          {/* Resource sidebar has nothing to do in a read-only Preview --
+              inserting resources requires an editable doc -- so it's
+              edit-only, same as the toolbar it pairs with. */}
+          {mode === "edit" && (
+            <div className={mobileTab === "resources" ? "block" : "hidden lg:block"}>
+              <ResourceSidebar resources={sidebarResources} editorRef={editorRef} />
+            </div>
+          )}
         </div>
       ) : (
         <>
