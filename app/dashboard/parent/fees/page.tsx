@@ -9,7 +9,7 @@ import { formatKobo, type InvoiceStatus, type PaymentMethod } from "@/types/data
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-leaf-soft text-leaf",
-  partial: "bg-marigold/20 text-marigold-dark",
+  partial: "bg-marigold/20 text-marigold-text",
   unpaid: "bg-clay/10 text-clay",
 };
 

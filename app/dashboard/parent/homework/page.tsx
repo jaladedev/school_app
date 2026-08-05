@@ -52,7 +52,7 @@ export default async function ParentHomeworkPage({
                       ? "bg-sky-100 text-sky-800"
                       : l.homework_status === "reviewed"
                         ? "bg-leaf-soft text-leaf"
-                        : "bg-marigold/20 text-marigold-dark"
+                        : "bg-marigold/20 text-marigold-text"
                   }`}
                 >
                   {l.homework_status === "graded"

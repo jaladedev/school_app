@@ -157,7 +157,7 @@ export function PromoteStudentsForm({
       )}
 
       {outcome === "graduate" && (
-        <p className="rounded-lg bg-marigold/10 p-3 text-sm text-marigold-dark">
+        <p className="rounded-lg bg-marigold/10 p-3 text-sm text-marigold-text">
           Graduating removes these students from any class. There&apos;s currently no separate
           &quot;alumni&quot; status — this just clears their class assignment.
         </p>

@@ -54,7 +54,7 @@ export default async function ParentAttendancePage({
           <p className="text-xs text-ink-soft">Absent</p>
         </div>
         <div className="rounded-lg border border-rule bg-white p-4 text-center">
-          <p className="font-display text-xl font-semibold text-marigold-dark">{summary.late}</p>
+          <p className="font-display text-xl font-semibold text-marigold-text">{summary.late}</p>
           <p className="text-xs text-ink-soft">Late</p>
         </div>
         <div className="rounded-lg border border-rule bg-white p-4 text-center">

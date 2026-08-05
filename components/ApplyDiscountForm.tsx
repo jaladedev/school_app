@@ -56,7 +56,7 @@ export function ApplyDiscountForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-xs font-medium text-marigold-dark hover:underline"
+        className="text-xs font-medium text-marigold-text hover:underline"
       >
         {currentDiscountKobo > 0 ? "Edit scholarship/discount" : "Apply scholarship/discount"}
       </button>

@@ -79,7 +79,7 @@ export function ClassRow({
             {periodsPerWeek} period{periodsPerWeek === 1 ? "" : "s"}/week
           </>
         ) : (
-          <span className="text-marigold-dark">Not scheduled yet</span>
+          <span className="text-marigold-text">Not scheduled yet</span>
         )}
       </p>
 

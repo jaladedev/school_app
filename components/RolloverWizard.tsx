@@ -178,7 +178,7 @@ export function RolloverWizard({ preview }: { preview: RolloverPreview }) {
   // Step 2: per-class review/edit, then confirm.
   return (
     <div>
-      <div className="mb-4 rounded-lg bg-marigold/10 px-4 py-3 text-sm text-marigold-dark">
+      <div className="mb-4 rounded-lg bg-marigold/10 px-4 py-3 text-sm text-marigold-text">
         Moving to <strong>{nextAcademicYear}</strong>, Term 1
         {nextTermStartDate ? ` starting ${nextTermStartDate}` : ""}. Review each class below, then
         confirm.

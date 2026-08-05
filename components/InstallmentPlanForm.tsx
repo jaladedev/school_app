@@ -106,7 +106,7 @@ export function InstallmentPlanForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-xs font-medium text-marigold-dark hover:underline"
+        className="text-xs font-medium text-marigold-text hover:underline"
       >
         {hasExistingPlan ? "Edit installment plan" : "Set up installment plan"}
       </button>

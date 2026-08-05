@@ -355,6 +355,44 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const [currentNoteId, setCurrentNoteId] = useState(noteId);
   useEffect(() => setCurrentNoteId(noteId), [noteId]);
 
+  // Mutex for the "no note exists yet" window. handleSave (first save)
+  // and ensureNoteId (drag-drop resource insert / diagram generation) can
+  // both fire while currentNoteId is still null -- e.g. a teacher drags a
+  // file in at the exact moment they click "Save draft". Without this,
+  // both paths independently call saveTopicNote and, since notes are
+  // append-only, that creates two brand-new rows instead of one. Whoever
+  // gets here first performs the actual insert and stores the in-flight
+  // promise here; whoever arrives second just awaits it and reuses the
+  // resulting id instead of racing a duplicate insert.
+  const pendingNoteCreationRef = useRef<Promise<string> | null>(null);
+
+  async function createFirstNoteIfNeeded(
+    content: string,
+    status: "draft" | "published"
+  ): Promise<{ id: string; createdHere: boolean }> {
+    if (currentNoteId) return { id: currentNoteId, createdHere: false };
+    if (pendingNoteCreationRef.current) {
+      const id = await pendingNoteCreationRef.current;
+      return { id, createdHere: false };
+    }
+    const creation = (async () => {
+      const note = await saveTopicNote(topicId, content, status);
+      if (!note?.id) throw new Error("Could not create the note.");
+      return note.id;
+    })();
+    pendingNoteCreationRef.current = creation;
+    try {
+      const id = await creation;
+      setCurrentNoteId(id);
+      return { id, createdHere: true };
+    } finally {
+      // Only clear once this call's own creation settles -- concurrent
+      // callers already captured the same promise reference above and
+      // will resolve from it regardless of when this ref is cleared.
+      pendingNoteCreationRef.current = null;
+    }
+  }
+
   const [localResources, setLocalResources] = useState(resources);
   // NOT a plain `setLocalResources(resources)` -- ensureNoteId() calls
   // router.refresh() when it creates the note (e.g. the first thing
@@ -828,24 +866,48 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     const isFirstSave = !currentNoteId;
     startTransition(async () => {
       try {
-        const note = await saveTopicNote(topicId, content, status);
-        // Not `if (isFirstSave)` -- notes are append-only (see
-        // saveTopicNote's own comment: "publishing a revision never
-        // overwrites an earlier draft or published copy"), so *every*
-        // save inserts a brand-new row with a brand-new id, not just the
-        // first. Any resource created after this point goes through
-        // ensureNoteId(), which returns currentNoteId as-is if it's
-        // already set -- so a stale id here silently attaches every
-        // subsequent diagram/upload to a superseded note version. The
-        // page always queries the *latest* version's resources
-        // (`.eq("note_id", note.id)` in page.tsx, intentionally scoped
-        // per note version, not per topic), so a resource attached to a
-        // stale id becomes permanently invisible the moment a newer
-        // version exists -- not just "not refreshed yet", genuinely
-        // orphaned in the database. This was the real cause of
-        // resources -- including ones from well before this session --
-        // silently disappearing after any second save.
-        if (note?.id) setCurrentNoteId(note.id);
+        let noteId: string;
+        if (isFirstSave) {
+          // Route the "note doesn't exist yet" case through the shared
+          // mutex -- a concurrent ensureNoteId() call (drag-drop insert,
+          // diagram generation) may already be creating it.
+          const result = await createFirstNoteIfNeeded(content, status);
+          noteId = result.id;
+          if (!result.createdHere) {
+            // Someone else's concurrent call performed the actual insert
+            // (e.g. a dropped file's ensureNoteId(), which always saves as
+            // "draft"). If this click specifically asked for something
+            // else -- a real "Publish" -- apply it as a normal follow-up
+            // revision now that a note exists, so the requested status
+            // isn't silently lost. No race here: currentNoteId is set by
+            // this point, so this goes through the ordinary append-only
+            // path, not another first-save race.
+            if (status === "published") {
+              const note = await saveTopicNote(topicId, content, status);
+              if (note?.id) noteId = note.id;
+            }
+          }
+        } else {
+          // Not `if (isFirstSave)` -- notes are append-only (see
+          // saveTopicNote's own comment: "publishing a revision never
+          // overwrites an earlier draft or published copy"), so *every*
+          // save inserts a brand-new row with a brand-new id, not just the
+          // first. Any resource created after this point goes through
+          // ensureNoteId(), which returns currentNoteId as-is if it's
+          // already set -- so a stale id here silently attaches every
+          // subsequent diagram/upload to a superseded note version. The
+          // page always queries the *latest* version's resources
+          // (`.eq("note_id", note.id)` in page.tsx, intentionally scoped
+          // per note version, not per topic), so a resource attached to a
+          // stale id becomes permanently invisible the moment a newer
+          // version exists -- not just "not refreshed yet", genuinely
+          // orphaned in the database. This was the real cause of
+          // resources -- including ones from well before this session --
+          // silently disappearing after any second save.
+          const note = await saveTopicNote(topicId, content, status);
+          noteId = note?.id ?? currentNoteId!;
+        }
+        setCurrentNoteId(noteId);
         setLastSavedContent(content);
         setLastSavedAt(new Date());
         setIsDirty(false);
@@ -864,14 +926,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   async function ensureNoteId(): Promise<string> {
     if (currentNoteId) return currentNoteId;
     if (!editor) throw new Error("Editor isn't ready yet.");
-    const note = await saveTopicNote(topicId, getMarkdown(), "draft");
-    if (!note?.id) throw new Error("Could not create the note.");
-    setCurrentNoteId(note.id);
-    setLastSavedContent(getMarkdown());
-    setLastSavedAt(new Date());
-    setIsDirty(false);
-    router.refresh();
-    return note.id;
+    const { id, createdHere } = await createFirstNoteIfNeeded(getMarkdown(), "draft");
+    if (createdHere) {
+      setLastSavedContent(getMarkdown());
+      setLastSavedAt(new Date());
+      setIsDirty(false);
+      router.refresh();
+    }
+    return id;
   }
 
   async function handleInsertVideoEmbed() {

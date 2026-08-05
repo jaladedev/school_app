@@ -94,7 +94,7 @@ export default function HomePage() {
           </p>
         </div>
         <div>
-          <p className="mb-2 font-mono text-xs uppercase tracking-widest text-marigold-dark">
+          <p className="mb-2 font-mono text-xs uppercase tracking-widest text-marigold-text">
             For administrators
           </p>
           <h2 className="mb-2 font-display text-xl font-semibold text-ink">

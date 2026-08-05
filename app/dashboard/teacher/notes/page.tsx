@@ -164,7 +164,7 @@ export default async function TeacherNotesPage({
                   status === "published"
                     ? "bg-leaf-soft text-leaf"
                     : status === "draft"
-                      ? "bg-marigold/20 text-marigold-dark"
+                      ? "bg-marigold/20 text-marigold-text"
                       : "bg-paper text-ink-soft"
                 }`}
               >

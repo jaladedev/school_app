@@ -51,7 +51,7 @@ export function HomeworkSubmissionUpload({
             <p className="text-xs font-medium text-ink">Submitted: {existing.fileName}</p>
             <span
               className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                reviewed ? "bg-leaf-soft text-leaf" : "bg-marigold/20 text-marigold-dark"
+                reviewed ? "bg-leaf-soft text-leaf" : "bg-marigold/20 text-marigold-text"
               }`}
             >
               {reviewed ? "Reviewed" : "Awaiting review"}

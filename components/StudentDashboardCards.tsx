@@ -102,7 +102,7 @@ export async function StudentDashboardCards() {
               : attendancePercent >= 90
                 ? "text-leaf"
                 : attendancePercent >= 75
-                  ? "text-marigold-dark"
+                  ? "text-marigold-text"
                   : "text-clay"
           }`}
         >

@@ -199,7 +199,7 @@ export default async function TeacherNoteEditPage({
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <p className="text-xs font-medium">
             {note.moderation_status === "pending" && (
-              <span className="rounded-full bg-marigold/20 px-2.5 py-1 text-marigold-dark">
+              <span className="rounded-full bg-marigold/20 px-2.5 py-1 text-marigold-text">
                 Awaiting HOD review — not visible to students yet
               </span>
             )}

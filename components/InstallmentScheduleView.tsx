@@ -37,7 +37,7 @@ export function InstallmentScheduleView({
               Overdue · {formatKobo(inst.remainingKobo)} due
             </span>
           ) : (
-            <span className="rounded-full bg-marigold/20 px-2 py-0.5 font-medium text-marigold-dark">
+            <span className="rounded-full bg-marigold/20 px-2 py-0.5 font-medium text-marigold-text">
               {formatKobo(inst.remainingKobo)} due
             </span>
           )}

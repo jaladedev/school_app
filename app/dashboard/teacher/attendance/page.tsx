@@ -123,7 +123,7 @@ export default async function AttendanceLandingPage({
         </div>
         <span
           className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-            marked ? "bg-leaf-soft text-leaf" : "bg-marigold/20 text-marigold-dark"
+            marked ? "bg-leaf-soft text-leaf" : "bg-marigold/20 text-marigold-text"
           }`}
         >
           {marked ? "Marked" : "Pending"}

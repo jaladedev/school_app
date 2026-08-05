@@ -35,7 +35,7 @@ export function HomeworkStatusToggle({
           ? "bg-sky-100 text-sky-800 hover:bg-sky-200"
           : status === "reviewed"
             ? "bg-leaf-soft text-leaf hover:bg-leaf/20"
-            : "bg-marigold/20 text-marigold-dark hover:bg-marigold/30"
+            : "bg-marigold/20 text-marigold-text hover:bg-marigold/30"
       }`}
     >
       {isPending ? "..." : label}

@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/EmptyState";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-leaf-soft text-leaf",
-  partial: "bg-marigold/20 text-marigold-dark",
+  partial: "bg-marigold/20 text-marigold-text",
   unpaid: "bg-clay/10 text-clay",
 };
 
@@ -197,7 +197,7 @@ export default async function BursarInvoicesPage({
                     <p className="text-xs text-clay">{formatKobo(balance)} outstanding</p>
                   )}
                   {!isVoided && inv.discount_kobo > 0 && (
-                    <p className="text-xs text-marigold-dark">
+                    <p className="text-xs text-marigold-text">
                       {formatKobo(inv.discount_kobo)} discount applied
                     </p>
                   )}

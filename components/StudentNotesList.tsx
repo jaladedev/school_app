@@ -2,7 +2,7 @@ import type { StudentNoteType } from "@/types/database";
 
 const TYPE_STYLES: Record<StudentNoteType, string> = {
   academic: "bg-leaf-soft text-leaf",
-  behavioral: "bg-marigold/20 text-marigold-dark",
+  behavioral: "bg-marigold/20 text-marigold-text",
   commendation: "bg-leaf-soft text-leaf",
   disciplinary: "bg-clay/10 text-clay",
 };
