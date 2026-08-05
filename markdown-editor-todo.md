@@ -265,15 +265,15 @@ TipTap ships common ones (Ctrl+B/I/U) by default — mostly free with migration.
 
 The editor toolbar now has a real browser Fullscreen toggle (`requestFullscreen`), with an exit state and normal Escape support. Focus mode remains the separate distraction-free dashboard overlay.
 
-## 32. Mobile Optimization — FIXED
+## 32. Mobile Optimization — DONE
 
-Write/Preview tabs (`mobileTab` state, tab buttons, `md:hidden` toggle bar) were deleted with no replacement in the "Word Statistics" commit (`e154cea`) — restored, and improved beyond the original: the old toggle was cosmetic-only (toolbar stayed visible, content stayed editable regardless of tab). Now `editor.setEditable(mobileTab !== "preview")` makes Preview an actual read view, and the toolbar hides on mobile while previewing (`hidden md:flex`). Desktop is unaffected since the toggle bar itself is `md:hidden`. Resources tab (from the original "Write / Preview / Resources" scope) still not built.
+Write/Preview tabs (`mobileTab` state, tab buttons, `md:hidden` toggle bar) were deleted with no replacement in the "Word Statistics" commit (`e154cea`) — restored, and improved beyond the original: the old toggle was cosmetic-only (toolbar stayed visible, content stayed editable regardless of tab). Now `editor.setEditable(mobileTab !== "preview")` makes Preview an actual read view, and the toolbar hides on mobile while previewing (`hidden md:flex`). Desktop is unaffected since the toggle bar itself is `md:hidden`.
 
-## 33. Resource Sidebar
+**Resources tab (final gap from the original "Write / Preview / Resources" scope) — done.** `NoteEditor`'s mobile tab state (`"write" | "preview" | "resources"`) is now controllable from its parent (falls back to internal state if unwired, so it still works standalone) and NoteWorkspace lifts it, since the actual Resources content is `ResourceSidebar` — a sibling of `NoteEditor`, not a child. Selecting the tab hides `NoteEditor`'s own toolbar+content area on mobile (same `hidden md:block` pattern as the existing Write/Preview toggle, without unmounting the TipTap instance) while `ResourceSidebar` becomes visible in its place; at `lg`+ the sidebar stays visible side-by-side regardless of tab, unchanged from before.
 
-Currently: resources listed via `TopicResourceList`, inserted via a dropdown picker — not a persistent sidebar.
+## 33. Resource Sidebar — DONE
 
-- Convert to persistent sidebar with one-click insertion (ties into #6 Resource Node)
+`ResourceSidebar.tsx` replaces the old below-the-editor `TopicResourceUpload` + `TopicResourceList` pairing with a persistent sidebar (`NoteWorkspace.tsx`). Clicking a resource inserts it at the cursor in one click via `editorRef.current.insertResource(resource)` (ties into #6's Resource Node), instead of going through the toolbar's "Insert resource" dropdown. Also handles drag-and-drop + file-picker upload directly in the sidebar, reusing `NoteEditor`'s own `uploadFiles`/`uploadDroppedFiles` pipeline rather than duplicating it. Takes the live, session-merged resource list (via `NoteWorkspace`'s `onResourcesChange`), so a resource created this session (new upload, new Mermaid diagram) shows up immediately without a page reload.
 
 ## 34. Drag-and-Drop Reordering — DONE
 
@@ -328,7 +328,7 @@ Not really an editor feature (no TipTap/node-view work involved) — logged here
 5. ~~#8 slash commands, #17 callouts~~ — DONE. #15 learning objectives SUSPENDED, skip
 6. ~~#13 autosave~~ — DONE. ~~#28 word stats~~ — DONE. ~~#12 resizable panes~~ — NOT NEEDED (no split pane exists post-migration)
 7. ~~#10 block-based editing~~ — V1 DONE (see status above for what's deferred). ~~#34 drag-and-drop reordering~~ — DONE, all four (sections/images/resources/activities) confirmed working, no gaps left.
-8. ~~#30 Focus Mode~~ — DONE (upstream). ~~#31 Fullscreen Editing~~ — DONE (upstream). ~~#37 Accessibility~~ — DONE (this session: keyboard reordering for all draggable node types including ResourceChip, screen-reader labeling across the toolbar/bubble-menus/slash-command/EmojiPicker/SymbolPicker, adjustable font size/high contrast/dyslexia font, and ARIA landmark roles -- see #37's entry above for the full breakdown and what's still open for a future pass). Everything else (#20–24, #26, #27, #32–33, #35, #36) is lower priority and additive -- new Node types or standalone features rather than gaps in what's shipped. No single obvious NEXT among them; pick based on what's actually being asked for next rather than working strictly down the list.
+8. ~~#30 Focus Mode~~ — DONE (upstream). ~~#31 Fullscreen Editing~~ — DONE (upstream). ~~#37 Accessibility~~ — DONE (this session: keyboard reordering for all draggable node types including ResourceChip, screen-reader labeling across the toolbar/bubble-menus/slash-command/EmojiPicker/SymbolPicker, adjustable font size/high contrast/dyslexia font, and ARIA landmark roles -- see #37's entry above for the full breakdown and what's still open for a future pass). ~~#33 Resource Sidebar~~ — DONE (upstream, `ResourceSidebar.tsx`). ~~#32 Mobile Optimization~~ — DONE (this session: Resources tab, the last gap from the original Write/Preview/Resources scope). Everything else (#20–24, #26, #27, #35, #36) is lower priority and additive -- new Node types or standalone features rather than gaps in what's shipped. No single obvious NEXT among them; pick based on what's actually being asked for next rather than working strictly down the list.
 
 ## Before building, verify these already exist
 

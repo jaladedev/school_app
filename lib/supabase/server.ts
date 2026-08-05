@@ -1,9 +1,58 @@
+import { cache } from "react";
+import { Agent } from "undici";
 import { createServerClient } from "@supabase/ssr";
 import { isAuthRetryableFetchError, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { Database } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
-import { ipv4Fetch } from "@/lib/supabase/ipv4-fetch";
+
+// Plain wrapper around Node's own global fetch, forced to HTTP/1.1.
+//
+// NOT a singleton -- this Agent is constructed fresh on every call and
+// never stored on globalThis or at module scope, specifically to avoid the
+// earlier Fast-Refresh/pooled-connection lifecycle bug. Its only purpose
+// is `allowH2: false`.
+//
+// Why: the logs showed one request hit a corrupted TLS connection ("bad
+// record mac" -- almost certainly TLS-inspecting AV/VPN software mangling
+// records, not something fixable from application code), and the
+// *retry* immediately failed too, with `ERR_HTTP2_INVALID_SESSION` /
+// "session has been destroyed". That's HTTP/2 connection multiplexing
+// working against us: undici was reusing the same pooled HTTP/2
+// connection for the retry, so a single corrupted connection took every
+// request on it down with it, retries included. Forcing HTTP/1.1 means a
+// retry opens a genuinely new connection instead of reusing a poisoned
+// one, so `getUserWithRetry`'s existing retry can actually succeed rather
+// than being doomed by construction. Logs and rethrows unchanged --
+// behavior (including existing retry logic) is otherwise unaffected.
+export async function loggingFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  try {
+    return await fetch(input, {
+      ...init,
+      // @ts-expect-error -- `dispatcher` is an undici-specific extension
+      // to RequestInit; Node's global fetch is undici under the hood and
+      // accepts it, but the DOM lib types don't know about it.
+      dispatcher: new Agent({ allowH2: false }),
+    });
+  } catch (err) {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : (input as Request).url;
+    console.error(
+      `[loggingFetch] Request to ${url} failed. Real underlying error:`,
+      err,
+      "\ncause:",
+      (err as { cause?: unknown })?.cause
+    );
+    throw err;
+  }
+}
 
 export function createClient() {
   const cookieStorePromise = cookies();
@@ -12,7 +61,7 @@ export function createClient() {
     serverEnv.NEXT_PUBLIC_SUPABASE_URL,
     serverEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
-      global: { fetch: ipv4Fetch },
+      global: { fetch: loggingFetch },
       cookies: {
         async getAll() {
           const cookieStore = await cookieStorePromise;
@@ -59,7 +108,22 @@ export async function getUserWithRetry(supabase: SupabaseClient<Database>) {
 }
 
 // Fetch the current user's profile (role, name) — used across dashboard pages.
-export async function getCurrentProfile() {
+//
+// Wrapped in React's cache() because it's called independently by every
+// nested layout/page that needs it (DashboardLayout, TeacherLayout,
+// TeacherNoteEditPage, etc. all call it for the same incoming request).
+// Without dedup, that's 2-3+ concurrent `auth.getUser()` calls to the same
+// Supabase host, multiplexed over one shared HTTP/2 connection -- which is
+// what was actually behind the "session has been destroyed"
+// (ERR_HTTP2_INVALID_SESSION) and "bad record mac" TLS errors: one
+// concurrent stream on that shared connection gets corrupted (very likely
+// by TLS-inspecting AV/VPN software, given the bad-record-mac signature)
+// and every other in-flight request on the same connection cascade-fails.
+// cache() makes this a per-request memo, so within a single incoming
+// request it actually only fires once no matter how many layouts/pages
+// call it -- cutting concurrent connection pressure to begin with, which
+// is a more direct fix than anything at the fetch/Agent layer.
+export const getCurrentProfile = cache(async function getCurrentProfile() {
   const supabase = createClient();
 
   // A cold connection (first outbound request after the dev server starts,
@@ -115,4 +179,4 @@ export async function getCurrentProfile() {
   }
 
   return profile;
-}
+});

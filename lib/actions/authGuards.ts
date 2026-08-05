@@ -41,11 +41,17 @@ export async function assertRole(
   }
 
   const admin = createAdminClient();
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from("profiles")
     .select("role, is_active")
     .eq("id", user.id)
     .single();
+
+  if (profileError && !profile && profileError.message.includes("fetch failed")) {
+    throw new Error("Couldn't verify your session right now — check your connection and retry.", {
+      cause: profileError,
+    });
+  }
 
   if (!profile || !profile.is_active || !allowedRoles.includes(profile.role)) {
     throw new Error(errorMessage);
