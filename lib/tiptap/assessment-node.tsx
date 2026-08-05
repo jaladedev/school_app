@@ -7,7 +7,9 @@
  * GradeEntryForm) — this is a *link*, not an embed. No question-type
  * authoring (Multiple Choice/True-False/etc.) happens here at all; the
  * chip is a read-only reference card that opens the existing
- * /dashboard/teacher/grades/[assessmentId] page.
+ * /dashboard/teacher/grades/[assessmentId] page — or, for a quiz-backed
+ * assessment, its own /dashboard/teacher/quizzes/[quizId] page, since
+ * that's where essay grading/attempts/publish actually live.
  *
  * That's the one deliberate divergence from ResourceChip's shape: no
  * "Edit" action in the popover (there's nothing here to edit — the title,
@@ -37,7 +39,7 @@ import { dragAwareStopEvent } from "./drag-utils";
 // the query site (page.tsx) into a plain string, rather than every
 // consumer here re-deriving it from Supabase's array-or-object join
 // shape.
-export type LinkableAssessment = Assessment & { classLabel: string };
+export type LinkableAssessment = Assessment & { classLabel: string; quizId?: string };
 
 export const ASSESSMENT_TYPE_ICON: Record<Assessment["assessment_type"], string> = {
   first_ca: "📋",
@@ -47,6 +49,7 @@ export const ASSESSMENT_TYPE_ICON: Record<Assessment["assessment_type"], string>
   assignment: "📚",
   project: "🛠️",
   practical: "🧪",
+  quiz: "🧩",
   other: "📊",
 };
 
@@ -210,12 +213,16 @@ function AssessmentChipView({
                   </button>
                   <span className="flex items-center gap-3">
                     <Link
-                      href={`/dashboard/teacher/grades/${assessment.id}`}
+                      href={
+                        assessment.quizId
+                          ? `/dashboard/teacher/quizzes/${assessment.quizId}`
+                          : `/dashboard/teacher/grades/${assessment.id}`
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs font-medium text-leaf hover:underline"
                     >
-                      Open assessment ↗
+                      {assessment.quizId ? "Open quiz ↗" : "Open assessment ↗"}
                     </Link>
                     <button
                       type="button"

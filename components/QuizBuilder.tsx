@@ -65,6 +65,8 @@ export function QuizBuilder({
   const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
   const [durationMinutes, setDurationMinutes] = useState("20");
+  const [opensAt, setOpensAt] = useState("");
+  const [closesAt, setClosesAt] = useState("");
   const [questions, setQuestions] = useState<QuestionDraft[]>([blankQuestion()]);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +145,9 @@ export function QuizBuilder({
 
     if (!title.trim()) return setError("Title is required.");
     if (!subjectId || !classId) return setError("Pick a subject and class.");
+    if (opensAt && closesAt && new Date(closesAt) <= new Date(opensAt)) {
+      return setError("Closing time must be after the opening time.");
+    }
 
     startTransition(async () => {
       try {
@@ -153,6 +158,8 @@ export function QuizBuilder({
           term,
           academicYear,
           durationMinutes: Number(durationMinutes),
+          opensAt: opensAt ? new Date(opensAt).toISOString() : undefined,
+          closesAt: closesAt ? new Date(closesAt).toISOString() : undefined,
           questions: questions.map((q) => ({
             questionText: q.questionText,
             questionType: q.questionType,
@@ -212,6 +219,24 @@ export function QuizBuilder({
             value={durationMinutes}
             onChange={(e) => setDurationMinutes(e.target.value)}
             className="w-24 rounded-lg border border-rule px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          Opens at (optional)
+          <input
+            type="datetime-local"
+            value={opensAt}
+            onChange={(e) => setOpensAt(e.target.value)}
+            className="rounded-lg border border-rule px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          Closes at (optional)
+          <input
+            type="datetime-local"
+            value={closesAt}
+            onChange={(e) => setClosesAt(e.target.value)}
+            className="rounded-lg border border-rule px-3 py-2 text-sm"
           />
         </label>
       </div>

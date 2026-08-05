@@ -7,7 +7,15 @@ export type AnnouncementAudience = "all" | "students" | "teachers" | "class";
 export type HomeworkStatus = "given" | "reviewed" | "graded";
 export type HomeworkSubmissionStatus = "submitted" | "reviewed";
 export type AssessmentType =
-  "first_ca" | "second_ca" | "exam" | "test" | "assignment" | "project" | "practical" | "other";
+  | "first_ca"
+  | "second_ca"
+  | "exam"
+  | "test"
+  | "assignment"
+  | "project"
+  | "practical"
+  | "quiz"
+  | "other";
 export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
 export type StaffRole =
@@ -1880,6 +1888,26 @@ export type Database = {
       grade_quiz_essay_answers: {
         Args: { p_attempt_id: string; p_scores: Record<string, number> };
         Returns: { score: number; total_points: number }[];
+      };
+      create_quiz_with_questions: {
+        Args: {
+          p_subject_id: string;
+          p_class_id: string;
+          p_title: string;
+          p_term: number;
+          p_academic_year: string;
+          p_created_by: string;
+          p_duration_minutes: number;
+          p_opens_at: string | null;
+          p_closes_at: string | null;
+          p_questions: {
+            question_text: string;
+            question_type: string;
+            points: number;
+            options: { text: string; match_prompt: string | null; is_correct: boolean }[];
+          }[];
+        };
+        Returns: string;
       };
       send_fee_reminders: {
         Args: { p_min_days_between?: number };

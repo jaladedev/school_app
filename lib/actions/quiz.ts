@@ -78,79 +78,39 @@ export async function createQuiz(input: {
   }
 
   const admin = createAdminClient();
-  const totalPoints = input.questions.reduce((sum, q) => sum + q.points, 0);
 
-  // Underlying assessment first — max_score is set to the sum of question
-  // points and is never edited independently afterward, so it can't drift
-  // out of sync with what submit_quiz_attempt() computes (the DB trigger
-  // check_grade_score_bounds relies on this staying true).
-  const { data: assessment, error: assessmentError } = await admin
-    .from("assessments")
-    .insert({
-      subject_id: input.subjectId,
-      class_id: input.classId,
-      title: input.title.trim(),
-      max_score: totalPoints,
-      term: input.term,
-      academic_year: input.academicYear,
-      created_by: actorId,
-    })
-    .select("id")
-    .single();
-  if (assessmentError) throw new Error(assessmentError.message);
-
-  const { data: quiz, error: quizError } = await admin
-    .from("quizzes")
-    .insert({
-      assessment_id: assessment.id,
-      duration_minutes: input.durationMinutes,
-      opens_at: input.opensAt || null,
-      closes_at: input.closesAt || null,
-    })
-    .select("id")
-    .single();
-  if (quizError) {
-    // Best-effort cleanup — the assessment row is orphaned without a
-    // quiz otherwise. Not wrapped in a real transaction since these are
-    // two sequential client calls, not a single RPC; a failure here is
-    // rare (the insert above already validated shape) but worth
-    // reverting rather than leaving a dangling assessment.
-    await admin.from("assessments").delete().eq("id", assessment.id);
-    throw new Error(quizError.message);
-  }
-
-  for (const [qIndex, q] of input.questions.entries()) {
-    const { data: question, error: questionError } = await admin
-      .from("quiz_questions")
-      .insert({
-        quiz_id: quiz.id,
-        question_text: q.questionText.trim(),
-        question_type: q.questionType,
-        points: q.points,
-        sequence_order: qIndex + 1,
-      })
-      .select("id")
-      .single();
-    if (questionError) throw new Error(questionError.message);
-
-    const nonBlankOptions = q.options.filter((o) => o.text.trim());
-    if (nonBlankOptions.length) {
-      const { error: optionsError } = await admin.from("quiz_options").insert(
-        nonBlankOptions.map((o, oIndex) => ({
-          question_id: question.id,
-          option_text: o.text.trim(),
+  // One RPC call = one Postgres transaction (see
+  // 2026_08_05b_create_quiz_with_questions_rpc.sql) -- if question 3 of 5
+  // fails to insert, the whole thing rolls back instead of leaving
+  // questions 1-2 (and the quiz/assessment rows) orphaned.
+  const { data: quizId, error } = await admin.rpc("create_quiz_with_questions", {
+    p_subject_id: input.subjectId,
+    p_class_id: input.classId,
+    p_title: input.title.trim(),
+    p_term: input.term,
+    p_academic_year: input.academicYear,
+    p_created_by: actorId,
+    p_duration_minutes: input.durationMinutes,
+    p_opens_at: input.opensAt || null,
+    p_closes_at: input.closesAt || null,
+    p_questions: input.questions.map((q) => ({
+      question_text: q.questionText.trim(),
+      question_type: q.questionType,
+      points: q.points,
+      options: q.options
+        .filter((o) => o.text.trim())
+        .map((o) => ({
+          text: o.text.trim(),
           match_prompt: o.matchPrompt?.trim() || null,
           // fill_blank has no "wrong" options — every accepted answer is correct
           is_correct: q.questionType === "fill_blank" ? true : o.isCorrect,
-          sequence_order: oIndex + 1,
-        }))
-      );
-      if (optionsError) throw new Error(optionsError.message);
-    }
-  }
+        })),
+    })),
+  });
+  if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/teacher/quizzes");
-  return quiz.id as string;
+  return quizId as string;
 }
 
 export async function setQuizPublished(quizId: string, isPublished: boolean) {

@@ -248,6 +248,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [assessmentPickerOpen, setAssessmentPickerOpen] = useState(false);
+  const [assessmentFilter, setAssessmentFilter] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [symbolPickerOpen, setSymbolPickerOpen] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
@@ -332,7 +333,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const mobileTab = controlledMobileTab ?? internalMobileTab;
   const setMobileTab = onMobileTabChange ?? setInternalMobileTab;
   const [isSavingDraft, setIsSavingDraft] = useState(false);
-  const [bubblePos, setBubblePos] = useState<{ top: number; left: number } | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
   const dragDepthRef = useRef(0);
@@ -746,6 +746,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     };
   }
 
+  // Recomputed only when the doc actually changes (editor.state.doc gets
+  // a new reference each transaction) rather than on every render -- this
+  // walks the entire doc via descendants(), which previously ran inline
+  // in JSX on every keystroke regardless of whether anything relevant to
+  // the stats had changed.
+  const noteStats = useMemo(
+    () => (editor ? computeNoteStats(editor) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editor, editor?.state.doc, localResources]
+  );
+
   const initialMarkdown = useMemo(() => initialContent, [initialContent]);
   const [lastSavedContent, setLastSavedContent] = useState(initialMarkdown);
   const [isDirty, setIsDirty] = useState(false);
@@ -1012,7 +1023,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   }, [pickerOpen]);
 
   useEffect(() => {
-    if (!assessmentPickerOpen) return;
+    if (!assessmentPickerOpen) {
+      setAssessmentFilter("");
+      return;
+    }
     function handleClickOutside(e: MouseEvent) {
       if (assessmentPickerRef.current && !assessmentPickerRef.current.contains(e.target as Node)) {
         setAssessmentPickerOpen(false);
@@ -1464,27 +1478,50 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                     Link assessment
                   </button>
                   {assessmentPickerOpen && assessments.length > 0 && (
-                    <div className="absolute right-0 z-10 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-rule bg-white py-1 shadow-lg">
-                      {assessments.map((assessment) => (
-                        <button
-                          key={assessment.id}
-                          type="button"
-                          onClick={() => handlePickAssessment(assessment)}
-                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-paper"
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate">{assessment.title}</span>
-                            {assessment.classLabel && (
-                              <span className="block truncate text-xs text-ink-soft">
-                                {assessment.classLabel}
+                    <div className="absolute right-0 z-10 mt-1 w-64 rounded-lg border border-rule bg-white py-1 shadow-lg">
+                      {/* With 20-30+ assessments once a subject/class has
+                          a term's worth, scrolling to find one by eye
+                          stopped being workable -- filter narrows the
+                          list as you type instead of just scrolling
+                          faster. */}
+                      {assessments.length > 5 && (
+                        <div className="px-2 pb-1">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={assessmentFilter}
+                            onChange={(e) => setAssessmentFilter(e.target.value)}
+                            placeholder="Filter by title…"
+                            className="w-full rounded-md border border-rule px-2 py-1 text-sm outline-none focus-visible:border-marigold"
+                          />
+                        </div>
+                      )}
+                      <div className="max-h-64 overflow-y-auto">
+                        {assessments
+                          .filter((a) =>
+                            a.title.toLowerCase().includes(assessmentFilter.trim().toLowerCase())
+                          )
+                          .map((assessment) => (
+                            <button
+                              key={assessment.id}
+                              type="button"
+                              onClick={() => handlePickAssessment(assessment)}
+                              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-paper"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate">{assessment.title}</span>
+                                {assessment.classLabel && (
+                                  <span className="block truncate text-xs text-ink-soft">
+                                    {assessment.classLabel}
+                                  </span>
+                                )}
                               </span>
-                            )}
-                          </span>
-                          <span className="shrink-0 text-xs uppercase tracking-wide text-ink-soft">
-                            {assessment.assessment_type.replace(/_/g, " ")}
-                          </span>
-                        </button>
-                      ))}
+                              <span className="shrink-0 text-xs uppercase tracking-wide text-ink-soft">
+                                {assessment.assessment_type.replace(/_/g, " ")}
+                              </span>
+                            </button>
+                          ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2030,63 +2067,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                 &ldquo;
               </button>
               <span className="mx-1 h-4 w-px bg-rule" />
-              {false && (
-                <>
-                  <button
-                    type="button"
-                    title="Underline (Ctrl/Cmd+U)"
-                    onClick={() => editor.chain().focus().toggleUnderline().run()}
-                    className={`min-w-[2rem] rounded-md px-2 py-1 text-sm underline hover:bg-white ${editor.isActive("underline") ? "bg-white" : ""}`}
-                  >
-                    U
-                  </button>
-                  <button
-                    type="button"
-                    title="Strikethrough"
-                    onClick={() => editor.chain().focus().toggleStrike().run()}
-                    className={`min-w-[2rem] rounded-md px-2 py-1 text-sm line-through hover:bg-white ${editor.isActive("strike") ? "bg-white" : ""}`}
-                  >
-                    S
-                  </button>
-                  <label
-                    title="Text color"
-                    className="flex min-w-[2rem] cursor-pointer items-center justify-center rounded-md px-1 py-1 text-sm hover:bg-white"
-                  >
-                    A
-                    <input
-                      type="color"
-                      onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
-                      value={editor.getAttributes("textStyle").color || "#1f2937"}
-                      className="ml-0.5 h-4 w-4 cursor-pointer border-none bg-transparent p-0"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    title="Highlight"
-                    onClick={() => editor.chain().focus().toggleHighlight().run()}
-                    className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("highlight") ? "bg-white" : ""}`}
-                  >
-                    ▧
-                  </button>
-                  <button
-                    type="button"
-                    title="Superscript"
-                    onClick={() => editor.chain().focus().toggleSuperscript().run()}
-                    className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("superscript") ? "bg-white" : ""}`}
-                  >
-                    x²
-                  </button>
-                  <button
-                    type="button"
-                    title="Subscript"
-                    onClick={() => editor.chain().focus().toggleSubscript().run()}
-                    className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("subscript") ? "bg-white" : ""}`}
-                  >
-                    x₂
-                  </button>
-                </>
-              )}
-              <span className="mx-1 h-4 w-px bg-rule" />
               <span className="mx-1 h-4 w-px bg-rule" />
               <button
                 type="button"
@@ -2588,46 +2568,43 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                 mobileTab === "resources" ? "hidden md:flex" : "flex"
               }`}
             >
-              {(() => {
-                const stats = computeNoteStats(editor);
-                return (
-                  <>
+              {noteStats && (
+                <>
+                  <span>
+                    {noteStats.words} word{noteStats.words === 1 ? "" : "s"}
+                  </span>
+                  <span>
+                    {noteStats.characters} character{noteStats.characters === 1 ? "" : "s"}
+                  </span>
+                  <span>~{noteStats.readingMinutes} min read</span>
+                  {noteStats.headings > 0 && (
                     <span>
-                      {stats.words} word{stats.words === 1 ? "" : "s"}
+                      {noteStats.headings} heading{noteStats.headings === 1 ? "" : "s"}
                     </span>
+                  )}
+                  {noteStats.tables > 0 && (
                     <span>
-                      {stats.characters} character{stats.characters === 1 ? "" : "s"}
+                      {noteStats.tables} table{noteStats.tables === 1 ? "" : "s"}
                     </span>
-                    <span>~{stats.readingMinutes} min read</span>
-                    {stats.headings > 0 && (
-                      <span>
-                        {stats.headings} heading{stats.headings === 1 ? "" : "s"}
-                      </span>
-                    )}
-                    {stats.tables > 0 && (
-                      <span>
-                        {stats.tables} table{stats.tables === 1 ? "" : "s"}
-                      </span>
-                    )}
-                    {stats.images > 0 && (
-                      <span>
-                        {stats.images} image{stats.images === 1 ? "" : "s"}
-                      </span>
-                    )}
-                    {stats.resources > 0 && (
-                      <span>
-                        {stats.resources} resource{stats.resources === 1 ? "" : "s"}
-                      </span>
-                    )}
-                    {stats.linkedAssessments > 0 && (
-                      <span>
-                        {stats.linkedAssessments} linked assessment
-                        {stats.linkedAssessments === 1 ? "" : "s"}
-                      </span>
-                    )}
-                  </>
-                );
-              })()}
+                  )}
+                  {noteStats.images > 0 && (
+                    <span>
+                      {noteStats.images} image{noteStats.images === 1 ? "" : "s"}
+                    </span>
+                  )}
+                  {noteStats.resources > 0 && (
+                    <span>
+                      {noteStats.resources} resource{noteStats.resources === 1 ? "" : "s"}
+                    </span>
+                  )}
+                  {noteStats.linkedAssessments > 0 && (
+                    <span>
+                      {noteStats.linkedAssessments} linked assessment
+                      {noteStats.linkedAssessments === 1 ? "" : "s"}
+                    </span>
+                  )}
+                </>
+              )}
             </div>
           )}
 

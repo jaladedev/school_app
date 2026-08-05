@@ -81,6 +81,31 @@ export function QuizAttemptRunner({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ score: number; total_points: number } | null>(null);
   const hasSubmitted = useRef(false);
+  // fill_blank/essay/matching answers used to call answerQuizQuestion on
+  // every keystroke -- fast typing fired a parallel RPC per character,
+  // and with no ordering guarantee the last response to land (not the
+  // last one sent) could overwrite a newer keystroke. Debounce those
+  // saves per-question; MCQ/true_false stay immediate since a click is a
+  // single discrete event, not a stream.
+  const saveTimers = useRef<
+    Record<string, { timer: ReturnType<typeof setTimeout>; run: () => Promise<void> }>
+  >({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(saveTimers.current).forEach(({ timer }) => clearTimeout(timer));
+    };
+  }, []);
+
+  function debouncedSave(questionId: string, save: () => Promise<void>) {
+    const timers = saveTimers.current;
+    if (timers[questionId]) clearTimeout(timers[questionId].timer);
+    const timer = setTimeout(() => {
+      delete timers[questionId];
+      save();
+    }, 400);
+    timers[questionId] = { timer, run: save };
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -118,6 +143,16 @@ export function QuizAttemptRunner({
     if (!attemptId || hasSubmitted.current) return;
     hasSubmitted.current = true;
     setSubmitting(true);
+    // Flush any answers still waiting out their debounce window so a
+    // keystroke from the last 400ms isn't dropped by the submit.
+    const timers = saveTimers.current;
+    const pendingSaves = Object.keys(timers).map((questionId) => {
+      const pending = timers[questionId];
+      clearTimeout(pending.timer);
+      delete timers[questionId];
+      return pending.run();
+    });
+    await Promise.all(pendingSaves);
     try {
       const res = await submitQuizAttempt(attemptId);
       setResult(res);
@@ -151,9 +186,11 @@ export function QuizAttemptRunner({
   function setTextAnswer(questionId: string, value: string) {
     setTextAnswers((a) => ({ ...a, [questionId]: value }));
     if (attemptId) {
-      answerQuizQuestion(attemptId, questionId, { answerText: value }).catch((err) => {
-        emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
-      });
+      debouncedSave(questionId, () =>
+        answerQuizQuestion(attemptId, questionId, { answerText: value }).catch((err) => {
+          emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
+        })
+      );
     }
   }
 
@@ -161,10 +198,11 @@ export function QuizAttemptRunner({
     setMatchedAnswers((a) => {
       const next = { ...a, [questionId]: { ...(a[questionId] ?? {}), [optionId]: chosenText } };
       if (attemptId) {
-        answerQuizQuestion(attemptId, questionId, { matchedPairs: next[questionId] }).catch(
-          (err) => {
+        const pairs = next[questionId];
+        debouncedSave(questionId, () =>
+          answerQuizQuestion(attemptId, questionId, { matchedPairs: pairs }).catch((err) => {
             emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
-          }
+          })
         );
       }
       return next;
@@ -269,7 +307,7 @@ export function QuizAttemptRunner({
                       checked={selectedAnswers[q.id] === o.id}
                       onChange={() => selectOption(q.id, o.id)}
                     />
-                    {o.text}
+                    <QuestionText text={o.text} className="inline" />
                   </label>
                 ))}
               </div>
@@ -311,11 +349,10 @@ export function QuizAttemptRunner({
                         Choose a match…
                       </option>
                       {[...q.options]
-                        .map((opt) => opt.text)
-                        .sort((a, b) => a.localeCompare(b))
-                        .map((text) => (
-                          <option key={text} value={text}>
-                            {text}
+                        .sort((a, b) => a.text.localeCompare(b.text))
+                        .map((opt) => (
+                          <option key={opt.id} value={opt.text}>
+                            {opt.text}
                           </option>
                         ))}
                     </select>

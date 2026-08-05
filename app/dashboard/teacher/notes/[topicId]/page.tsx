@@ -126,7 +126,7 @@ export default async function TeacherNoteEditPage({
     topic && matchingClassIds.length > 0
       ? await supabase
           .from("assessments")
-          .select("*, classes(name, arm)")
+          .select("*, classes(name, arm), quizzes(id)")
           .eq("subject_id", topic.subject_id)
           .in("class_id", matchingClassIds)
           .order("academic_year", { ascending: false })
@@ -140,9 +140,15 @@ export default async function TeacherNoteEditPage({
   // with `classLabel: string` instead of each re-deriving it.
   const assessments = (rawAssessments ?? []).map((assessment) => {
     const cls = Array.isArray(assessment.classes) ? assessment.classes[0] : assessment.classes;
+    // Same array-or-object join quirk as `classes` above. A quiz-backed
+    // assessment has exactly one row here (assessment_id is unique on
+    // quizzes); a non-quiz assessment has none, so quizId stays
+    // undefined and AssessmentChip falls back to the generic grades page.
+    const quizRow = Array.isArray(assessment.quizzes) ? assessment.quizzes[0] : assessment.quizzes;
     return {
       ...assessment,
       classLabel: cls ? `${cls.name}${cls.arm ? ` ${cls.arm}` : ""}` : "",
+      quizId: quizRow?.id as string | undefined,
     };
   });
 
