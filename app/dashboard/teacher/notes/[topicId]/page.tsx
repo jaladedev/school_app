@@ -82,6 +82,70 @@ export default async function TeacherNoteEditPage({
     })
   );
 
+  // Linkable (not embeddable — see #16 of markdown-editor-todo.md)
+  // assessments for "Link assessment" in the note editor. Scoped to this
+  // topic's subject *and* class, not just subject+teacher: a topic has no
+  // `class_id` of its own (`curriculum_topics` is keyed by
+  // education_level/level_number, taught across every class at that
+  // level, not one specific class), so "matching class" here means every
+  // class at the topic's education_level/level_number for the current
+  // academic year — the same set of classes this topic's note is
+  // actually relevant to. Any teacher's assessment for one of those
+  // classes is linkable, not just the current teacher's own — a note is
+  // shared content for the whole department teaching that subject/level,
+  // so restricting links to "assessments I personally created" would
+  // hide a colleague's assessment for the exact same class this note is
+  // written for.
+  //
+  // `current_academic_year` comes from `school_settings`, not computed
+  // from today's date -- same source of truth the teacher notes list page
+  // already uses. A calendar-derived guess (e.g. "current year/next
+  // year") would silently disagree with whatever academic year the
+  // school has actually configured as current, particularly right around
+  // a year boundary or mid-year rollover.
+  const { data: schoolSettings } = await supabase
+    .from("school_settings")
+    .select("current_academic_year")
+    .eq("id", 1)
+    .single();
+  const currentAcademicYear = schoolSettings?.current_academic_year ?? "";
+
+  const { data: matchingClasses } =
+    topic && currentAcademicYear
+      ? await supabase
+          .from("classes")
+          .select("id")
+          .eq("education_level", topic.education_level)
+          .eq("level_number", topic.level_number)
+          .eq("academic_year", currentAcademicYear)
+          .eq("is_archived", false)
+      : { data: [] };
+  const matchingClassIds = (matchingClasses ?? []).map((c) => c.id);
+
+  const { data: rawAssessments } =
+    topic && matchingClassIds.length > 0
+      ? await supabase
+          .from("assessments")
+          .select("*, classes(name, arm)")
+          .eq("subject_id", topic.subject_id)
+          .in("class_id", matchingClassIds)
+          .order("academic_year", { ascending: false })
+          .order("term", { ascending: false })
+      : { data: [] };
+
+  // Same "comes back as an array even for a to-one join" Supabase quirk
+  // handled elsewhere on this page (see the version-history `profiles`
+  // join below) -- resolved into a plain string here so every downstream
+  // component (NoteWorkspace, NoteEditor, AssessmentChip) can just work
+  // with `classLabel: string` instead of each re-deriving it.
+  const assessments = (rawAssessments ?? []).map((assessment) => {
+    const cls = Array.isArray(assessment.classes) ? assessment.classes[0] : assessment.classes;
+    return {
+      ...assessment,
+      classLabel: cls ? `${cls.name}${cls.arm ? ` ${cls.arm}` : ""}` : "",
+    };
+  });
+
   // For the bell timer shown in Present mode — today's schedule for this
   // teacher, same query/shape the teacher dashboard already uses.
   const today = new Date();
@@ -167,6 +231,7 @@ export default async function TeacherNoteEditPage({
         initialContent={note?.content ?? ""}
         initialStatus={note?.status ?? "unwritten"}
         resources={signedResources}
+        assessments={assessments}
         placeholder={`Write about "${topic?.title}" here. Use tables for summaries, and the ∑ button for math.`}
         todaysEntries={(todaysEntries ?? []).map((entry) => ({
           id: entry.id,

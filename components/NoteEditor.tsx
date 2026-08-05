@@ -53,6 +53,7 @@ import {
 import { emitToast } from "@/lib/toast";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { ResourceChip } from "@/lib/tiptap/resource-node";
+import { AssessmentChip, type LinkableAssessment } from "@/lib/tiptap/assessment-node";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { SymbolPicker } from "@/components/SymbolPicker";
 import { clampPopoverToEditor } from "@/lib/tiptap/popover-position";
@@ -192,6 +193,13 @@ type NoteEditorProps = {
   initialContent: string;
   initialStatus: "draft" | "published" | "archived" | "unwritten";
   resources?: TopicResource[];
+  // Assessments available to link (not embed) into this note via #16's
+  // AssessmentChip -- see lib/tiptap/assessment-node.tsx. Server-fetched,
+  // scoped to the topic's subject (see page.tsx); unlike `resources`,
+  // nothing here is ever created from inside the editor, so there's no
+  // matching `onAssessmentsChange`/local-merge state the way resources
+  // has for session-created uploads/diagrams.
+  assessments?: LinkableAssessment[];
   placeholder?: string;
   // Fired whenever the live (server + locally-created-this-session)
   // resource list changes, so a sidebar rendered by the parent can stay
@@ -218,6 +226,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     initialContent,
     initialStatus,
     resources = [],
+    assessments = [],
     placeholder = "Write the topic explanation here. Use tables for summaries, and the ∑ button for math.",
     onResourcesChange,
     mobileTab: controlledMobileTab,
@@ -229,6 +238,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [assessmentPickerOpen, setAssessmentPickerOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [symbolPickerOpen, setSymbolPickerOpen] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
@@ -318,6 +328,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const [uploadingCount, setUploadingCount] = useState(0);
   const dragDepthRef = useRef(0);
   const pickerRef = useRef<HTMLDivElement | null>(null);
+  const assessmentPickerRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const symbolPickerRef = useRef<HTMLDivElement | null>(null);
   const colorPickerRef = useRef<HTMLDivElement | null>(null);
@@ -422,6 +433,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       TaskList,
       TaskItem.configure({ nested: true }),
       ResourceChip,
+      AssessmentChip,
       MathInline,
       MathBlock,
       Markdown.configure({
@@ -630,6 +642,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     };
   }, [editor, localResources]);
 
+  useEffect(() => {
+    if (!editor) return;
+    editor.storage.assessmentChip.assessments = assessments;
+  }, [editor, assessments]);
+
   const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;
 
   // The mobile Write/Preview/Resources tab bar only renders below `md`
@@ -651,6 +668,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     let tables = 0;
     let images = 0;
     let resources = 0;
+    let linkedAssessments = 0;
     ed.state.doc.descendants((node) => {
       if (node.type.name === "heading") headings++;
       else if (node.type.name === "table") tables++;
@@ -658,6 +676,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         resources++;
         const resource = localResources.find((r) => r.id === node.attrs.id);
         if (resource?.resource_type === "image") images++;
+      } else if (node.type.name === "assessmentChip") {
+        linkedAssessments++;
       }
       return true;
     });
@@ -667,7 +687,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     // good enough for a rough "how long will this take a student to
     // read" estimate, not meant to be precise.
     const readingMinutes = Math.max(1, Math.round(words / 200));
-    return { words, characters, readingMinutes, headings, tables, images, resources };
+    return {
+      words,
+      characters,
+      readingMinutes,
+      headings,
+      tables,
+      images,
+      resources,
+      linkedAssessments,
+    };
   }
 
   const initialMarkdown = useMemo(() => initialContent, [initialContent]);
@@ -912,6 +941,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   }, [pickerOpen]);
 
   useEffect(() => {
+    if (!assessmentPickerOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (assessmentPickerRef.current && !assessmentPickerRef.current.contains(e.target as Node)) {
+        setAssessmentPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [assessmentPickerOpen]);
+
+  useEffect(() => {
     if (!emojiPickerOpen) return;
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
@@ -1032,6 +1072,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   function handlePickResource(resource: TopicResource) {
     insertResourceMarker(resource);
     setPickerOpen(false);
+  }
+
+  function insertAssessmentMarker(assessment: LinkableAssessment) {
+    editor
+      ?.chain()
+      .focus()
+      .insertContent({ type: "assessmentChip", attrs: { id: assessment.id } })
+      .run();
+  }
+
+  function handlePickAssessment(assessment: LinkableAssessment) {
+    insertAssessmentMarker(assessment);
+    setAssessmentPickerOpen(false);
   }
 
   function insertTable() {
@@ -1318,6 +1371,46 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                           <span className="truncate">{resource.title ?? "Untitled resource"}</span>
                           <span className="shrink-0 text-xs uppercase tracking-wide text-ink-soft">
                             {RESOURCE_TYPE_LABEL[resource.resource_type]}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative" ref={assessmentPickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setAssessmentPickerOpen((open) => !open)}
+                    disabled={isPending || assessments.length === 0}
+                    className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
+                    title={
+                      assessments.length === 0
+                        ? "No assessments for this subject yet"
+                        : "Link an existing assessment — opens its own page, doesn't embed its questions"
+                    }
+                  >
+                    Link assessment
+                  </button>
+                  {assessmentPickerOpen && assessments.length > 0 && (
+                    <div className="absolute right-0 z-10 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-rule bg-white py-1 shadow-lg">
+                      {assessments.map((assessment) => (
+                        <button
+                          key={assessment.id}
+                          type="button"
+                          onClick={() => handlePickAssessment(assessment)}
+                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-paper"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate">{assessment.title}</span>
+                            {assessment.classLabel && (
+                              <span className="block truncate text-xs text-ink-soft">
+                                {assessment.classLabel}
+                              </span>
+                            )}
+                          </span>
+                          <span className="shrink-0 text-xs uppercase tracking-wide text-ink-soft">
+                            {assessment.assessment_type.replace(/_/g, " ")}
                           </span>
                         </button>
                       ))}
@@ -2453,6 +2546,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                     {stats.resources > 0 && (
                       <span>
                         {stats.resources} resource{stats.resources === 1 ? "" : "s"}
+                      </span>
+                    )}
+                    {stats.linkedAssessments > 0 && (
+                      <span>
+                        {stats.linkedAssessments} linked assessment
+                        {stats.linkedAssessments === 1 ? "" : "s"}
                       </span>
                     )}
                   </>

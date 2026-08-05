@@ -62,6 +62,17 @@ function MediaError({ label }: { label: string }) {
 // instead of the image.
 const RESOURCE_MARKER = /\[\[resource:([0-9a-fA-F-]{36})(?:#([a-z]+)(?:-([a-z]+))?)?\]\]/g;
 
+// AssessmentChip's marker (lib/tiptap/assessment-node.tsx) -- a link from
+// the teacher's own editing view to their assessments/grades pages, not
+// student-facing content. There's no per-student rendering for it here
+// (that's out of scope for #16 as currently built -- see
+// markdown-editor-todo.md), so it's stripped from published content
+// rather than leaking through as literal "[[assessment:...]]" text,
+// which is what RESOURCE_MARKER's "unmatched marker" handling below
+// would otherwise do to it (it doesn't recognize this marker shape at
+// all, so it would fall straight through into a "text" part untouched).
+const ASSESSMENT_MARKER = /\[\[assessment:[0-9a-fA-F-]{36}\]\]/g;
+
 export type ContentPart =
   | { type: "text"; value: string }
   | { type: "resource"; resource: TopicResource; size?: ImageSize; align?: ImageAlign };
@@ -70,6 +81,7 @@ export function splitContentByMarkers(
   content: string,
   resources: TopicResource[]
 ): { parts: ContentPart[]; leftover: TopicResource[] } {
+  const strippedContent = content.replace(ASSESSMENT_MARKER, "");
   const byId = new Map(resources.map((r) => [r.id, r]));
   const usedIds = new Set<string>();
   const parts: ContentPart[] = [];
@@ -78,8 +90,8 @@ export function splitContentByMarkers(
   let match: RegExpExecArray | null;
   RESOURCE_MARKER.lastIndex = 0;
 
-  while ((match = RESOURCE_MARKER.exec(content))) {
-    const textChunk = content.slice(lastIndex, match.index);
+  while ((match = RESOURCE_MARKER.exec(strippedContent))) {
+    const textChunk = strippedContent.slice(lastIndex, match.index);
     if (textChunk.trim()) parts.push({ type: "text", value: textChunk });
 
     const resource = byId.get(match[1]);
@@ -96,7 +108,7 @@ export function splitContentByMarkers(
     lastIndex = match.index + match[0].length;
   }
 
-  const remainder = content.slice(lastIndex);
+  const remainder = strippedContent.slice(lastIndex);
   if (remainder.trim()) parts.push({ type: "text", value: remainder });
 
   // Any resource never referenced by a marker still needs to show up

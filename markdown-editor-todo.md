@@ -163,12 +163,19 @@ New — build as a TipTap custom Node (or slash-command insert):
 
 **Suspended for now** (per request) — skip in the build order below until re-prioritized. Slash Commands (#8) should not list "Learning Objective" as a menu item while this is suspended, to avoid pointing at a block that doesn't exist.
 
-## 16. Assessment Block
+## 16. Assessment Block — DONE
 
 Currently: assessments are a separate system (`CreateAssessmentForm`, `GradeEntryForm`), not embeddable in notes.
 
-- Decide: embed a lightweight reference/preview block in the note, or keep fully separate — needs a product decision before building
-- If embedding: Multiple Choice, True/False, Fill in the Blank, Matching, Essay
+**Decision: linked reference, not embedded.** Assessments stay a fully separate system — no question-type authoring (Multiple Choice/True-False/Fill-in-the-Blank/Matching/Essay) inside the note editor. What notes get instead is a reference/link to an existing assessment.
+
+Built as `AssessmentChip` (`lib/tiptap/assessment-node.tsx`), the same pattern as #6's `ResourceChip` (`[[resource:UUID]]`) applied to a new `[[assessment:UUID]]` marker: a read-only card (title, type, term, max score, weight) rendered inline, with a link out to `/dashboard/teacher/grades/[assessmentId]` and a "Remove from note" action. No editing UI on the chip itself — nothing about the assessment is editable from here, only its title/id link.
+
+- `NoteEditor.tsx`: registered the node, new `assessments` prop synced into `editor.storage.assessmentChip`, and a "Link assessment" toolbar dropdown next to "Insert resource." Note stats bar now also shows a "N linked assessments" count.
+- `NoteWorkspace.tsx` / `page.tsx`: `assessments` threaded down from a new server query scoped to the topic's subject **and** class — not teacher. A topic has no `class_id` of its own (`curriculum_topics` is keyed by education_level/level_number, taught across every class at that level), so "matching class" resolves to every class at the topic's level for the school's current academic year (from `school_settings.current_academic_year`, the same source of truth the teacher notes list page already uses — not a calendar-derived guess). Any teacher's assessment for one of those classes is linkable, not just the current teacher's own, since a note is shared department content, not personal to whoever's editing it. The class each assessment belongs to is resolved into a plain `classLabel` string at the query site and shown in both the picker and the chip's card, since results can now span multiple classes/teachers for the same subject.
+- **Published/student-facing content**: `TopicContent.tsx`'s `splitContentByMarkers` now strips `[[assessment:UUID]]` markers before rendering, rather than leaking them as literal `[[assessment:...]]` text (its `RESOURCE_MARKER` regex doesn't recognize this marker shape at all, so an unmatched marker would otherwise fall straight through into rendered text). `NoteSlideView.tsx` inherits this fix for free since it calls the same `splitContentByMarkers`. Assessment links are teacher-only for now — no student-facing assessment card rendering was built as part of this pass.
+
+Not done as part of this pass, and out of scope for the "linked reference" decision as built: any question-type authoring, and any student-facing rendering of the linked assessment (currently invisible to students entirely, by design — see above).
 
 ## 17. Callout Components — DONE
 
@@ -328,7 +335,7 @@ Not really an editor feature (no TipTap/node-view work involved) — logged here
 5. ~~#8 slash commands, #17 callouts~~ — DONE. #15 learning objectives SUSPENDED, skip
 6. ~~#13 autosave~~ — DONE. ~~#28 word stats~~ — DONE. ~~#12 resizable panes~~ — NOT NEEDED (no split pane exists post-migration)
 7. ~~#10 block-based editing~~ — V1 DONE (see status above for what's deferred). ~~#34 drag-and-drop reordering~~ — DONE, all four (sections/images/resources/activities) confirmed working, no gaps left.
-8. ~~#30 Focus Mode~~ — DONE (upstream). ~~#31 Fullscreen Editing~~ — DONE (upstream). ~~#37 Accessibility~~ — DONE (this session: keyboard reordering for all draggable node types including ResourceChip, screen-reader labeling across the toolbar/bubble-menus/slash-command/EmojiPicker/SymbolPicker, adjustable font size/high contrast/dyslexia font, and ARIA landmark roles -- see #37's entry above for the full breakdown and what's still open for a future pass). ~~#33 Resource Sidebar~~ — DONE (upstream, `ResourceSidebar.tsx`). ~~#32 Mobile Optimization~~ — DONE (this session: Resources tab, the last gap from the original Write/Preview/Resources scope). Everything else (#20–24, #26, #27, #35, #36) is lower priority and additive -- new Node types or standalone features rather than gaps in what's shipped. No single obvious NEXT among them; pick based on what's actually being asked for next rather than working strictly down the list.
+8. ~~#30 Focus Mode~~ — DONE (upstream). ~~#31 Fullscreen Editing~~ — DONE (upstream). ~~#37 Accessibility~~ — DONE (this session: keyboard reordering for all draggable node types including ResourceChip, screen-reader labeling across the toolbar/bubble-menus/slash-command/EmojiPicker/SymbolPicker, adjustable font size/high contrast/dyslexia font, and ARIA landmark roles -- see #37's entry above for the full breakdown and what's still open for a future pass). ~~#33 Resource Sidebar~~ — DONE (upstream, `ResourceSidebar.tsx`). ~~#32 Mobile Optimization~~ — DONE (this session: Resources tab, the last gap from the original Write/Preview/Resources scope). ~~#16 Assessment Block~~ — DONE (this session: `AssessmentChip`, linked-not-embedded per the recorded product decision). Everything else (#20–24, #26, #27, #35, #36) is lower priority and additive -- new Node types or standalone features rather than gaps in what's shipped. No single obvious NEXT among them; pick based on what's actually being asked for next rather than working strictly down the list.
 
 ## Before building, verify these already exist
 

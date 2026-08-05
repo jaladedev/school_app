@@ -6,6 +6,7 @@ import { NoteSlideView } from "@/components/NoteSlideView";
 import { BellTimer, type BellTimerEntry } from "@/components/BellTimer";
 import { ResourceSidebar } from "@/components/ResourceSidebar";
 import type { TopicResource } from "@/types/database";
+import type { LinkableAssessment } from "@/lib/tiptap/assessment-node";
 
 export function NoteWorkspace({
   topicId,
@@ -13,6 +14,7 @@ export function NoteWorkspace({
   initialContent,
   initialStatus,
   resources,
+  assessments = [],
   placeholder,
   todaysEntries = [],
 }: {
@@ -21,6 +23,11 @@ export function NoteWorkspace({
   initialContent: string;
   initialStatus: "draft" | "published" | "archived" | "unwritten";
   resources: TopicResource[];
+  // Assessments linkable (not embeddable, see #16) from this note --
+  // scoped to the topic's subject + matching classes, fetched
+  // server-side in page.tsx, open to any teacher's assessments for
+  // those classes (not just the current teacher's own).
+  assessments?: LinkableAssessment[];
   placeholder?: string;
   todaysEntries?: BellTimerEntry[];
 }) {
@@ -83,6 +90,7 @@ export function NoteWorkspace({
               initialContent={initialContent}
               initialStatus={initialStatus}
               resources={resources}
+              assessments={assessments}
               placeholder={placeholder}
               onResourcesChange={setSidebarResources}
               mobileTab={mobileTab}
