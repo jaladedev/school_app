@@ -18,8 +18,15 @@ export default async function NewQuizPage() {
 
   const assignedSubjectIds = teacherProfile?.subjects_taught ?? [];
 
-  const { data: allSubjects } = await supabase.from("subjects").select("id, name").order("name");
-  const subjects = (allSubjects ?? []).filter((s) => assignedSubjectIds.includes(s.id));
+  const { data: allSubjects } = await supabase
+    .from("subjects")
+    .select("id, name, education_level, min_level_number, max_level_number")
+    .order("education_level")
+    .order("min_level_number")
+    .order("name");
+  const subjects = (allSubjects ?? []).filter((s: { id: string }) =>
+    assignedSubjectIds.includes(s.id)
+  );
 
   const { data: classes } = await supabase
     .from("classes")

@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { createQuiz } from "@/lib/actions/quiz";
 import { emitToast } from "@/lib/toast";
 import { QuestionText } from "@/components/QuestionText";
+import { type EducationLevel } from "@/types/database";
+
+const LEVEL_LABELS: Record<EducationLevel, string> = {
+  primary: "Primary",
+  jss: "Junior Secondary (JSS)",
+  sss: "Senior Secondary (SS)",
+};
 
 type QuestionType = "mcq" | "true_false" | "fill_blank" | "matching" | "essay";
 type OptionDraft = { text: string; isCorrect: boolean; matchPrompt?: string };
@@ -55,7 +62,13 @@ export function QuizBuilder({
   academicYear,
   term,
 }: {
-  subjects: { id: string; name: string }[];
+  subjects: {
+    id: string;
+    name: string;
+    education_level: EducationLevel;
+    min_level_number: number;
+    max_level_number: number;
+  }[];
   classes: { id: string; label: string }[];
   academicYear: string;
   term: number;
@@ -194,11 +207,27 @@ export function QuizBuilder({
           onChange={(e) => setSubjectId(e.target.value)}
           className="rounded-lg border border-rule px-3 py-2 text-sm"
         >
-          {subjects.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
+          {(["primary", "jss", "sss"] as EducationLevel[])
+            .map((level) => ({
+              level,
+              items: subjects.filter((s) => s.education_level === level),
+            }))
+            .filter(({ items }) => items.length > 0)
+            .map(({ level, items }) => (
+              <optgroup key={level} label={LEVEL_LABELS[level]}>
+                {items.map((s) => {
+                  const range =
+                    s.min_level_number === s.max_level_number
+                      ? `${s.min_level_number}`
+                      : `${s.min_level_number}–${s.max_level_number}`;
+                  return (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({range})
+                    </option>
+                  );
+                })}
+              </optgroup>
+            ))}
         </select>
         <select
           value={classId}

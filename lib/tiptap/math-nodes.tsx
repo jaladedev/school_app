@@ -186,6 +186,27 @@ const MathFieldInput = forwardRef<
     return () => cancelAnimationFrame(raf);
   }, [ready, autoFocusToken]);
 
+  // Capture-phase stopPropagation for math-field to prevent Shadow DOM events
+  // from escaping to the editor and breaking contentEditable
+  useEffect(() => {
+    if (!fieldRef.current) return;
+    const stopEvent = (e: Event) => {
+      e.stopPropagation();
+    };
+    fieldRef.current.addEventListener("mousedown", stopEvent, true);
+    fieldRef.current.addEventListener("mouseup", stopEvent, true);
+    fieldRef.current.addEventListener("click", stopEvent, true);
+    fieldRef.current.addEventListener("keydown", stopEvent, true);
+    fieldRef.current.addEventListener("keyup", stopEvent, true);
+    return () => {
+      fieldRef.current?.removeEventListener("mousedown", stopEvent, true);
+      fieldRef.current?.removeEventListener("mouseup", stopEvent, true);
+      fieldRef.current?.removeEventListener("click", stopEvent, true);
+      fieldRef.current?.removeEventListener("keydown", stopEvent, true);
+      fieldRef.current?.removeEventListener("keyup", stopEvent, true);
+    };
+  }, [ready]);
+
   if (!ready)
     return (
       <div className="min-w- w-full rounded border border-rule px-2 py-1.5 text-sm text-ink-soft">
@@ -202,14 +223,13 @@ const MathFieldInput = forwardRef<
         onValueChange((e.currentTarget as MathfieldElement).value)
       }
       onKeyDown={(e: React.KeyboardEvent) => {
+        e.stopPropagation();
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
-          e.stopPropagation();
           onCommit(fieldRef.current?.value ?? "");
         }
         if (e.key === "Escape") {
           e.preventDefault();
-          e.stopPropagation();
           onCancel();
         }
       }}
@@ -262,23 +282,19 @@ function makeMathView(displayMode: boolean) {
       const isMathliveUi = (n: globalThis.Node) =>
         n instanceof Element && (n.closest?.('[class*="ML__"]') || n.tagName === "MATH-FIELD");
       const onDown = (e: globalThis.MouseEvent) => {
+        // Use composedPath() to detect clicks through Shadow DOM boundaries
         const path = (e as any).composedPath?.() as globalThis.Node[] | undefined;
-        const target = e.target as unknown as globalThis.Node;
-        const inside = path
-          ? path.some(
-              (n) =>
-                n === popupRef.current ||
-                n === anchorRef.current ||
-                (n instanceof Element &&
-                  (popupRef.current?.contains(n as globalThis.Node) ||
-                    anchorRef.current?.contains(n as globalThis.Node))) ||
-                isMathliveUi(n)
-            )
-          : !!(
-              popupRef.current?.contains(target) ||
-              anchorRef.current?.contains(target) ||
-              isMathliveUi(target)
-            );
+        if (!path) return; // No composedPath() support, assume inside
+        
+        const inside = path.some(
+          (n) =>
+            n === popupRef.current ||
+            n === anchorRef.current ||
+            (n instanceof Element &&
+              (popupRef.current?.contains(n as globalThis.Node) ||
+                anchorRef.current?.contains(n as globalThis.Node))) ||
+            isMathliveUi(n)
+        );
         if (inside) return;
         updateAttributes({ latex: draftRef.current });
         setEditing(false);
@@ -322,8 +338,24 @@ function makeMathView(displayMode: boolean) {
               ref={popupRef}
               style={{ position: "fixed", top: portalPos.top, left: portalPos.left }}
               className="max-w- z-[100] w-max rounded-md border border-marigold bg-white p-2 shadow-lg"
-              onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-              onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
+              onMouseDown={(e: React.MouseEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onMouseUp={(e: React.MouseEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                e.stopPropagation();
+              }}
+              onKeyUp={(e: React.KeyboardEvent) => {
+                e.stopPropagation();
+              }}
             >
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <div className="flex flex-wrap gap-0.5">
