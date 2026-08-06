@@ -16,7 +16,7 @@ export default async function StudentQuizzesPage() {
   const { data: attempts } = profile
     ? await supabase
         .from("quiz_attempts")
-        .select("id, quiz_id, submitted_at, score, total_points")
+        .select("id, quiz_id, submitted_at, score, total_points, grade_id")
         .eq("student_id", profile.id)
     : { data: [] };
 
@@ -41,6 +41,14 @@ export default async function StudentQuizzesPage() {
     : { data: [] };
   const attemptsPendingGrading = new Set((pendingEssays ?? []).map((r) => r.attempt_id));
 
+  const gradeIds = (attempts ?? []).map((a) => a.grade_id).filter((id): id is string => !!id);
+  const { data: grades } = gradeIds.length
+    ? await supabase.from("grades").select("id, moderation_status").in("id", gradeIds)
+    : { data: [] };
+  const approvedGradeIds = new Set(
+    (grades ?? []).filter((g) => g.moderation_status === "approved").map((g) => g.id)
+  );
+
   const attemptByQuiz = new Map((attempts ?? []).map((a) => [a.quiz_id, a]));
 
   return (
@@ -53,6 +61,8 @@ export default async function StudentQuizzesPage() {
           const attempt = attemptByQuiz.get(q.id);
           const submitted = !!attempt?.submitted_at;
           const pendingGrading = !!attempt && attemptsPendingGrading.has(attempt.id);
+          const pendingApproval =
+            !!attempt && !pendingGrading && !approvedGradeIds.has(attempt.grade_id ?? "");
           const closed = q.closes_at ? new Date(q.closes_at) < new Date() : false;
 
           return (
@@ -73,6 +83,13 @@ export default async function StudentQuizzesPage() {
                     className="rounded-full bg-marigold/20 px-2.5 py-1 text-xs font-medium text-ink"
                   >
                     Submitted — grading in progress
+                  </span>
+                ) : pendingApproval ? (
+                  <span
+                    title="Your score is computed but hasn't been approved yet — it'll appear here and on your grades page once that's done."
+                    className="rounded-full bg-marigold/20 px-2.5 py-1 text-xs font-medium text-ink"
+                  >
+                    Submitted — pending approval
                   </span>
                 ) : (
                   <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-xs font-medium text-leaf">
