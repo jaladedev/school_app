@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { NoteEditor, type NoteEditorHandle } from "@/components/NoteEditor";
 import { NoteSlideView } from "@/components/NoteSlideView";
+import { TopicContent } from "@/components/TopicContent";
 import { BellTimer, type BellTimerEntry } from "@/components/BellTimer";
 import { ResourceSidebar } from "@/components/ResourceSidebar";
 import type { TopicResource } from "@/types/database";
@@ -39,7 +40,7 @@ export function NoteWorkspace({
   // rather than a NoteEditor-internal-only concept so it's a real,
   // desktop-visible mode in this top pill, not just the mobile-only
   // Write/Preview tab bar NoteEditor already had.
-  const [mode, setMode] = useState<"edit" | "preview" | "present">("edit");
+  const [mode, setMode] = useState<"edit" | "preview" | "student" | "present">("edit");
   const editorRef = useRef<NoteEditorHandle>(null);
   // Seeded from the server-fetched `resources` prop, then kept live by
   // NoteEditor's `onResourcesChange` callback -- so the sidebar reflects
@@ -75,6 +76,17 @@ export function NoteWorkspace({
           }`}
         >
           Preview
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("student")}
+          disabled={!noteId}
+          title={!noteId ? "Save the note once before viewing as a student" : undefined}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40 ${
+            mode === "student" ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"
+          }`}
+        >
+          Student view
         </button>
         <button
           type="button"
@@ -124,6 +136,8 @@ export function NoteWorkspace({
             </div>
           )}
         </div>
+      ) : mode === "student" ? (
+        <TopicContent content={initialContent} resources={resources} />
       ) : (
         <>
           {/* Bell timer sits above the slide content in Present mode

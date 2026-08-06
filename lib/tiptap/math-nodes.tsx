@@ -285,7 +285,7 @@ function makeMathView(displayMode: boolean) {
         // Use composedPath() to detect clicks through Shadow DOM boundaries
         const path = (e as any).composedPath?.() as globalThis.Node[] | undefined;
         if (!path) return; // No composedPath() support, assume inside
-        
+
         const inside = path.some(
           (n) =>
             n === popupRef.current ||

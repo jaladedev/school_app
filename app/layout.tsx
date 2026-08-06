@@ -5,6 +5,7 @@ import { ToastProvider } from "@/components/ToastProvider";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { OfflineAttendanceSync } from "@/components/OfflineAttendanceSync";
 import "./globals.css";
+import "mathlive/static.css";
 
 export const metadata: Metadata = {
   title: "School Management",
