@@ -206,18 +206,18 @@ export default async function TeacherNoteEditPage({
     <div>
       <Link
         href="/dashboard/teacher/notes"
-        className="mb-2 inline-block text-sm text-leaf hover:underline"
+        className="mb-2 inline-block text-sm text-leaf hover:underline print:hidden"
       >
         ← My subjects
       </Link>
-      <p className="mb-1 text-xs uppercase tracking-wide text-leaf">
+      <p className="mb-1 text-xs uppercase tracking-wide text-leaf print:hidden">
         {topic?.subjects?.name} · {topic && formatLevel(topic.education_level, topic.level_number)}{" "}
         · Term {topic?.term}
       </p>
-      <h1 className="mb-6 font-display text-2xl font-semibold text-ink">{topic?.title}</h1>
+      <h1 className="mb-6 font-display text-2xl font-semibold text-ink print:hidden">{topic?.title}</h1>
 
       {note?.status === "published" && (
-        <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="mb-4 flex flex-wrap items-center gap-3 print:hidden">
           <p className="text-xs font-medium">
             {note.moderation_status === "pending" && (
               <span className="rounded-full bg-marigold/20 px-2.5 py-1 text-marigold-text">
@@ -278,7 +278,7 @@ export default async function TeacherNoteEditPage({
         }))}
       />
       {!!versions?.length && (
-        <section className="mt-6 rounded-xl border border-rule bg-white p-4">
+        <section className="mt-6 rounded-xl border border-rule bg-white p-4 print:hidden">
           <h2 className="font-display text-lg font-semibold text-ink">Version history</h2>
           <div className="mt-3 space-y-2">
             {versions.map((version, i) => (

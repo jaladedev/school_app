@@ -82,7 +82,7 @@ export function NoteWorkspace({
 
   return (
     <div>
-      <div className="mb-3 inline-flex rounded-lg border border-rule bg-paper p-1">
+      <div className="mb-3 inline-flex rounded-lg border border-rule bg-paper p-1 print:hidden">
         <button
           type="button"
           onClick={() => setMode("edit")}

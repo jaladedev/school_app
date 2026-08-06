@@ -266,8 +266,195 @@ h4 {
 }
 
 @media print {
+  /* ── Page setup ─────────────────────────────────────────────────── */
+  @page {
+    margin: 18mm 15mm;
+    size: A4;
+  }
+
   body {
     background: white;
+    color: #000;
+    font-size: 11pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── App chrome — hide everything except the handout card ───────── */
+
+  /* Sidebar nav rendered by the dashboard layout */
+  nav,
+  aside,
+  header,
+  [data-sidebar],
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Page-level chrome marked print:hidden in page.tsx /
+     NoteWorkspace mode pill */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* ── Handout card — remove screen-only decoration ───────────────── */
+  .rounded-2xl.border.border-rule.bg-white {
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Typography ─────────────────────────────────────────────────── */
+  .topic-prose h1 {
+    font-size: 18pt;
+    margin-top: 16pt;
+  }
+  .topic-prose h2 {
+    font-size: 15pt;
+    margin-top: 14pt;
+  }
+  .topic-prose h3 {
+    font-size: 13pt;
+    margin-top: 12pt;
+  }
+  .topic-prose h4 {
+    font-size: 11pt;
+    margin-top: 10pt;
+  }
+  .topic-prose p,
+  .topic-prose li {
+    line-height: 1.55;
+  }
+
+  /* ── Page breaks ─────────────────────────────────────────────────── */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  figure, table, pre, blockquote,
+  /* Callout cards, resource embeds */
+  .callout, [data-callout], [data-resource] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* Section nodes — prefer a break before a new major heading section
+     rather than mid-paragraph, but don't force it */
+  .note-section {
+    break-before: auto;
+  }
+
+  /* ── Tables ──────────────────────────────────────────────────────── */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 10pt;
+  }
+  th,
+  td {
+    border: 1px solid #aaa;
+    padding: 4pt 6pt;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #f0f0f0 !important;
+    font-weight: 600;
+  }
+
+  /* ── Code blocks ─────────────────────────────────────────────────── */
+  pre,
+  code {
+    font-size: 9pt;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border: 1px solid #ddd;
+    border-radius: 3pt;
+  }
+  pre {
+    padding: 6pt 8pt;
+    background: #f8f8f8 !important;
+  }
+
+  /* ── Callout blocks (:::tip / :::warning etc.) ────────────────────── */
+  /* TopicContent (student/handout view) renders :::type fences as plain
+     paragraphs — no special treatment needed. The [data-callout] rule
+     below targets the editor-only TipTap node view which is never visible
+     in handout mode, but is included defensively. */
+  [data-callout] {
+    border-left: 3pt solid #aaa;
+    padding: 6pt 10pt;
+    margin: 8pt 0;
+    background: #f9f9f9 !important;
+  }
+
+  /* ── Math (KaTeX already renders as HTML — just ensure colour) ─── */
+  .katex {
+    color: #000 !important;
+  }
+
+  /* ── Mermaid diagrams — SVG already in DOM, just ensure sizing ─── */
+  .mermaid svg,
+  [data-mermaid] svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* ── Resource embeds ─────────────────────────────────────────────── */
+  /* Images: cap width, centre them */
+  .topic-prose img {
+    max-width: 100% !important;
+    height: auto;
+    display: block;
+    margin: 6pt auto;
+  }
+
+  /* Video / audio iframes: replace with a note (can't print video) */
+  iframe,
+  video,
+  audio {
+    display: none !important;
+  }
+
+  /* ── Assessment & topic link chips ───────────────────────────────── */
+  /* These render as card-style bordered links in the browser.
+     In print, flatten them to a simple inline reference label. */
+  .topic-prose a.rounded-xl {
+    display: inline !important;
+    border: none !important;
+    padding: 0 !important;
+    background: none !important;
+    color: #000 !important;
+    gap: 0 !important;
+  }
+  /* Hide the decorative emoji icon, keep the text spans */
+  .topic-prose a.rounded-xl > span[aria-hidden] {
+    display: none !important;
+  }
+  .topic-prose a.rounded-xl .text-sm {
+    display: inline !important;
+    font-weight: 600;
+  }
+  .topic-prose a.rounded-xl .text-xs {
+    display: inline !important;
+    font-weight: normal;
+    color: #555 !important;
+  }
+  .topic-prose a.rounded-xl .text-xs::before {
+    content: " (";
+  }
+  .topic-prose a.rounded-xl .text-xs::after {
+    content: ")";
+  }
+
+  /* ── Resource chip (non-image) — show as italicised label ────────── */
+  [data-resource-id]:not(img) {
+    font-style: italic;
+    color: #555 !important;
   }
 }
 
