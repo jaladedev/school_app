@@ -148,6 +148,25 @@ export default async function TeacherNoteEditPage({
     };
   });
 
+  // Other topics in the same subject, linkable via TopicLinkChip
+  // ("see the note on Photosynthesis"). Scoped purely to subject_id, not
+  // education_level/level_number the way assessments' matchingClassIds
+  // is -- a topic link is a cross-reference for the teacher writing the
+  // note, not a per-class enrollment concern, and "within the same
+  // subject" (not "same level") is the scope this was actually asked
+  // for. The current topic itself is excluded -- linking a note to its
+  // own topic is never meaningful.
+  const { data: rawTopics } = topic
+    ? await supabase
+        .from("curriculum_topics")
+        .select("id, title, term, week_number, week_end_number")
+        .eq("subject_id", topic.subject_id)
+        .neq("id", resolvedParams.topicId)
+        .order("term", { ascending: true })
+        .order("sequence_order", { ascending: true })
+    : { data: [] };
+  const topics = rawTopics ?? [];
+
   // For the bell timer shown in Present mode — today's schedule for this
   // teacher, same query/shape the teacher dashboard already uses.
   const today = new Date();
@@ -234,6 +253,20 @@ export default async function TeacherNoteEditPage({
         initialStatus={note?.status ?? "unwritten"}
         resources={signedResources}
         assessments={assessments}
+        topics={topics}
+        topicMeta={
+          topic
+            ? {
+                title: topic.title,
+                subjectName: topic.subjects?.name,
+                term: topic.term,
+                weekNumber: topic.week_number,
+                weekEndNumber: topic.week_end_number,
+                educationLevel: topic.education_level,
+                levelNumber: topic.level_number,
+              }
+            : undefined
+        }
         placeholder={`Write about "${topic?.title}" here. Use tables for summaries, and the ∑ button for math.`}
         todaysEntries={(todaysEntries ?? []).map((entry) => ({
           id: entry.id,

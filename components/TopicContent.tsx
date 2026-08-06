@@ -71,11 +71,22 @@ const RESOURCE_MARKER = /\[\[resource:([0-9a-fA-F-]{36})(?:#([a-z]+)(?:-([a-z]+)
 // clickable, despite looking linked in the teacher's own editor.
 const ASSESSMENT_MARKER = /\[\[assessment:([0-9a-fA-F-]{36})\]\]/g;
 
+// TopicLinkChip's marker (lib/tiptap/topic-link-node.tsx) -- same
+// "split out and rendered as a real link" treatment as ASSESSMENT_MARKER
+// above, for the same reason: a teacher's "Link topic" needs to reach
+// students as something clickable, not get silently stripped.
+const TOPIC_LINK_MARKER = /\[\[topic:([0-9a-fA-F-]{36})\]\]/g;
+
 export type LinkedAssessment = {
   id: string;
   title: string;
   assessment_type: string;
   quizId?: string;
+};
+
+export type LinkedTopic = {
+  id: string;
+  title: string;
 };
 
 const ASSESSMENT_TYPE_ICON: Record<string, string> = {
@@ -93,27 +104,31 @@ const ASSESSMENT_TYPE_ICON: Record<string, string> = {
 export type ContentPart =
   | { type: "text"; value: string }
   | { type: "resource"; resource: TopicResource; size?: ImageSize; align?: ImageAlign }
-  | { type: "assessment"; assessment: LinkedAssessment };
+  | { type: "assessment"; assessment: LinkedAssessment }
+  | { type: "topic"; topic: LinkedTopic };
 
 export function splitContentByMarkers(
   content: string,
   resources: TopicResource[],
-  linkedAssessments: LinkedAssessment[] = []
+  linkedAssessments: LinkedAssessment[] = [],
+  linkedTopics: LinkedTopic[] = []
 ): { parts: ContentPart[]; leftover: TopicResource[] } {
   const assessmentsById = new Map(linkedAssessments.map((a) => [a.id, a]));
+  const topicsById = new Map(linkedTopics.map((t) => [t.id, t]));
   const byId = new Map(resources.map((r) => [r.id, r]));
   const usedIds = new Set<string>();
   const parts: ContentPart[] = [];
 
-  // Two marker shapes can appear interleaved in the same content string
-  // ([[resource:...]] and [[assessment:...]]), so both regexes have to be
-  // walked together in document order -- running RESOURCE_MARKER over the
-  // whole string first (as the old ASSESSMENT_MARKER-strip-then-
-  // RESOURCE_MARKER-split approach effectively did) would have been fine
-  // only because assessment markers were being deleted outright; now that
-  // they render as real content, deleting them first would silently
-  // reorder them to "not present" instead of "in the right place".
-  const combined = new RegExp(`${RESOURCE_MARKER.source}|${ASSESSMENT_MARKER.source}`, "g");
+  // Three marker shapes can appear interleaved in the same content
+  // string ([[resource:...]], [[assessment:...]], [[topic:...]]), so all
+  // three regexes have to be walked together in document order -- same
+  // reasoning as the resource/assessment combined regex below: splitting
+  // any one of them out and processing it separately would silently
+  // reorder it to "not present" relative to the others.
+  const combined = new RegExp(
+    `${RESOURCE_MARKER.source}|${ASSESSMENT_MARKER.source}|${TOPIC_LINK_MARKER.source}`,
+    "g"
+  );
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   combined.lastIndex = 0;
@@ -141,6 +156,11 @@ export function splitContentByMarkers(
       // Same silent-drop behavior for a deleted/inaccessible assessment
       // (e.g. RLS denies it, or it was removed after the note was
       // published) -- no broken "[[assessment:...]]" text on the page.
+    } else if (match[5]) {
+      // Topic-link marker: group 5 is the id.
+      const linkedTopic = topicsById.get(match[5]);
+      if (linkedTopic) parts.push({ type: "topic", topic: linkedTopic });
+      // Same silent-drop behavior as assessment/resource above.
     }
 
     lastIndex = match.index + match[0].length;
@@ -162,12 +182,19 @@ export function TopicContent({
   content,
   resources,
   linkedAssessments = [],
+  linkedTopics = [],
 }: {
   content: string;
   resources: TopicResource[];
   linkedAssessments?: LinkedAssessment[];
+  linkedTopics?: LinkedTopic[];
 }) {
-  const { parts, leftover } = splitContentByMarkers(content, resources, linkedAssessments);
+  const { parts, leftover } = splitContentByMarkers(
+    content,
+    resources,
+    linkedAssessments,
+    linkedTopics
+  );
 
   return (
     <div>
@@ -183,6 +210,8 @@ export function TopicContent({
           </div>
         ) : part.type === "assessment" ? (
           <AssessmentLink key={part.assessment.id} assessment={part.assessment} />
+        ) : part.type === "topic" ? (
+          <TopicLink key={part.topic.id} topic={part.topic} />
         ) : (
           <TopicResourceItem
             key={part.resource.id}
@@ -223,6 +252,26 @@ function AssessmentLink({ assessment }: { assessment: LinkedAssessment }) {
           {assessment.assessment_type.replace(/_/g, " ")}
           {assessment.quizId ? " · Start quiz" : " · View in grades"}
         </span>
+      </span>
+    </Link>
+  );
+}
+
+// Same "real clickable card, not a stripped marker" treatment as
+// AssessmentLink above. Every topic has the same one student-facing
+// route, so there's no quiz/non-quiz branching to do here.
+function TopicLink({ topic }: { topic: LinkedTopic }) {
+  return (
+    <Link
+      href={`/dashboard/student/topics/${topic.id}`}
+      className="my-4 flex items-center gap-3 rounded-xl border border-rule bg-white p-3 transition hover:border-marigold"
+    >
+      <span aria-hidden className="text-xl">
+        📄
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium text-ink">{topic.title}</span>
+        <span className="block text-xs text-ink-soft">Related topic</span>
       </span>
     </Link>
   );

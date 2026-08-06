@@ -12,6 +12,10 @@ import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
 // TopicContent's runs client-side (to place them in the rendered output).
 const ASSESSMENT_MARKER_ID = /\[\[assessment:([0-9a-fA-F-]{36})\]\]/g;
 
+// Same "kept in sync manually" relationship to
+// lib/tiptap/topic-link-node.tsx and TopicContent's TOPIC_LINK_MARKER.
+const TOPIC_LINK_MARKER_ID = /\[\[topic:([0-9a-fA-F-]{36})\]\]/g;
+
 export default async function TopicPage({ params }: { params: Promise<{ topicId: string }> }) {
   const resolvedParams = await params;
 
@@ -91,6 +95,19 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
     quizId: (Array.isArray(a.quizzes) ? a.quizzes[0] : a.quizzes)?.id,
   }));
 
+  // Same pattern as linkedAssessments above -- extract ids referenced in
+  // this note's content, then fetch just those rows. RLS on
+  // curriculum_topics already scopes what a student can see (see the
+  // "may belong to a different class" comment above) -- a linked topic
+  // outside that scope simply won't come back here, and TopicContent
+  // silently drops any marker it can't resolve, same as a deleted/
+  // inaccessible assessment.
+  const topicLinkIds = [...(note?.content ?? "").matchAll(TOPIC_LINK_MARKER_ID)].map((m) => m[1]);
+  const { data: linkedTopics } =
+    topicLinkIds.length > 0
+      ? await supabase.from("curriculum_topics").select("id, title").in("id", topicLinkIds)
+      : { data: [] };
+
   return (
     <div className="max-w-2xl">
       <Link
@@ -114,6 +131,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
           content={note.content}
           resources={displayResources}
           linkedAssessments={linkedAssessments}
+          linkedTopics={linkedTopics ?? []}
         />
       ) : (
         <p className="rounded-lg border border-rule bg-white p-4 text-sm text-ink-soft">

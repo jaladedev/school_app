@@ -54,6 +54,7 @@ import { emitToast } from "@/lib/toast";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { ResourceChip } from "@/lib/tiptap/resource-node";
 import { AssessmentChip, type LinkableAssessment } from "@/lib/tiptap/assessment-node";
+import { TopicLinkChip, type LinkableTopic } from "@/lib/tiptap/topic-link-node";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { SymbolPicker } from "@/components/SymbolPicker";
 import { clampPopoverToEditor } from "@/lib/tiptap/popover-position";
@@ -200,6 +201,11 @@ type NoteEditorProps = {
   // matching `onAssessmentsChange`/local-merge state the way resources
   // has for session-created uploads/diagrams.
   assessments?: LinkableAssessment[];
+  // Other topics (same subject) available to link into this note via
+  // TopicLinkChip -- see lib/tiptap/topic-link-node.tsx. Same shape as
+  // `assessments`: server-fetched, nothing here is ever created from
+  // inside the editor.
+  topics?: LinkableTopic[];
   placeholder?: string;
   // Fired whenever the live (server + locally-created-this-session)
   // resource list changes, so a sidebar rendered by the parent can stay
@@ -235,6 +241,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     initialStatus,
     resources = [],
     assessments = [],
+    topics = [],
     placeholder = "Write the topic explanation here. Use tables for summaries, and the ∑ button for math.",
     onResourcesChange,
     mobileTab: controlledMobileTab,
@@ -249,6 +256,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const [pickerOpen, setPickerOpen] = useState(false);
   const [assessmentPickerOpen, setAssessmentPickerOpen] = useState(false);
   const [assessmentFilter, setAssessmentFilter] = useState("");
+  const [topicPickerOpen, setTopicPickerOpen] = useState(false);
+  const [topicFilter, setTopicFilter] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [symbolPickerOpen, setSymbolPickerOpen] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
@@ -338,6 +347,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const dragDepthRef = useRef(0);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const assessmentPickerRef = useRef<HTMLDivElement | null>(null);
+  const topicPickerRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const symbolPickerRef = useRef<HTMLDivElement | null>(null);
   const colorPickerRef = useRef<HTMLDivElement | null>(null);
@@ -481,6 +491,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       TaskItem.configure({ nested: true }),
       ResourceChip,
       AssessmentChip,
+      TopicLinkChip,
       MathInline,
       MathBlock,
       Markdown.configure({
@@ -694,6 +705,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     editor.storage.assessmentChip.assessments = assessments;
   }, [editor, assessments]);
 
+  useEffect(() => {
+    if (!editor) return;
+    editor.storage.topicLinkChip.topics = topics;
+  }, [editor, topics]);
+
   const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;
 
   // The mobile Write/Preview/Resources tab bar only renders below `md`
@@ -716,6 +732,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     let images = 0;
     let resources = 0;
     let linkedAssessments = 0;
+    let linkedTopics = 0;
     ed.state.doc.descendants((node) => {
       if (node.type.name === "heading") headings++;
       else if (node.type.name === "table") tables++;
@@ -725,6 +742,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         if (resource?.resource_type === "image") images++;
       } else if (node.type.name === "assessmentChip") {
         linkedAssessments++;
+      } else if (node.type.name === "topicLinkChip") {
+        linkedTopics++;
       }
       return true;
     });
@@ -743,6 +762,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       images,
       resources,
       linkedAssessments,
+      linkedTopics,
     };
   }
 
@@ -1037,6 +1057,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   }, [assessmentPickerOpen]);
 
   useEffect(() => {
+    if (!topicPickerOpen) {
+      setTopicFilter("");
+      return;
+    }
+    function handleClickOutside(e: MouseEvent) {
+      if (topicPickerRef.current && !topicPickerRef.current.contains(e.target as Node)) {
+        setTopicPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [topicPickerOpen]);
+
+  useEffect(() => {
     if (!emojiPickerOpen) return;
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
@@ -1170,6 +1204,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   function handlePickAssessment(assessment: LinkableAssessment) {
     insertAssessmentMarker(assessment);
     setAssessmentPickerOpen(false);
+  }
+
+  function insertTopicMarker(topic: LinkableTopic) {
+    editor
+      ?.chain()
+      .focus()
+      .insertContent({ type: "topicLinkChip", attrs: { id: topic.id } })
+      .run();
+  }
+
+  function handlePickTopic(topic: LinkableTopic) {
+    insertTopicMarker(topic);
+    setTopicPickerOpen(false);
   }
 
   function insertTable() {
@@ -1524,6 +1571,62 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                               </span>
                               <span className="shrink-0 text-xs uppercase tracking-wide text-ink-soft">
                                 {assessment.assessment_type.replace(/_/g, " ")}
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative" ref={topicPickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setTopicPickerOpen((open) => !open)}
+                    disabled={isPending || topics.length === 0}
+                    className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink hover:bg-paper disabled:opacity-60"
+                    title={
+                      topics.length === 0
+                        ? "No other topics for this subject yet"
+                        : "Link another topic — opens its own note, doesn't embed its content"
+                    }
+                  >
+                    Link topic
+                  </button>
+                  {topicPickerOpen && topics.length > 0 && (
+                    <div className="absolute right-0 z-10 mt-1 w-64 rounded-lg border border-rule bg-white py-1 shadow-lg">
+                      {topics.length > 5 && (
+                        <div className="px-2 pb-1">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={topicFilter}
+                            onChange={(e) => setTopicFilter(e.target.value)}
+                            placeholder="Filter by title…"
+                            className="w-full rounded-md border border-rule px-2 py-1 text-sm outline-none focus-visible:border-marigold"
+                          />
+                        </div>
+                      )}
+                      <div className="max-h-64 overflow-y-auto">
+                        {topics
+                          .filter((t) =>
+                            t.title.toLowerCase().includes(topicFilter.trim().toLowerCase())
+                          )
+                          .map((topic) => (
+                            <button
+                              key={topic.id}
+                              type="button"
+                              onClick={() => handlePickTopic(topic)}
+                              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-paper"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate">{topic.title}</span>
+                                <span className="block truncate text-xs text-ink-soft">
+                                  Term {topic.term} ·{" "}
+                                  {topic.week_end_number > topic.week_number
+                                    ? `Weeks ${topic.week_number}–${topic.week_end_number}`
+                                    : `Week ${topic.week_number}`}
+                                </span>
                               </span>
                             </button>
                           ))}
@@ -2607,6 +2710,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                     <span>
                       {noteStats.linkedAssessments} linked assessment
                       {noteStats.linkedAssessments === 1 ? "" : "s"}
+                    </span>
+                  )}
+                  {noteStats.linkedTopics > 0 && (
+                    <span>
+                      {noteStats.linkedTopics} linked topic{noteStats.linkedTopics === 1 ? "" : "s"}
                     </span>
                   )}
                 </>

@@ -6,8 +6,11 @@ import { NoteSlideView } from "@/components/NoteSlideView";
 import { TopicContent } from "@/components/TopicContent";
 import { BellTimer, type BellTimerEntry } from "@/components/BellTimer";
 import { ResourceSidebar } from "@/components/ResourceSidebar";
+import { PrintButton } from "@/components/PrintButton";
+import { formatLevel, type EducationLevel } from "@/types/database";
 import type { TopicResource } from "@/types/database";
 import type { LinkableAssessment } from "@/lib/tiptap/assessment-node";
+import type { LinkableTopic } from "@/lib/tiptap/topic-link-node";
 
 export function NoteWorkspace({
   topicId,
@@ -16,8 +19,10 @@ export function NoteWorkspace({
   initialStatus,
   resources,
   assessments = [],
+  topics = [],
   placeholder,
   todaysEntries = [],
+  topicMeta,
 }: {
   topicId: string;
   noteId?: string;
@@ -29,8 +34,27 @@ export function NoteWorkspace({
   // server-side in page.tsx, open to any teacher's assessments for
   // those classes (not just the current teacher's own).
   assessments?: LinkableAssessment[];
+  // Other topics (same subject) linkable via TopicLinkChip -- same
+  // "fetched server-side, open to the whole department" shape as
+  // `assessments`.
+  topics?: LinkableTopic[];
   placeholder?: string;
   todaysEntries?: BellTimerEntry[];
+  // Just enough context for the printable Handout header -- title is
+  // already shown above this component on the page itself, but that
+  // header isn't print-visible (it sits outside NoteWorkspace, and
+  // nothing marks it print:hidden either, so it would otherwise print
+  // messily alongside the mode pill/toolbar). Optional: Handout mode
+  // simply omits the header block if this isn't passed.
+  topicMeta?: {
+    title: string;
+    subjectName?: string | null;
+    term: number;
+    weekNumber: number;
+    weekEndNumber: number;
+    educationLevel: EducationLevel;
+    levelNumber: number;
+  };
 }) {
   // #11 Better Preview: "preview" renders the same live NoteEditor/TipTap
   // doc as "edit" (so it always reflects the current, possibly-unsaved
@@ -40,7 +64,7 @@ export function NoteWorkspace({
   // rather than a NoteEditor-internal-only concept so it's a real,
   // desktop-visible mode in this top pill, not just the mobile-only
   // Write/Preview tab bar NoteEditor already had.
-  const [mode, setMode] = useState<"edit" | "preview" | "student" | "present">("edit");
+  const [mode, setMode] = useState<"edit" | "preview" | "student" | "present" | "handout">("edit");
   const editorRef = useRef<NoteEditorHandle>(null);
   // Seeded from the server-fetched `resources` prop, then kept live by
   // NoteEditor's `onResourcesChange` callback -- so the sidebar reflects
@@ -99,6 +123,17 @@ export function NoteWorkspace({
         >
           Present
         </button>
+        <button
+          type="button"
+          onClick={() => setMode("handout")}
+          disabled={!noteId}
+          title={!noteId ? "Save the note once before printing a handout" : undefined}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40 ${
+            mode === "handout" ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"
+          }`}
+        >
+          Handout
+        </button>
       </div>
 
       {/* Present mode shows the last-saved version of the note (what's
@@ -120,6 +155,7 @@ export function NoteWorkspace({
               initialStatus={initialStatus}
               resources={resources}
               assessments={assessments}
+              topics={topics}
               placeholder={placeholder}
               onResourcesChange={setSidebarResources}
               mobileTab={mobileTab}
@@ -137,7 +173,70 @@ export function NoteWorkspace({
           )}
         </div>
       ) : mode === "student" ? (
-        <TopicContent content={initialContent} resources={resources} />
+        // `assessments`/`topics` are the full linkable lists (server-
+        // fetched for the "Link assessment"/"Link topic" pickers), not
+        // filtered to only what this note actually references -- that's
+        // fine, TopicContent's splitContentByMarkers only renders the
+        // ones whose id shows up in the content, so passing the full
+        // list here is just "what's available to resolve against", same
+        // as it already is for the editor's own AssessmentChip/
+        // TopicLinkChip storage.
+        //
+        // linkedAssessments was missing here entirely before -- a
+        // teacher's own Student-view preview silently dropped every
+        // assessment link, unlike the real student-facing page (which
+        // does resolve and pass them). Fixed alongside adding
+        // linkedTopics rather than repeating the same gap for it.
+        <TopicContent
+          content={initialContent}
+          resources={resources}
+          linkedAssessments={assessments}
+          linkedTopics={topics}
+        />
+      ) : mode === "handout" ? (
+        // Reuses the exact same TopicContent render as Student view (math,
+        // tables, resources, topic/assessment links all render
+        // identically) -- the only difference is the wrapper: a printable
+        // card with its own topic/subject/term header (Student view has no
+        // need for that, since the student's own page already shows it),
+        // and a PrintButton instead of nothing. Same "last-saved content,
+        // not live unsaved edits" behavior as Present mode, for the same
+        // reason (see the comment above this whole conditional) --
+        // `initialContent` either way, not anything lifted from the live
+        // editor.
+        <div className="max-w-2xl">
+          <div className="mb-4 flex items-center justify-between print:hidden">
+            <p className="text-sm text-ink-soft">
+              Printable version — resource embeds, math, and links render the same as Student view.
+            </p>
+            <PrintButton />
+          </div>
+          <div className="rounded-2xl border border-rule bg-white p-8 print:border-0 print:p-0 print:shadow-none">
+            {topicMeta && (
+              <div className="mb-6 border-b-2 border-ink pb-4">
+                <h1 className="font-display text-2xl font-semibold text-ink">{topicMeta.title}</h1>
+                <p className="mt-1 text-sm text-ink-soft">
+                  {[
+                    topicMeta.subjectName,
+                    formatLevel(topicMeta.educationLevel, topicMeta.levelNumber),
+                    `Term ${topicMeta.term}`,
+                    topicMeta.weekEndNumber > topicMeta.weekNumber
+                      ? `Weeks ${topicMeta.weekNumber}–${topicMeta.weekEndNumber}`
+                      : `Week ${topicMeta.weekNumber}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              </div>
+            )}
+            <TopicContent
+              content={initialContent}
+              resources={resources}
+              linkedAssessments={assessments}
+              linkedTopics={topics}
+            />
+          </div>
+        </div>
       ) : (
         <>
           {/* Bell timer sits above the slide content in Present mode
