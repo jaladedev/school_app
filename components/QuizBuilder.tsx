@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createQuiz } from "@/lib/actions/quiz";
 import { emitToast } from "@/lib/toast";
 import { QuestionText } from "@/components/QuestionText";
+import { MathInsertButton } from "@/components/MathInsertButton";
+import { TimeSelect } from "@/components/TimeSelect";
 import { type EducationLevel } from "@/types/database";
 
 const LEVEL_LABELS: Record<EducationLevel, string> = {
@@ -56,6 +58,29 @@ function blankQuestion(): QuestionDraft {
   };
 }
 
+// datetime-local's native picker popup is date-only in several browsers
+// (Firefox included) -- the time has to be edited directly inside the
+// input's own time segment instead, which is easy to miss and reads as
+// "time isn't editable". Splitting into separate date + time inputs
+// keeps a real, always-visible native time control while still storing
+// a single "YYYY-MM-DDTHH:mm" string, same shape datetime-local used.
+// Neither field is gated on the other being filled first -- a teacher
+// can set the time before the date (or vice versa); joinDateTime fills
+// in today's date / midnight for whichever side is still blank so the
+// combined value stays valid either way.
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+function splitDateTime(value: string): { date: string; time: string } {
+  if (!value) return { date: "", time: "" };
+  const [date, time] = value.split("T");
+  return { date: date ?? "", time: time ?? "" };
+}
+function joinDateTime(date: string, time: string): string {
+  if (!date && !time) return "";
+  return `${date || todayIsoDate()}T${time || "00:00"}`;
+}
+
 export function QuizBuilder({
   subjects,
   classes,
@@ -83,9 +108,27 @@ export function QuizBuilder({
   const [questions, setQuestions] = useState<QuestionDraft[]>([blankQuestion()]);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // One textarea ref per question, keyed by index, so MathInsertButton
+  // can splice its $...$ / $$...$$ snippet in at the caret instead of
+  // just appending to the end of questionText.
+  const questionTextRefs = useRef<Map<number, HTMLTextAreaElement>>(new Map());
 
   function updateQuestion(index: number, patch: Partial<QuestionDraft>) {
     setQuestions((qs) => qs.map((q, i) => (i === index ? { ...q, ...patch } : q)));
+  }
+
+  function insertMathSnippet(index: number, snippet: string) {
+    const el = questionTextRefs.current.get(index);
+    const current = questions[index].questionText;
+    const start = el?.selectionStart ?? current.length;
+    const end = el?.selectionEnd ?? current.length;
+    const next = current.slice(0, start) + snippet + current.slice(end);
+    updateQuestion(index, { questionText: next });
+    const cursor = start + snippet.length;
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(cursor, cursor);
+    });
   }
 
   function setQuestionType(index: number, type: QuestionType) {
@@ -252,21 +295,39 @@ export function QuizBuilder({
         </label>
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
           Opens at (optional)
-          <input
-            type="datetime-local"
-            value={opensAt}
-            onChange={(e) => setOpensAt(e.target.value)}
-            className="rounded-lg border border-rule px-3 py-2 text-sm"
-          />
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={splitDateTime(opensAt).date}
+              onChange={(e) =>
+                setOpensAt(joinDateTime(e.target.value, splitDateTime(opensAt).time))
+              }
+              className="min-w-0 flex-1 rounded-lg border border-rule px-3 py-2 text-sm"
+            />
+            <TimeSelect
+              value={splitDateTime(opensAt).time}
+              onChangeAction={(time) => setOpensAt(joinDateTime(splitDateTime(opensAt).date, time))}
+            />
+          </div>
         </label>
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
           Closes at (optional)
-          <input
-            type="datetime-local"
-            value={closesAt}
-            onChange={(e) => setClosesAt(e.target.value)}
-            className="rounded-lg border border-rule px-3 py-2 text-sm"
-          />
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={splitDateTime(closesAt).date}
+              onChange={(e) =>
+                setClosesAt(joinDateTime(e.target.value, splitDateTime(closesAt).time))
+              }
+              className="min-w-0 flex-1 rounded-lg border border-rule px-3 py-2 text-sm"
+            />
+            <TimeSelect
+              value={splitDateTime(closesAt).time}
+              onChangeAction={(time) =>
+                setClosesAt(joinDateTime(splitDateTime(closesAt).date, time))
+              }
+            />
+          </div>
         </label>
       </div>
 
@@ -286,9 +347,16 @@ export function QuizBuilder({
               )}
             </div>
 
+            <div className="mb-1.5 flex items-center justify-end">
+              <MathInsertButton onInsertAction={(snippet) => insertMathSnippet(qIndex, snippet)} />
+            </div>
             <textarea
+              ref={(el) => {
+                if (el) questionTextRefs.current.set(qIndex, el);
+                else questionTextRefs.current.delete(qIndex);
+              }}
               required
-              placeholder="Question text — use $...$ for inline math, e.g. $x^2 + 3x - 4 = 0$"
+              placeholder="Question text"
               value={q.questionText}
               onChange={(e) => updateQuestion(qIndex, { questionText: e.target.value })}
               rows={2}

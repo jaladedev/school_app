@@ -50,6 +50,19 @@ function renderKatex(latex: string, displayMode: boolean) {
   }
 }
 
+// `mathVirtualKeyboard` is a runtime global mathlive attaches to
+// `window` once the module has been imported at least once (see
+// mathlive's own .d.ts -- it's declared under `declare global {
+// interface Window { ... } }`, not as a module export). With
+// math-virtual-keyboard-policy="manual" mathlive never auto-hides this
+// on its own, so every path that closes the popup (commit, cancel, a
+// genuine outside click) needs to hide it explicitly -- otherwise the
+// on-screen keyboard panel is left sitting on screen, orphaned from any
+// field, once the field itself has unmounted.
+function hideVirtualKeyboard() {
+  import("mathlive").then(() => window.mathVirtualKeyboard?.hide()).catch(() => {});
+}
+
 // `mathliveInsert`, where present, is what's sent to the mathlive
 // `<math-field>` in Visual mode instead of `insert` -- it wraps each empty
 // argument slot in `\placeholder{}`, mathlive's own construct for a
@@ -311,6 +324,7 @@ function makeMathView(displayMode: boolean) {
         if (inside) return;
         updateAttributes({ latex: draftRef.current });
         setEditing(false);
+        hideVirtualKeyboard();
       };
       document.addEventListener("mousedown", onDown, true);
       return () => document.removeEventListener("mousedown", onDown, true);
@@ -319,11 +333,13 @@ function makeMathView(displayMode: boolean) {
     const handleCommit = useCallback(() => {
       updateAttributes({ latex: draftRef.current });
       setEditing(false);
+      hideVirtualKeyboard();
     }, [updateAttributes]);
     const handleCancel = useCallback(() => {
       draftRef.current = node.attrs.latex ?? "";
       setLatexDraft(draftRef.current);
       setEditing(false);
+      hideVirtualKeyboard();
     }, [node.attrs.latex]);
 
     function insertSymbolLatex(insert: string, caret: number) {
@@ -401,6 +417,7 @@ function makeMathView(displayMode: boolean) {
                     type="button"
                     onMouseDown={(e: React.MouseEvent) => e.preventDefault()}
                     onClick={() => {
+                      hideVirtualKeyboard();
                       setMode("latex");
                       setStoredMathMode("latex");
                     }}
