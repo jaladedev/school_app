@@ -1,4 +1,4 @@
-export type ToastTone = "success" | "error";
+export type ToastTone = "success" | "error" | "info";
 export type ToastOptions = { duration?: number };
 
 export function emitToast(

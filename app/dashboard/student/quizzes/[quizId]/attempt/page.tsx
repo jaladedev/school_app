@@ -7,7 +7,7 @@ export default async function QuizAttemptPage({ params }: { params: Promise<{ qu
 
   const { data: quiz } = await supabase
     .from("quizzes")
-    .select("id, duration_minutes, assessments(title)")
+    .select("id, duration_minutes, closes_at, assessments(title)")
     .eq("id", quizId)
     .single();
 
@@ -27,6 +27,7 @@ export default async function QuizAttemptPage({ params }: { params: Promise<{ qu
       quizId={quiz.id}
       quizTitle={quiz.assessments?.title ?? "Quiz"}
       durationMinutes={quiz.duration_minutes}
+      closesAt={quiz.closes_at}
     />
   );
 }

@@ -60,14 +60,27 @@ function formatClock(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// Thresholds (seconds) at which a one-time "time's running out" toast
+// fires. Checked in descending order against secondsLeft each tick so a
+// slow tab (background throttling, etc.) that skips past one threshold
+// straight to a lower one still fires the lower one instead of being
+// silently skipped.
+const WARNING_THRESHOLDS_SECONDS = [5 * 60, 60];
+
 export function QuizAttemptRunner({
   quizId,
   quizTitle,
   durationMinutes,
+  closesAt,
 }: {
   quizId: string;
   quizTitle: string;
   durationMinutes: number;
+  // Absolute deadline for the quiz as a whole (from quizzes.closes_at),
+  // distinct from durationMinutes which is the per-attempt time budget.
+  // A student who starts late still has to submit by this wall-clock
+  // time even if their per-attempt duration hasn't run out yet.
+  closesAt?: string | null;
 }) {
   const router = useRouter();
   const [attemptId, setAttemptId] = useState<string | null>(null);
@@ -81,6 +94,10 @@ export function QuizAttemptRunner({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ score: number; total_points: number } | null>(null);
   const hasSubmitted = useRef(false);
+  // Tracks which warning thresholds have already fired this attempt, so
+  // the 400ms-granular countdown tick doesn't re-toast every second
+  // once secondsLeft is below a threshold.
+  const firedWarnings = useRef<Set<number>>(new Set());
   // fill_blank/essay/matching answers used to call answerQuizQuestion on
   // every keystroke -- fast typing fired a parallel RPC per character,
   // and with no ordering guarantee the last response to land (not the
@@ -118,8 +135,23 @@ export function QuizAttemptRunner({
         const elapsedSeconds = Math.floor(
           (Date.now() - new Date(attempt.started_at).getTime()) / 1000
         );
-        const remaining = Math.max(0, durationMinutes * 60 - elapsedSeconds);
+        const durationRemaining = durationMinutes * 60 - elapsedSeconds;
+        // The effective deadline is whichever comes first: the
+        // per-attempt duration running out, or the quiz's own closes_at
+        // passing (e.g. a 30-minute quiz that closes for everyone at
+        // 3pm, started by a student at 2:50pm only really gets 10
+        // minutes, not 30).
+        const closesAtRemaining = closesAt
+          ? Math.floor((new Date(closesAt).getTime() - Date.now()) / 1000)
+          : Infinity;
+        const remaining = Math.max(0, Math.min(durationRemaining, closesAtRemaining));
         setSecondsLeft(remaining);
+        // Any threshold the attempt is already past by the time it loads
+        // (e.g. resuming a page reload with 40s left) shouldn't toast —
+        // only crossings that happen live, in the ticking effect below.
+        for (const t of WARNING_THRESHOLDS_SECONDS) {
+          if (remaining <= t) firedWarnings.current.add(t);
+        }
 
         const rows = await getQuizAttemptQuestions(attempt.id);
         if (cancelled) return;
@@ -169,6 +201,15 @@ export function QuizAttemptRunner({
     if (secondsLeft <= 0) {
       doSubmit();
       return;
+    }
+    for (const t of WARNING_THRESHOLDS_SECONDS) {
+      if (secondsLeft <= t && !firedWarnings.current.has(t)) {
+        firedWarnings.current.add(t);
+        emitToast(
+          `${formatClock(secondsLeft)} left — your quiz will auto-submit when time runs out.`,
+          "info"
+        );
+      }
     }
     const timer = setTimeout(() => setSecondsLeft((s) => (s !== null ? s - 1 : s)), 1000);
     return () => clearTimeout(timer);

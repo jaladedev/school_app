@@ -64,7 +64,9 @@ export function ToastProvider() {
           className={`pointer-events-auto flex items-start gap-3 rounded-lg border px-3 py-2 text-sm shadow-sm ${
             toast.tone === "error"
               ? "border-clay bg-clay/10 text-clay"
-              : "border-leaf bg-leaf-soft text-leaf"
+              : toast.tone === "info"
+                ? "bg-marigold-soft border-marigold text-ink"
+                : "border-leaf bg-leaf-soft text-leaf"
           }`}
         >
           <span className="flex-1">{toast.message}</span>
