@@ -210,20 +210,15 @@ export async function moveStop(stopId: string, direction: "up" | "down") {
     .maybeSingle();
   if (!neighbor) return; // already at the top/bottom — nothing to do
 
-  // Two updates, not one transaction — swapping sequence_order under a
-  // unique(route_id, sequence_order) constraint needs a temporary
-  // out-of-range value in between, or the second update collides with
-  // whichever row hasn't moved yet.
-  const TEMP_ORDER = -1;
-  await admin.from("transport_stops").update({ sequence_order: TEMP_ORDER }).eq("id", stopId);
-  await admin
-    .from("transport_stops")
-    .update({ sequence_order: stop.sequence_order })
-    .eq("id", neighbor.id);
-  const { error } = await admin
-    .from("transport_stops")
-    .update({ sequence_order: neighbor.sequence_order })
-    .eq("id", stopId);
+  // Swap inside a single Postgres transaction via RPC so concurrent
+  // moveStop() calls on the same route can't interleave and corrupt the
+  // ordering. The old three-sequential-UPDATE approach had a race window
+  // between reads and writes that this closes.
+  // Migration: 2026_08_06c_swap_transport_stops_rpc.sql
+  const { error } = await admin.rpc("swap_transport_stop_order", {
+    p_stop_a: stopId,
+    p_stop_b: neighbor.id,
+  });
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin/transport");

@@ -1935,6 +1935,10 @@ export type Database = {
         Args: { p_min_days_between?: number };
         Returns: { reminders_sent: number; invoices_considered: number }[];
       };
+      swap_transport_stop_order: {
+        Args: { p_stop_a: string; p_stop_b: string };
+        Returns: void;
+      };
     };
   };
 };

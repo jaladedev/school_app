@@ -11,7 +11,14 @@ export async function saveReportCardRemark(input: {
   classTeacherRemark?: string;
   adminRemark?: string;
 }) {
-  const { id } = await assertRole(["admin", "teacher"], "Only staff can add report card remarks.");
+  const { id, role } = await assertRole(
+    ["admin", "teacher"],
+    "Only staff can add report card remarks."
+  );
+
+  if (role !== "admin" && input.adminRemark !== undefined) {
+    throw new Error("Only an admin can write the head teacher's remark.");
+  }
 
   const supabase = createClient();
 

@@ -118,19 +118,29 @@ async function cleanupOrphanedAuthUsers(admin: ReturnType<typeof createAdminClie
 
   const profileIds = new Set((profileRows ?? []).map((row) => row.id));
 
-  const { data: usersPage, error: listUsersError } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
+  // Paginate through ALL auth users
+  const allAuthUsers: { id: string }[] = [];
+  let page = 1;
+  while (true) {
+    const { data: usersPage, error: listUsersError } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 1000,
+    });
 
-  if (listUsersError) {
-    throw new Error(listUsersError.message);
+    if (listUsersError) throw new Error(listUsersError.message);
+
+    const batch = usersPage?.users ?? [];
+    allAuthUsers.push(...batch);
+
+    // Supabase returns fewer than perPage on the last page
+    if (batch.length < 1000) break;
+    page++;
   }
 
   const deletedIds: string[] = [];
   const errors: string[] = [];
 
-  for (const user of usersPage?.users ?? []) {
+  for (const user of allAuthUsers) {
     if (profileIds.has(user.id)) continue;
 
     const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);

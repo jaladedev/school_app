@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function sendMessage(recipientId: string, content: string) {
   const profile = await getCurrentProfile();
@@ -67,6 +68,10 @@ export async function markThreadRead(partnerId: string) {
  * per-user "hide for me" concept for messages themselves (that's what
  * archiving is for). This permanently removes the conversation for
  * both people, not just the caller.
+ *
+ * The deletion is audit-logged so admins can see who wiped what and
+ * approximately how many messages were removed — no data recovery, but
+ * at least there's a trace if a dispute arises later.
  */
 export async function deleteConversation(partnerId: string) {
   const profile = await getCurrentProfile();
@@ -75,6 +80,14 @@ export async function deleteConversation(partnerId: string) {
   }
 
   const supabase = createClient();
+
+  // Count messages before deleting so the audit entry is useful
+  const { count: messageCount } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .or(
+      `and(sender_id.eq.${profile.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${profile.id})`
+    );
 
   const { error } = await supabase
     .from("messages")
@@ -92,6 +105,20 @@ export async function deleteConversation(partnerId: string) {
     .delete()
     .eq("user_id", profile.id)
     .eq("partner_id", partnerId);
+
+  // Best-effort audit trail — deletion affects both parties so admins
+  // can investigate if the other participant reports missing messages.
+  await writeAuditLog({
+    entityType: "conversation",
+    entityId: profile.id,
+    action: "conversation_deleted",
+    actorId: profile.id,
+    metadata: {
+      deleted_by: profile.id,
+      partner_id: partnerId,
+      message_count: messageCount ?? 0,
+    },
+  });
 
   revalidatePath("/dashboard/messages");
 }

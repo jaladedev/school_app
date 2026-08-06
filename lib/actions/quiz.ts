@@ -345,8 +345,36 @@ export async function getQuizQuestionAnalytics(quizId: string): Promise<{
 }
 
 export async function setQuizPublished(quizId: string, isPublished: boolean) {
-  await assertRole(["admin", "teacher"], "Only an admin or teacher can do this.");
+  const { id: actorId, role: actorRole } = await assertRole(
+    ["admin", "teacher"],
+    "Only an admin or teacher can do this."
+  );
   const admin = createAdminClient();
+
+  // Teachers may only publish/unpublish their own quizzes. Admins can
+  // toggle any quiz — same ownership model as the quiz-preview RLS
+  // (is_quiz_owner / is_admin). Using the admin client for the ownership
+  // look-up bypasses any RLS gap that might let a teacher read another
+  // teacher's assessment row via the session client.
+  if (actorRole === "teacher") {
+    const { data: quiz } = await admin
+      .from("quizzes")
+      .select("assessment_id")
+      .eq("id", quizId)
+      .single();
+
+    if (!quiz) throw new Error("Quiz not found.");
+
+    const { data: assessment } = await admin
+      .from("assessments")
+      .select("created_by")
+      .eq("id", quiz.assessment_id)
+      .single();
+
+    if (assessment?.created_by !== actorId) {
+      throw new Error("You can only publish your own quizzes.");
+    }
+  }
 
   const { error } = await admin
     .from("quizzes")
