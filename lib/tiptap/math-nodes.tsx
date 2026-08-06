@@ -16,6 +16,7 @@ import { clampPopoverToEditor } from "./popover-position";
 type MathfieldElement = HTMLElement & {
   value: string;
   executeCommand: (command: string | [string, ...unknown[]]) => boolean;
+  placeholderSymbol: string;
 };
 
 declare global {
@@ -175,6 +176,18 @@ const MathFieldInput = forwardRef<
     if (!ready || !fieldRef.current) return;
     if (fieldRef.current.value !== initialValue) fieldRef.current.value = initialValue;
   }, [ready, initialValue]);
+
+  useEffect(() => {
+    if (!ready || !fieldRef.current) return;
+    // Default placeholderSymbol is U+25A2 (rounded-corner white square) --
+    // an obscure enough codepoint that it's missing from Windows' default
+    // UI font stack (Segoe UI doesn't cover it; the separate "Segoe UI
+    // Symbol" fallback font isn't being reached), rendering as a solid
+    // "missing glyph" tofu box tinted by MathLive's placeholder color
+    // instead of a proper hollow square. U+25A1 (plain white square) has
+    // universal coverage in basic fonts, so swap to that instead.
+    fieldRef.current.placeholderSymbol = "\u25A1";
+  }, [ready]);
 
   useEffect(() => {
     if (!ready) return;

@@ -6,7 +6,8 @@ import { cookies } from "next/headers";
 import type { Database } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
 
-// Plain wrapper around Node's own global fetch, forced to HTTP/1.1.
+// Plain wrapper around Node's own global fetch, forced to HTTP/1.1 --
+// but *only* outside Vercel (see the `isVercel` check below).
 //
 // NOT a singleton -- this Agent is constructed fresh on every call and
 // never stored on globalThis or at module scope, specifically to avoid the
@@ -25,6 +26,20 @@ import { serverEnv } from "@/lib/env.server";
 // one, so `getUserWithRetry`'s existing retry can actually succeed rather
 // than being doomed by construction. Logs and rethrows unchanged --
 // behavior (including existing retry logic) is otherwise unaffected.
+//
+// Vercel gate: that TLS corruption was local-machine AV/VPN interference,
+// never observed in production. The standalone `undici` npm package this
+// Agent comes from doesn't match the internal undici version Vercel's
+// Next.js runtime patches `fetch` through -- passing this dispatcher
+// there breaks the internal request-handler contract with
+// `UND_ERR_INVALID_ARG: invalid onRequestStart method`, which took down
+// *every* Supabase call (auth, REST) in production. Vercel sets
+// `process.env.VERCEL` in every one of its own environments (prod,
+// preview, `vercel dev`), so this restores the fix exactly where it's
+// needed (a developer's own machine) without it ever reaching Vercel's
+// runtime again.
+const isVercel = Boolean(process.env.VERCEL);
+
 export async function loggingFetch(
   input: RequestInfo | URL,
   init?: RequestInit
@@ -32,10 +47,17 @@ export async function loggingFetch(
   try {
     return await fetch(input, {
       ...init,
-      // @ts-expect-error -- `dispatcher` is an undici-specific extension
-      // to RequestInit; Node's global fetch is undici under the hood and
-      // accepts it, but the DOM lib types don't know about it.
-      dispatcher: new Agent({ allowH2: false }),
+      ...(isVercel
+        ? {}
+        : {
+            // `dispatcher` is an undici-specific extension to RequestInit;
+            // Node's global fetch is undici under the hood and accepts it,
+            // but the DOM lib types don't know about it. Object-spread
+            // here (rather than a direct property) means TS no longer
+            // does excess-property checking against it, so the type
+            // suppression comment this line used to need isn't required.
+            dispatcher: new Agent({ allowH2: false }),
+          }),
     });
   } catch (err) {
     const url =
