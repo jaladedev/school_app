@@ -8,6 +8,7 @@ import {
   answerQuizQuestion,
   submitQuizAttempt,
 } from "@/lib/actions/quizAttempt";
+import { getQuizPreviewQuestions } from "@/lib/actions/quiz";
 import { emitToast } from "@/lib/toast";
 import { QuestionText } from "@/components/QuestionText";
 import type { QuizAttemptQuestionRow } from "@/types/database";
@@ -19,6 +20,19 @@ type Question = {
   type: QuizAttemptQuestionRow["question_type"];
   options: { id: string; text: string; matchPrompt: string | null }[];
 };
+
+// Local scoring key used only in preview mode, built once at load from
+// quiz_options.is_correct (which the real student-facing RPCs never
+// expose — grading there happens server-side in submit_quiz_attempt so
+// a student can't read answers out of the network tab). Mirrors that
+// same SQL's per-type logic exactly (case-insensitive/trimmed compares,
+// matching all-or-nothing) so a teacher's practice score matches what a
+// student would actually get.
+type AnswerKeyEntry =
+  | { type: "options"; correctOptionId: string }
+  | { type: "fill_blank"; accepted: string[] }
+  | { type: "matching"; correctPairs: Record<string, string> }
+  | { type: "essay" };
 
 function groupQuestions(rows: QuizAttemptQuestionRow[]): {
   questions: Question[];
@@ -72,6 +86,7 @@ export function QuizAttemptRunner({
   quizTitle,
   durationMinutes,
   closesAt,
+  mode = "attempt",
 }: {
   quizId: string;
   quizTitle: string;
@@ -81,6 +96,12 @@ export function QuizAttemptRunner({
   // A student who starts late still has to submit by this wall-clock
   // time even if their per-attempt duration hasn't run out yet.
   closesAt?: string | null;
+  // "preview": a teacher/admin dry-run. No quiz_attempts row is ever
+  // created, no quiz_answers are persisted, no grade is recorded — the
+  // whole thing lives in this component's state and is scored locally
+  // on submit. closesAt is ignored in this mode (there's no real
+  // attempt for a deadline to apply to).
+  mode?: "attempt" | "preview";
 }) {
   const router = useRouter();
   const [attemptId, setAttemptId] = useState<string | null>(null);
@@ -94,6 +115,10 @@ export function QuizAttemptRunner({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ score: number; total_points: number } | null>(null);
   const hasSubmitted = useRef(false);
+  // Preview-mode-only scoring key, keyed by question id. Populated once
+  // when preview questions load; unused (stays empty) in normal attempt
+  // mode since real scoring happens server-side.
+  const answerKeyRef = useRef<Record<string, AnswerKeyEntry>>({});
   // Tracks which warning thresholds have already fired this attempt, so
   // the 400ms-granular countdown tick doesn't re-toast every second
   // once secondsLeft is below a threshold.
@@ -128,6 +153,56 @@ export function QuizAttemptRunner({
     let cancelled = false;
     (async () => {
       try {
+        if (mode === "preview") {
+          // No attempt row, no closes_at capping (there's no real
+          // attempt for a deadline to bind to) — just a plain
+          // duration_minutes countdown for a realistic feel.
+          setSecondsLeft(durationMinutes * 60);
+          const rows = await getQuizPreviewQuestions(quizId);
+          if (cancelled) return;
+          const qs: Question[] = [];
+          const key: Record<string, AnswerKeyEntry> = {};
+          for (const row of rows) {
+            const opts = [...(row.quiz_options ?? [])].sort(
+              (a, b) => a.sequence_order - b.sequence_order
+            );
+            qs.push({
+              id: row.id,
+              text: row.question_text,
+              points: row.points,
+              type: row.question_type,
+              options: opts.map((o) => ({
+                id: o.id,
+                text: o.option_text ?? "",
+                matchPrompt: o.match_prompt,
+              })),
+            });
+            if (row.question_type === "mcq" || row.question_type === "true_false") {
+              key[row.id] = {
+                type: "options",
+                correctOptionId: opts.find((o) => o.is_correct)?.id ?? "",
+              };
+            } else if (row.question_type === "fill_blank") {
+              key[row.id] = {
+                type: "fill_blank",
+                accepted: opts
+                  .filter((o) => o.is_correct)
+                  .map((o) => (o.option_text ?? "").trim().toLowerCase()),
+              };
+            } else if (row.question_type === "matching") {
+              const correctPairs: Record<string, string> = {};
+              for (const o of opts) correctPairs[o.id] = (o.option_text ?? "").trim().toLowerCase();
+              key[row.id] = { type: "matching", correctPairs };
+            } else {
+              key[row.id] = { type: "essay" };
+            }
+          }
+          answerKeyRef.current = key;
+          setQuestions(qs);
+          setLoading(false);
+          return;
+        }
+
         const attempt = await startQuizAttempt(quizId);
         if (cancelled) return;
         setAttemptId(attempt.id);
@@ -169,12 +244,43 @@ export function QuizAttemptRunner({
     return () => {
       cancelled = true;
     };
-  }, [quizId, durationMinutes]);
+  }, [quizId, durationMinutes, mode, closesAt]);
 
   const doSubmit = useCallback(async () => {
-    if (!attemptId || hasSubmitted.current) return;
+    if (hasSubmitted.current) return;
+    if (mode !== "preview" && !attemptId) return;
     hasSubmitted.current = true;
     setSubmitting(true);
+
+    if (mode === "preview") {
+      // Scored entirely client-side, mirroring submit_quiz_attempt's SQL
+      // per-type logic (see answerKeyRef comment) — nothing is written
+      // anywhere, so there's no server round trip to await here.
+      let score = 0;
+      for (const q of questions) {
+        const entry = answerKeyRef.current[q.id];
+        if (!entry) continue;
+        if (entry.type === "options") {
+          if (selectedAnswers[q.id] === entry.correctOptionId) score += q.points;
+        } else if (entry.type === "fill_blank") {
+          const answer = (textAnswers[q.id] ?? "").trim().toLowerCase();
+          if (answer && entry.accepted.includes(answer)) score += q.points;
+        } else if (entry.type === "matching") {
+          const pairs = matchedAnswers[q.id] ?? {};
+          const pairIds = Object.keys(entry.correctPairs);
+          const allCorrect = pairIds.every(
+            (optId) => (pairs[optId] ?? "").trim().toLowerCase() === entry.correctPairs[optId]
+          );
+          if (pairIds.length > 0 && allCorrect) score += q.points;
+        }
+        // essay: never auto-scored, same as the real submit flow.
+      }
+      const totalPoints = questions.reduce((sum, q) => sum + q.points, 0);
+      setResult({ score, total_points: totalPoints });
+      setSubmitting(false);
+      return;
+    }
+
     // Flush any answers still waiting out their debounce window so a
     // keystroke from the last 400ms isn't dropped by the submit.
     const timers = saveTimers.current;
@@ -186,7 +292,7 @@ export function QuizAttemptRunner({
     });
     await Promise.all(pendingSaves);
     try {
-      const res = await submitQuizAttempt(attemptId);
+      const res = await submitQuizAttempt(attemptId!);
       setResult(res);
     } catch (err) {
       emitToast(err instanceof Error ? err.message : "Something went wrong.", "error");
@@ -194,7 +300,7 @@ export function QuizAttemptRunner({
     } finally {
       setSubmitting(false);
     }
-  }, [attemptId]);
+  }, [attemptId, mode, questions, selectedAnswers, textAnswers, matchedAnswers]);
 
   useEffect(() => {
     if (secondsLeft === null || result) return;
@@ -257,9 +363,17 @@ export function QuizAttemptRunner({
     const hasEssay = questions.some((q) => q.type === "essay");
     return (
       <div className="max-w-lg rounded-xl border border-rule bg-white p-6 text-center">
-        <p className="mb-1 font-display text-xl font-semibold text-ink">Submitted</p>
+        <p className="mb-1 font-display text-xl font-semibold text-ink">
+          {mode === "preview" ? "Preview complete" : "Submitted"}
+        </p>
         <p className="mb-4 text-sm text-ink-soft">
-          {hasEssay ? (
+          {mode === "preview" ? (
+            <>
+              {result.score}/{result.total_points}
+              {hasEssay && " (essay questions excluded — they're never auto-scored)"} — this was a
+              preview, nothing was saved.
+            </>
+          ) : hasEssay ? (
             // Essay questions score 0 at submit time (submit_quiz_attempt
             // never auto-grades them) -- showing the raw result.score/
             // total_points here would understate the real total and read
@@ -279,10 +393,16 @@ export function QuizAttemptRunner({
           )}
         </p>
         <button
-          onClick={() => router.push("/dashboard/student/quizzes")}
+          onClick={() =>
+            router.push(
+              mode === "preview"
+                ? `/dashboard/teacher/quizzes/${quizId}`
+                : "/dashboard/student/quizzes"
+            )
+          }
           className="rounded-lg bg-leaf px-4 py-2 text-sm font-medium text-white hover:bg-leaf/90"
         >
-          Back to quizzes
+          {mode === "preview" ? "Back to quiz" : "Back to quizzes"}
         </button>
       </div>
     );
@@ -302,6 +422,12 @@ export function QuizAttemptRunner({
 
   return (
     <div className="max-w-2xl">
+      {mode === "preview" && (
+        <div className="bg-marigold-soft mb-4 rounded-xl border border-marigold px-3 py-2 text-sm text-ink">
+          <span className="font-medium">Preview mode</span> — you&apos;re dry-running this quiz as a
+          teacher. Nothing you do here is saved or scored for any student.
+        </div>
+      )}
       <div className="sticky top-0 z-10 mb-4 flex items-center justify-between rounded-xl border border-rule bg-white/95 p-3 backdrop-blur">
         <div>
           <p className="text-sm font-medium text-ink">{quizTitle}</p>
@@ -416,7 +542,7 @@ export function QuizAttemptRunner({
         disabled={submitting}
         className="mt-6 rounded-lg bg-leaf px-4 py-2 text-sm font-medium text-white hover:bg-leaf/90 disabled:opacity-60"
       >
-        {submitting ? "Submitting…" : "Submit quiz"}
+        {submitting ? "Submitting…" : mode === "preview" ? "Finish preview" : "Submit quiz"}
       </button>
     </div>
   );

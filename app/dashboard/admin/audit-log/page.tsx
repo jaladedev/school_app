@@ -6,6 +6,7 @@ const ENTITY_TYPES = [
   "profile",
   "teacher_profile",
   "assessment",
+  "quiz",
   "grade",
   "enrollment",
   "fee_structure",

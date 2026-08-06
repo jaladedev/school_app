@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 import { PublishToggle } from "@/components/PublishToggle";
 import { QuestionText } from "@/components/QuestionText";
 import { EssayGradingForm } from "@/components/EssayGradingForm";
@@ -14,7 +15,7 @@ export default async function TeacherQuizDetailPage({
   const { data: quiz } = await supabase
     .from("quizzes")
     .select(
-      "id, is_published, duration_minutes, opens_at, closes_at, assessments(title, max_score, term, academic_year, classes(name, arm))"
+      "id, is_published, duration_minutes, opens_at, closes_at, shuffle_questions, assessments(title, max_score, term, academic_year, classes(name, arm))"
     )
     .eq("id", quizId)
     .single();
@@ -84,10 +85,18 @@ export default async function TeacherQuizDetailPage({
           <p className="text-sm text-ink-soft">
             {quiz.assessments?.classes?.name} {quiz.assessments?.classes?.arm} ·{" "}
             {quiz.duration_minutes} min · {quiz.assessments?.max_score} points total
+            {quiz.shuffle_questions && " · shuffled per student"}
           </p>
         </div>
         <PublishToggle quizId={quiz.id} isPublished={quiz.is_published} />
       </div>
+
+      <Link
+        href={`/dashboard/teacher/quizzes/${quiz.id}/preview`}
+        className="mb-6 inline-block rounded-lg border border-rule px-3 py-2 text-sm font-medium text-ink hover:bg-paper"
+      >
+        Preview / dry-run this quiz
+      </Link>
 
       <div className="mb-6 rounded-xl border border-rule bg-white p-4 text-sm text-ink-soft">
         Scores are submitted with moderation status{" "}

@@ -623,6 +623,7 @@ export type Quiz = {
   opens_at: string | null;
   closes_at: string | null;
   is_published: boolean;
+  shuffle_questions: boolean;
   created_at: string;
 };
 

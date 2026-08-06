@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
+import { writeAuditLog } from "@/lib/audit";
 import { videoEmbedUrl } from "@/lib/video-embed";
 import { fetchLinkMetadata } from "@/lib/linkPreview";
 import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
@@ -196,6 +197,22 @@ export async function saveGrade(
 
   if (error) throw new Error(error.message);
 
+  // Regular teacher grade entry had no audit trail before this --
+  // gradesModeration.tsx already logs admin/HOD *approvals*, but not the
+  // actual score being typed in that gets approved. `entity_type: "grade"`
+  // matches what that file uses so both show up together under the same
+  // filter in /dashboard/admin/audit-log, rather than needing a second
+  // category. Not distinguishing create vs. update here -- upsert makes
+  // that a second query just to check, and "someone set this score to
+  // X" is the fact that matters for an audit trail either way.
+  await writeAuditLog({
+    entityType: "grade",
+    entityId: assessmentId,
+    action: "grade_saved",
+    actorId: teacherId,
+    metadata: { student_id: studentId, score, max_score: assessment.max_score },
+  });
+
   revalidatePath(`/dashboard/teacher/grades/${assessmentId}`);
   revalidatePath("/dashboard/admin/grades");
   revalidatePath(`/dashboard/admin/students/${studentId}/grades`);
@@ -326,20 +343,46 @@ export async function createStandardAssessmentSet(input: {
     return { created: [] as string[] };
   }
 
-  const { error } = await supabase.from("assessments").insert(
-    toCreate.map((a) => ({
-      subject_id: input.subjectId,
-      class_id: input.classId,
-      title: a.title,
-      assessment_type: a.assessment_type,
-      max_score: a.max_score,
-      term: input.term,
-      academic_year: input.academicYear,
-      created_by: teacherId,
-    }))
-  );
+  const { data: created, error } = await supabase
+    .from("assessments")
+    .insert(
+      toCreate.map((a) => ({
+        subject_id: input.subjectId,
+        class_id: input.classId,
+        title: a.title,
+        assessment_type: a.assessment_type,
+        max_score: a.max_score,
+        term: input.term,
+        academic_year: input.academicYear,
+        created_by: teacherId,
+      }))
+    )
+    .select("id, title");
 
   if (error) throw new Error(error.message);
+
+  // One entry per assessment (not one entry for the whole batch) so each
+  // shows up individually in /dashboard/admin/audit-log under its own
+  // entity_id -- consistent with how a single createCustomAssessment
+  // call logs one entry per assessment it creates.
+  await Promise.all(
+    (created ?? []).map((assessment) =>
+      writeAuditLog({
+        entityType: "assessment",
+        entityId: assessment.id,
+        action: "assessment_created",
+        actorId: teacherId,
+        metadata: {
+          kind: "standard_set",
+          title: assessment.title,
+          subject_id: input.subjectId,
+          class_id: input.classId,
+          term: input.term,
+          academic_year: input.academicYear,
+        },
+      })
+    )
+  );
 
   revalidatePath("/dashboard/teacher/grades");
   revalidatePath("/dashboard/admin/grades");
@@ -363,18 +406,39 @@ export async function createCustomAssessment(input: {
   const supabase = createClient();
   await assertTeacherAssignedTo(supabase, teacherId, input.subjectId, input.classId);
 
-  const { error } = await supabase.from("assessments").insert({
-    subject_id: input.subjectId,
-    class_id: input.classId,
-    title: input.title,
-    assessment_type: input.assessmentType,
-    max_score: input.maxScore,
-    term: input.term,
-    academic_year: input.academicYear,
-    created_by: teacherId,
-  });
+  const { data: created, error } = await supabase
+    .from("assessments")
+    .insert({
+      subject_id: input.subjectId,
+      class_id: input.classId,
+      title: input.title,
+      assessment_type: input.assessmentType,
+      max_score: input.maxScore,
+      term: input.term,
+      academic_year: input.academicYear,
+      created_by: teacherId,
+    })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
+
+  await writeAuditLog({
+    entityType: "assessment",
+    entityId: created.id,
+    action: "assessment_created",
+    actorId: teacherId,
+    metadata: {
+      kind: "custom",
+      title: input.title,
+      assessment_type: input.assessmentType,
+      max_score: input.maxScore,
+      subject_id: input.subjectId,
+      class_id: input.classId,
+      term: input.term,
+      academic_year: input.academicYear,
+    },
+  });
 
   revalidatePath("/dashboard/teacher/grades");
   revalidatePath("/dashboard/admin/grades");

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
+import { writeAuditLog } from "@/lib/audit";
 
 type QuestionInput = {
   questionText: string;
@@ -27,6 +28,12 @@ export async function createQuiz(input: {
   durationMinutes: number;
   opensAt?: string;
   closesAt?: string;
+  // Opt-in per-quiz: when true, get_quiz_attempt_questions serves each
+  // student a different (but stable-for-that-attempt) question order
+  // instead of the authored sequence_order. Defaults to off server-side
+  // too (see 2026_08_06b_quiz_shuffle_questions.sql), so omitting this
+  // keeps existing create-quiz callers unaffected.
+  shuffleQuestions?: boolean;
   questions: QuestionInput[];
 }) {
   const { id: actorId, role: actorRole } = await assertRole(
@@ -93,6 +100,7 @@ export async function createQuiz(input: {
     p_duration_minutes: input.durationMinutes,
     p_opens_at: input.opensAt || null,
     p_closes_at: input.closesAt || null,
+    p_shuffle_questions: input.shuffleQuestions ?? false,
     p_questions: input.questions.map((q) => ({
       question_text: q.questionText.trim(),
       question_type: q.questionType,
@@ -109,8 +117,53 @@ export async function createQuiz(input: {
   });
   if (error) throw new Error(error.message);
 
+  // Quiz creation had no audit trail at all before this -- unlike
+  // gradesModeration.tsx's admin approvals, which already log every
+  // moderation action. A quiz is a form of assessment (it creates its
+  // own `assessments` row), so it deserves the same accountability:
+  // who created it, for which subject/class, how many questions/points.
+  await writeAuditLog({
+    entityType: "quiz",
+    entityId: quizId as string,
+    action: "quiz_created",
+    actorId,
+    metadata: {
+      title: input.title.trim(),
+      subject_id: input.subjectId,
+      class_id: input.classId,
+      term: input.term,
+      academic_year: input.academicYear,
+      question_count: input.questions.length,
+      total_points: input.questions.reduce((sum, q) => sum + q.points, 0),
+      shuffle_questions: input.shuffleQuestions ?? false,
+    },
+  });
+
   revalidatePath("/dashboard/teacher/quizzes");
   return quizId as string;
+}
+
+// Fetches a quiz's questions/options (including is_correct and accepted
+// answers) for a teacher/admin dry-run — never creates a quiz_attempts
+// row and never touches quiz_answers/grades. Runs on the caller's own
+// session (not the admin client): RLS's quiz_questions_select_staff /
+// quiz_options_select_staff policies already restrict these tables to
+// is_admin() or is_quiz_owner(quiz_id), so a teacher previewing a quiz
+// they don't own simply gets an empty question list back, same as any
+// other RLS-filtered read in this app — no extra ownership check needed
+// here.
+export async function getQuizPreviewQuestions(quizId: string) {
+  await assertRole(["admin", "teacher"], "Only an admin or teacher can preview a quiz.");
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("quiz_questions")
+    .select(
+      "id, question_text, question_type, points, sequence_order, quiz_options(id, option_text, match_prompt, is_correct, sequence_order)"
+    )
+    .eq("quiz_id", quizId)
+    .order("sequence_order", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 export async function setQuizPublished(quizId: string, isPublished: boolean) {
@@ -136,7 +189,10 @@ export async function gradeQuizEssayAnswers(
   attemptId: string,
   scores: Record<string, number>
 ) {
-  await assertRole(["admin", "teacher"], "Only an admin or teacher can do this.");
+  const { id: actorId } = await assertRole(
+    ["admin", "teacher"],
+    "Only an admin or teacher can do this."
+  );
 
   // Runs as the caller's own session (not the admin client) — the RPC is
   // SECURITY DEFINER and checks auth.uid() against is_admin()/
@@ -148,6 +204,18 @@ export async function gradeQuizEssayAnswers(
     p_scores: scores,
   });
   if (error) throw new Error(error.message);
+
+  // Manual essay scoring changes a student's grade outside the normal
+  // auto-scored path -- same accountability reasoning as
+  // gradesModeration.tsx's grade_approved entries, just for the
+  // "someone typed in a number" moment instead of an approval click.
+  await writeAuditLog({
+    entityType: "grade",
+    entityId: attemptId,
+    action: "quiz_essay_graded",
+    actorId,
+    metadata: { quiz_id: quizId, scores },
+  });
 
   revalidatePath(`/dashboard/teacher/quizzes/${quizId}`);
 }

@@ -105,6 +105,7 @@ export function QuizBuilder({
   const [durationMinutes, setDurationMinutes] = useState("20");
   const [opensAt, setOpensAt] = useState("");
   const [closesAt, setClosesAt] = useState("");
+  const [shuffleQuestions, setShuffleQuestions] = useState(false);
   const [questions, setQuestions] = useState<QuestionDraft[]>([blankQuestion()]);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -241,6 +242,7 @@ export function QuizBuilder({
           durationMinutes: Number(durationMinutes),
           opensAt: opensAt ? new Date(opensAt).toISOString() : undefined,
           closesAt: closesAt ? new Date(closesAt).toISOString() : undefined,
+          shuffleQuestions,
           questions: questions.map((q) => ({
             questionText: q.questionText,
             questionType: q.questionType,
@@ -353,6 +355,15 @@ export function QuizBuilder({
               }
             />
           </div>
+        </label>
+        <label className="col-span-2 flex items-center gap-2 text-sm text-ink-soft">
+          <input
+            type="checkbox"
+            checked={shuffleQuestions}
+            onChange={(e) => setShuffleQuestions(e.target.checked)}
+            className="h-4 w-4 rounded border-rule"
+          />
+          Shuffle question order for each student
         </label>
       </div>
 
