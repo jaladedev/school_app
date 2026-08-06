@@ -2,8 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { IdCardBatch, type IdCardData } from "@/components/IdCardBatch";
 import { formatLevel } from "@/types/database";
-
-const STUDENT_PHOTO_BUCKET = "student-photos";
+import { STUDENT_PHOTO_BUCKET } from "@/lib/storageBuckets";
 
 async function signStudentPhotos(paths: (string | null)[]): Promise<Map<string, string>> {
   const admin = createAdminClient();

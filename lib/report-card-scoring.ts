@@ -29,6 +29,11 @@ export function computeSubjectPercent(
 
   if (!relevantGrades.length) return null;
 
+  const hasAllGrades = assessmentIds.every((aid) =>
+    relevantGrades.some((g) => g.assessment_id === aid)
+  );
+  if (!hasAllGrades) return null;
+
   const allWeighted = assessmentIds.every((aid) => weights.get(aid) != null);
 
   if (allWeighted) {

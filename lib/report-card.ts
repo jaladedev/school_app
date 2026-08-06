@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { assertRole } from "@/lib/actions/authGuards";
 import { scoreToLetterGrade, type GradeScaleEntry, type AttendanceStatus } from "@/types/database";
 import {
   ordinal,
@@ -43,6 +44,40 @@ export async function getReportCardData(
   term: number,
   academicYear: string
 ): Promise<ReportCardData | null> {
+  // This function uses the admin (service-role) client for most of its
+  // reads, which bypasses RLS entirely — so it must not trust its callers
+  // to have already checked access. Every existing caller today happens
+  // to be protected upstream (role-gated layouts, or a parent/child link
+  // resolved server-side), but that's an easy invariant to break for a
+  // future caller (a new API route, a server action) that forgets the
+  // check. Enforce it here instead, once. assertRole (rather than
+  // getCurrentProfile) re-verifies the session against Supabase's Auth
+  // server with retry, re-reads the profile via the admin client instead
+  // of depending on RLS SELECT policies being airtight, and already
+  // rejects deactivated accounts — the same guard every other privileged
+  // action in this codebase uses.
+  const requester = await assertRole(
+    ["admin", "teacher", "parent", "student"],
+    "You must be signed in to view a report card."
+  );
+
+  if (requester.id !== studentId && requester.role !== "admin" && requester.role !== "teacher") {
+    if (requester.role !== "parent") {
+      throw new Error("You don't have permission to view this report card.");
+    }
+
+    const { data: link } = await createAdminClient()
+      .from("guardian_links")
+      .select("id")
+      .eq("parent_id", requester.id)
+      .eq("student_id", studentId)
+      .maybeSingle();
+
+    if (!link) {
+      throw new Error("You don't have permission to view this report card.");
+    }
+  }
+
   const supabase = createClient();
 
   const admin = createAdminClient();

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
+import { STUDENT_PHOTO_BUCKET } from "@/lib/storageBuckets";
 import type { StaffRole } from "@/types/database";
 
 const TEMP_PASSWORD_WORDS = [
@@ -563,7 +564,6 @@ export async function updateStudentAccount(input: {
   revalidatePath("/dashboard/admin/students");
 }
 
-const STUDENT_PHOTO_BUCKET = "student-photos";
 const MAX_STUDENT_PHOTO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_STUDENT_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 

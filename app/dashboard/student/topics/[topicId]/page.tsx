@@ -4,6 +4,7 @@ import { TopicContent } from "@/components/TopicContent";
 import { formatLevel } from "@/types/database";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EmptyState } from "@/components/EmptyState";
+import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
 
 // Matches lib/tiptap/assessment-node.tsx's marker shape and
 // TopicContent's own ASSESSMENT_MARKER regex -- kept in sync manually
@@ -68,7 +69,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
     (resources ?? []).map(async (resource) => {
       if (!resource.file_url || resource.file_url.startsWith("http")) return resource;
       const { data: signed } = await admin.storage
-        .from("topic-resources")
+        .from(TOPIC_RESOURCE_BUCKET)
         .createSignedUrl(resource.file_url, 6 * 60 * 60);
       return { ...resource, file_url: signed?.signedUrl ?? null };
     })

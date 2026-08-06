@@ -34,9 +34,21 @@ export function formatLevel(level: EducationLevel, levelNumber: number): string 
   return `SS ${levelNumber}`;
 }
 
-export function formatKobo(kobo: number): string {
-  const naira = kobo / 100;
-  return `₦${naira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function groupThousands(digits: string): string {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+export function formatKobo(kobo: number | bigint | string): string {
+  const zero = BigInt(0);
+  const hundred = BigInt(100);
+  const kb = typeof kobo === "bigint" ? kobo : BigInt(Math.trunc(Number(kobo)));
+  const negative = kb < zero;
+  const abs = negative ? -kb : kb;
+  const wholeNaira = abs / hundred;
+  const koboRemainder = abs % hundred;
+  const naira = groupThousands(wholeNaira.toString());
+  const decimals = koboRemainder.toString().padStart(2, "0");
+  return `${negative ? "-" : ""}₦${naira}.${decimals}`;
 }
 
 export type Profile = {
@@ -331,6 +343,8 @@ export type FeeStructure = {
   due_date: string | null;
   created_by: string | null;
   created_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
 };
 
 export type Invoice = {
@@ -410,7 +424,14 @@ export type LibraryLoan = {
 
 export function isLoanOverdue(loan: Pick<LibraryLoan, "due_at" | "returned_at">): boolean {
   if (loan.returned_at) return false;
-  return new Date(loan.due_at) < new Date(new Date().toDateString());
+
+  const [year, month, day] = loan.due_at.split("-").map(Number);
+  const dueAtLocalMidnight = new Date(year, month - 1, day);
+
+  const now = new Date();
+  const todayLocalMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  return dueAtLocalMidnight < todayLocalMidnight;
 }
 
 export type Asset = {

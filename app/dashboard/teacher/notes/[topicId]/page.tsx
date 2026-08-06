@@ -7,6 +7,7 @@ import { RestoreVersionButton } from "@/components/RestoreVersionButton";
 import { DeleteVersionButton } from "@/components/DeleteVersionButton";
 import { LessonPlanReviewButtons } from "@/components/LessonPlanReviewButtons";
 import { formatLevel } from "@/types/database";
+import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
 
 export default async function TeacherNoteEditPage({
   params,
@@ -72,7 +73,7 @@ export default async function TeacherNoteEditPage({
       if (!resource.file_url || resource.file_url.startsWith("http")) return resource;
       try {
         const { data: signed, error } = await admin.storage
-          .from("topic-resources")
+          .from(TOPIC_RESOURCE_BUCKET)
           .createSignedUrl(resource.file_url, 6 * 60 * 60);
         if (error || !signed?.signedUrl) return resource;
         return { ...resource, file_url: signed.signedUrl };

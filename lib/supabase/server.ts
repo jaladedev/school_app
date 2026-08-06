@@ -47,6 +47,7 @@ export async function loggingFetch(
   try {
     return await fetch(input, {
       ...init,
+      cache: "no-store",
       ...(isVercel
         ? {}
         : {

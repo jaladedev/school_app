@@ -98,6 +98,27 @@ export async function proxy(request: NextRequest) {
   let mustChangePassword = false;
 
   if (user && (isDashboardRoute || isLoginRoute || isChangePasswordRoute)) {
+    // is_active isn't included in the JWT claims, so it always needs a
+    // profile lookup (unlike must_change_password below, which can often
+    // be read straight off the token). Deactivated staff/students must be
+    // blocked immediately, not just on their next full getCurrentProfile()
+    // call, so this runs on every request to a protected route.
+    const { data: activeCheck } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (activeCheck && activeCheck.is_active === false) {
+      // Clear the session so the stale-but-valid cookie can't keep
+      // granting access on subsequent requests, then send them to login
+      // with a reason the login page can surface.
+      await supabase.auth.signOut();
+      const redirectUrl = new URL("/login", request.url);
+      redirectUrl.searchParams.set("reason", "deactivated");
+      return NextResponse.redirect(redirectUrl);
+    }
+
     const {
       data: { session },
     } = await supabase.auth.getSession();

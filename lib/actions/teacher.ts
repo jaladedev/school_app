@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { videoEmbedUrl } from "@/lib/video-embed";
 import { fetchLinkMetadata } from "@/lib/linkPreview";
+import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
 import type {
   AssessmentType,
   AttendanceStatus,
@@ -741,7 +742,6 @@ export async function deleteTopicNoteVersion(topicId: string, versionNoteId: str
   revalidatePath("/dashboard/teacher/notes");
 }
 
-const TOPIC_RESOURCE_BUCKET = "topic-resources";
 const MAX_TOPIC_RESOURCE_BYTES = 20 * 1024 * 1024;
 const RESOURCE_TYPES = new Map<string, Extract<ResourceType, "image" | "pdf" | "audio" | "video">>([
   ["image/jpeg", "image"],

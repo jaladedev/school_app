@@ -1,3 +1,68 @@
 {
-  "extends": ["next/core-web-vitals"]
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@/lib/supabase/admin",
+            "message": "createAdminClient() bypasses RLS with the service_role key. Only import it from lib/actions/*, app/api/*, or another explicitly-reviewed allowlisted file — see the override list below in .eslintrc.json. Prefer the RLS-scoped client from lib/supabase/server instead."
+          },
+          {
+            "name": "@supabase/supabase-js",
+            "importNames": ["createClient"],
+            "message": "Importing createClient from @supabase/supabase-js directly can be used to build a service_role client outside of lib/supabase/admin.ts. Use createAdminClient() from @/lib/supabase/admin (itself restricted, see above) or the request-scoped client from @/lib/supabase/server."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      // Server actions and route handlers are the intended, reviewed
+      // places to use the service-role client — they run only on the
+      // server and are the boundary where privileged operations (bulk
+      // writes, cross-user reads for a verified admin/staff action,
+      // webhook handlers) are expected to need it.
+      "files": ["lib/actions/**/*.ts", "lib/actions/**/*.tsx", "app/api/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      // lib/supabase/admin.ts is the definition of createAdminClient()
+      // itself, so it must reference the underlying supabase-js
+      // createClient. lib/env.server.ts only reads the raw env var, not
+      // a client, but lives next to server-only secrets by design.
+      "files": ["lib/supabase/admin.ts", "lib/env.server.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      // Existing, reviewed call sites as of this rule's introduction.
+      // lib/audit.ts writes audit log rows regardless of the calling
+      // user's RLS permissions; lib/report-card.ts guards access
+      // internally (see getReportCardData) before using the admin
+      // client; the dashboard pages below are protected by role-gated
+      // layouts and need cross-user reads the signed-in user's own RLS
+      // policies wouldn't allow (e.g. an admin looking up any student).
+      // New page-level usages should be added here deliberately rather
+      // than the rule being silently disabled — prefer moving the logic
+      // into a server action under lib/actions/ where practical instead.
+      "files": [
+        "lib/audit.ts",
+        "lib/report-card.ts",
+        "app/dashboard/admin/id-cards/print/page.tsx",
+        "app/dashboard/admin/students/\\[studentId\\]/page.tsx",
+        "app/dashboard/student/topics/\\[topicId\\]/page.tsx",
+        "app/dashboard/teacher/homework/page.tsx",
+        "app/dashboard/teacher/notes/\\[topicId\\]/page.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }

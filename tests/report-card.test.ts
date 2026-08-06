@@ -44,6 +44,80 @@ describe("report-card scoring and ranking", () => {
     ).toBe(71);
   });
 
+  it("returns null when a student is missing a grade for one of the standard 1st CA / 2nd CA / Exam assessments", () => {
+    // This is the actual shape createStandardAssessmentSet() produces:
+    // weight_percent is never set, so max_score ratios (20 + 20 + 60 =
+    // 100) do the weighting instead. A student who's only sat both CAs
+    // should not get a final percent computed from 40 marks as if that
+    // were the whole subject.
+    expect(
+      computeSubjectPercent(
+        "student-1",
+        ["1st_ca", "2nd_ca", "exam"],
+        new Map([
+          ["1st_ca", 20],
+          ["2nd_ca", 20],
+          ["exam", 60],
+        ]),
+        new Map([
+          ["1st_ca", null],
+          ["2nd_ca", null],
+          ["exam", null],
+        ]),
+        [
+          { assessment_id: "1st_ca", student_id: "student-1", score: 18 },
+          { assessment_id: "2nd_ca", student_id: "student-1", score: 20 },
+          // exam not yet graded
+        ]
+      )
+    ).toBeNull();
+  });
+
+  it("computes the standard 1st CA / 2nd CA / Exam percent once all three are graded", () => {
+    expect(
+      computeSubjectPercent(
+        "student-1",
+        ["1st_ca", "2nd_ca", "exam"],
+        new Map([
+          ["1st_ca", 20],
+          ["2nd_ca", 20],
+          ["exam", 60],
+        ]),
+        new Map([
+          ["1st_ca", null],
+          ["2nd_ca", null],
+          ["exam", null],
+        ]),
+        [
+          { assessment_id: "1st_ca", student_id: "student-1", score: 18 },
+          { assessment_id: "2nd_ca", student_id: "student-1", score: 20 },
+          { assessment_id: "exam", student_id: "student-1", score: 50 },
+        ]
+      )
+    ).toBe(88);
+  });
+
+  it("returns null when weighted assessments are missing a grade, instead of a partial score", () => {
+    expect(
+      computeSubjectPercent(
+        "student-1",
+        ["ca", "exam"],
+        new Map([
+          ["ca", 20],
+          ["exam", 100],
+        ]),
+        new Map([
+          ["ca", 20],
+          ["exam", 80],
+        ]),
+        [
+          // Full marks on the CA, but never sat the exam.
+          { assessment_id: "ca", student_id: "student-1", score: 20 },
+        ]
+      )
+    ).toBeNull();
+  });
+
   it("returns null when the student has no approved grades for a subject", () => {
     expect(
       computeSubjectPercent(

@@ -4,6 +4,7 @@ import { EditStudentForm } from "@/components/EditStudentForm";
 import { StudentPhotoUpload } from "@/components/StudentPhotoUpload";
 import { formatLevel } from "@/types/database";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { STUDENT_PHOTO_BUCKET } from "@/lib/storageBuckets";
 
 export default async function StudentInfoPage({
   params,
@@ -34,7 +35,7 @@ export default async function StudentInfoPage({
   const photoPath = profile?.avatar_url;
   const { data: signedPhoto } = photoPath
     ? await createAdminClient()
-        .storage.from("student-photos")
+        .storage.from(STUDENT_PHOTO_BUCKET)
         .createSignedUrl(photoPath, 60 * 60)
     : { data: null };
 
