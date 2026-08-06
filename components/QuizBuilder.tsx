@@ -112,6 +112,11 @@ export function QuizBuilder({
   // can splice its $...$ / $$...$$ snippet in at the caret instead of
   // just appending to the end of questionText.
   const questionTextRefs = useRef<Map<number, HTMLTextAreaElement>>(new Map());
+  // Same idea, one ref per *option* field, keyed by "qIndex-oIndex-field"
+  // ("text" or "matchPrompt" for matching's left-hand side) -- options
+  // are plain <input>s, not textareas, but selectionStart/End and
+  // setSelectionRange work identically on both.
+  const optionRefs = useRef<Map<string, HTMLInputElement>>(new Map());
 
   function updateQuestion(index: number, patch: Partial<QuestionDraft>) {
     setQuestions((qs) => qs.map((q, i) => (i === index ? { ...q, ...patch } : q)));
@@ -124,6 +129,26 @@ export function QuizBuilder({
     const end = el?.selectionEnd ?? current.length;
     const next = current.slice(0, start) + snippet + current.slice(end);
     updateQuestion(index, { questionText: next });
+    const cursor = start + snippet.length;
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(cursor, cursor);
+    });
+  }
+
+  function insertOptionMathSnippet(
+    qIndex: number,
+    oIndex: number,
+    field: "text" | "matchPrompt",
+    snippet: string
+  ) {
+    const key = `${qIndex}-${oIndex}-${field}`;
+    const el = optionRefs.current.get(key);
+    const current = (questions[qIndex].options[oIndex][field] ?? "") as string;
+    const start = el?.selectionStart ?? current.length;
+    const end = el?.selectionEnd ?? current.length;
+    const next = current.slice(0, start) + snippet + current.slice(end);
+    updateOption(qIndex, oIndex, { [field]: next } as Partial<OptionDraft>);
     const cursor = start + snippet.length;
     requestAnimationFrame(() => {
       el?.focus();
@@ -403,31 +428,63 @@ export function QuizBuilder({
             {(q.questionType === "mcq" || q.questionType === "true_false") && (
               <div className="space-y-2">
                 {q.options.map((o, oIndex) => (
-                  <div key={oIndex} className="flex items-center gap-2">
+                  <div key={oIndex} className="flex items-start gap-2">
                     <input
                       type="radio"
                       name={`correct-${qIndex}`}
                       checked={o.isCorrect}
                       onChange={() => markCorrect(qIndex, oIndex)}
                       aria-label="Correct answer"
+                      className="mt-2.5"
                     />
-                    <input
-                      required
-                      disabled={q.questionType === "true_false"}
-                      placeholder={`Option ${oIndex + 1}`}
-                      value={o.text}
-                      onChange={(e) => updateOption(qIndex, oIndex, { text: e.target.value })}
-                      className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold disabled:bg-paper"
-                    />
-                    {q.questionType === "mcq" && q.options.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() => removeOption(qIndex, oIndex)}
-                        className="text-xs text-clay hover:underline"
-                      >
-                        Remove
-                      </button>
-                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={(el) => {
+                            const key = `${qIndex}-${oIndex}-text`;
+                            if (el) optionRefs.current.set(key, el);
+                            else optionRefs.current.delete(key);
+                          }}
+                          required
+                          disabled={q.questionType === "true_false"}
+                          placeholder={`Option ${oIndex + 1}`}
+                          value={o.text}
+                          onChange={(e) => updateOption(qIndex, oIndex, { text: e.target.value })}
+                          className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold disabled:bg-paper"
+                        />
+                        {/* True/false options are the fixed strings
+                            "True"/"False" (disabled above) -- math entry
+                            on them would never be rendered anywhere, so
+                            skip the button rather than offer a dead
+                            control. */}
+                        {q.questionType === "mcq" && (
+                          <MathInsertButton
+                            onInsertAction={(snippet) =>
+                              insertOptionMathSnippet(qIndex, oIndex, "text", snippet)
+                            }
+                          />
+                        )}
+                        {q.questionType === "mcq" && q.options.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => removeOption(qIndex, oIndex)}
+                            className="text-xs text-clay hover:underline"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      {/* Same live-preview pattern as questionText below --
+                          renders exactly what QuizAttemptRunner shows
+                          students for this option (QuestionText is the
+                          shared component both use), so a teacher isn't
+                          guessing whether "$x^2$" actually came out right. */}
+                      {q.questionType === "mcq" && o.text.trim() && (
+                        <div className="mt-1 rounded-lg border border-dashed border-rule bg-paper px-3 py-1.5">
+                          <QuestionText text={o.text} className="inline" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {q.questionType === "mcq" && (
@@ -480,18 +537,47 @@ export function QuizBuilder({
             {q.questionType === "matching" && (
               <div className="space-y-2">
                 <p className="text-xs text-ink-soft">Pairs students will match left to right</p>
+                {/* Note: the prompt side renders with math below, same as
+                    everywhere else. The match/answer side (o.text) can't
+                    -- it doubles as the literal value in a native
+                    <select><option> on the student's side
+                    (QuizAttemptRunner), and browsers render <option>
+                    content as plain text only, with no HTML/KaTeX
+                    support. So math entry is offered on the prompt but
+                    intentionally not on the match text, rather than
+                    letting a teacher build an answer that can never
+                    actually display for students. */}
                 {q.options.map((o, oIndex) => (
-                  <div key={oIndex} className="flex items-center gap-2">
-                    <input
-                      required
-                      placeholder={`Prompt ${oIndex + 1}`}
-                      value={o.matchPrompt ?? ""}
-                      onChange={(e) =>
-                        updateOption(qIndex, oIndex, { matchPrompt: e.target.value })
-                      }
-                      className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
-                    />
-                    <span className="text-ink-soft">→</span>
+                  <div key={oIndex} className="flex items-start gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={(el) => {
+                            const key = `${qIndex}-${oIndex}-matchPrompt`;
+                            if (el) optionRefs.current.set(key, el);
+                            else optionRefs.current.delete(key);
+                          }}
+                          required
+                          placeholder={`Prompt ${oIndex + 1}`}
+                          value={o.matchPrompt ?? ""}
+                          onChange={(e) =>
+                            updateOption(qIndex, oIndex, { matchPrompt: e.target.value })
+                          }
+                          className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+                        />
+                        <MathInsertButton
+                          onInsertAction={(snippet) =>
+                            insertOptionMathSnippet(qIndex, oIndex, "matchPrompt", snippet)
+                          }
+                        />
+                      </div>
+                      {(o.matchPrompt ?? "").trim() && (
+                        <div className="mt-1 rounded-lg border border-dashed border-rule bg-paper px-3 py-1.5">
+                          <QuestionText text={o.matchPrompt ?? ""} className="inline" />
+                        </div>
+                      )}
+                    </div>
+                    <span className="mt-2.5 text-ink-soft">→</span>
                     <input
                       required
                       placeholder={`Match ${oIndex + 1}`}
@@ -503,7 +589,7 @@ export function QuizBuilder({
                       <button
                         type="button"
                         onClick={() => removeOption(qIndex, oIndex)}
-                        className="text-xs text-clay hover:underline"
+                        className="mt-2.5 text-xs text-clay hover:underline"
                       >
                         Remove
                       </button>

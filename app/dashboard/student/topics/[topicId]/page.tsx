@@ -5,6 +5,12 @@ import { formatLevel } from "@/types/database";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EmptyState } from "@/components/EmptyState";
 
+// Matches lib/tiptap/assessment-node.tsx's marker shape and
+// TopicContent's own ASSESSMENT_MARKER regex -- kept in sync manually
+// since this one runs server-side (to fetch the linked rows) while
+// TopicContent's runs client-side (to place them in the rendered output).
+const ASSESSMENT_MARKER_ID = /\[\[assessment:([0-9a-fA-F-]{36})\]\]/g;
+
 export default async function TopicPage({ params }: { params: Promise<{ topicId: string }> }) {
   const resolvedParams = await params;
 
@@ -68,6 +74,22 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
     })
   );
 
+  const assessmentIds = [...(note?.content ?? "").matchAll(ASSESSMENT_MARKER_ID)].map((m) => m[1]);
+  const { data: rawLinkedAssessments } =
+    assessmentIds.length > 0
+      ? await supabase
+          .from("assessments")
+          .select("id, title, assessment_type, quizzes(id)")
+          .in("id", assessmentIds)
+      : { data: [] };
+
+  const linkedAssessments = (rawLinkedAssessments ?? []).map((a) => ({
+    id: a.id,
+    title: a.title,
+    assessment_type: a.assessment_type,
+    quizId: (Array.isArray(a.quizzes) ? a.quizzes[0] : a.quizzes)?.id,
+  }));
+
   return (
     <div className="max-w-2xl">
       <Link
@@ -87,7 +109,11 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
       </p>
 
       {note ? (
-        <TopicContent content={note.content} resources={displayResources} />
+        <TopicContent
+          content={note.content}
+          resources={displayResources}
+          linkedAssessments={linkedAssessments}
+        />
       ) : (
         <p className="rounded-lg border border-rule bg-white p-4 text-sm text-ink-soft">
           Notes for this topic haven&apos;t been published yet.

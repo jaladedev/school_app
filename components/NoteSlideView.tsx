@@ -216,18 +216,26 @@ export function NoteSlideView({
             }}
             className="topic-prose slide-prose [&_ol]:list-inside [&_ul]:list-inside"
           >
-            {parts.map((part, i) =>
-              part.type === "text" ? (
-                <ReactMarkdown
-                  key={i}
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeHighlight]}
-                >
-                  {part.value}
-                </ReactMarkdown>
-              ) : (
-                <TopicResourceItem key={part.resource.id} resource={part.resource} />
-              )
+            {parts.map(
+              (part, i) =>
+                part.type === "text" ? (
+                  <ReactMarkdown
+                    key={i}
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                  >
+                    {part.value}
+                  </ReactMarkdown>
+                ) : part.type === "resource" ? (
+                  <TopicResourceItem key={part.resource.id} resource={part.resource} />
+                ) : null
+              // Presentation/fullscreen mode is a teacher-only preview of
+              // their own note (see NoteWorkspace) -- it doesn't pass
+              // linkedAssessments to splitContentByMarkers, so no
+              // "assessment" part is ever actually produced here today.
+              // Handled anyway (render nothing) so this stays correct if
+              // that ever changes, rather than relying on a type they
+              // can't happen at runtime but TypeScript can't prove.
             )}
             {isLastSlide &&
               noteLeftover.map((resource) => (
@@ -242,9 +250,9 @@ export function NoteSlideView({
               <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
                 {part.value}
               </ReactMarkdown>
-            ) : (
+            ) : part.type === "resource" ? (
               <TopicResourceItem key={part.resource.id} resource={part.resource} />
-            )
+            ) : null
           )}
           {isLastSlide &&
             noteLeftover.map((resource) => (

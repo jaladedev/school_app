@@ -1510,9 +1510,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                             >
                               <span className="min-w-0">
                                 <span className="block truncate">{assessment.title}</span>
-                                {assessment.classLabel && (
+                                {(assessment.classLabel || assessment.academic_year) && (
                                   <span className="block truncate text-xs text-ink-soft">
-                                    {assessment.classLabel}
+                                    {[
+                                      assessment.classLabel,
+                                      assessment.academic_year,
+                                      `Term ${assessment.term}`,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" · ")}
                                   </span>
                                 )}
                               </span>

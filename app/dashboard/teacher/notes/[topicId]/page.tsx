@@ -97,29 +97,24 @@ export default async function TeacherNoteEditPage({
   // hide a colleague's assessment for the exact same class this note is
   // written for.
   //
-  // `current_academic_year` comes from `school_settings`, not computed
-  // from today's date -- same source of truth the teacher notes list page
-  // already uses. A calendar-derived guess (e.g. "current year/next
-  // year") would silently disagree with whatever academic year the
-  // school has actually configured as current, particularly right around
-  // a year boundary or mid-year rollover.
-  const { data: schoolSettings } = await supabase
-    .from("school_settings")
-    .select("current_academic_year")
-    .eq("id", 1)
-    .single();
-  const currentAcademicYear = schoolSettings?.current_academic_year ?? "";
-
-  const { data: matchingClasses } =
-    topic && currentAcademicYear
-      ? await supabase
-          .from("classes")
-          .select("id")
-          .eq("education_level", topic.education_level)
-          .eq("level_number", topic.level_number)
-          .eq("academic_year", currentAcademicYear)
-          .eq("is_archived", false)
-      : { data: [] };
+  // Matching classes span every academic year, not just the current one.
+  // A topic (curriculum_topics) is keyed by education_level/level_number
+  // only -- it has no academic_year of its own and is reused across
+  // years -- so a note written against it is just as relevant to last
+  // year's SS2 Physics assessments as this year's. Scoping this to the
+  // school's current academic year (as it used to) silently hid every
+  // prior-year assessment from the "Link assessment" picker the moment
+  // the school rolled over to a new academic year, even though the
+  // underlying assessment (and its scores) never stopped existing or
+  // being worth linking to.
+  const { data: matchingClasses } = topic
+    ? await supabase
+        .from("classes")
+        .select("id")
+        .eq("education_level", topic.education_level)
+        .eq("level_number", topic.level_number)
+        .eq("is_archived", false)
+    : { data: [] };
   const matchingClassIds = (matchingClasses ?? []).map((c) => c.id);
 
   const { data: rawAssessments } =

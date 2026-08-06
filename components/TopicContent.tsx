@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -62,53 +63,90 @@ function MediaError({ label }: { label: string }) {
 // instead of the image.
 const RESOURCE_MARKER = /\[\[resource:([0-9a-fA-F-]{36})(?:#([a-z]+)(?:-([a-z]+))?)?\]\]/g;
 
-// AssessmentChip's marker (lib/tiptap/assessment-node.tsx) -- a link from
-// the teacher's own editing view to their assessments/grades pages, not
-// student-facing content. There's no per-student rendering for it here
-// (that's out of scope for #16 as currently built -- see
-// markdown-editor-todo.md), so it's stripped from published content
-// rather than leaking through as literal "[[assessment:...]]" text,
-// which is what RESOURCE_MARKER's "unmatched marker" handling below
-// would otherwise do to it (it doesn't recognize this marker shape at
-// all, so it would fall straight through into a "text" part untouched).
-const ASSESSMENT_MARKER = /\[\[assessment:[0-9a-fA-F-]{36}\]\]/g;
+// AssessmentChip's marker (lib/tiptap/assessment-node.tsx). Split out and
+// rendered as a real link below -- it used to be regex-stripped here with
+// nothing put in its place (see splitContentByMarkers's old comment: "no
+// per-student rendering for it here... out of scope"), which meant a
+// teacher's "Link assessment" never actually reached a student anywhere
+// clickable, despite looking linked in the teacher's own editor.
+const ASSESSMENT_MARKER = /\[\[assessment:([0-9a-fA-F-]{36})\]\]/g;
+
+export type LinkedAssessment = {
+  id: string;
+  title: string;
+  assessment_type: string;
+  quizId?: string;
+};
+
+const ASSESSMENT_TYPE_ICON: Record<string, string> = {
+  first_ca: "📋",
+  second_ca: "📋",
+  exam: "📝",
+  test: "❓",
+  assignment: "📚",
+  project: "🛠️",
+  practical: "🧪",
+  quiz: "🧩",
+  other: "📊",
+};
 
 export type ContentPart =
   | { type: "text"; value: string }
-  | { type: "resource"; resource: TopicResource; size?: ImageSize; align?: ImageAlign };
+  | { type: "resource"; resource: TopicResource; size?: ImageSize; align?: ImageAlign }
+  | { type: "assessment"; assessment: LinkedAssessment };
 
 export function splitContentByMarkers(
   content: string,
-  resources: TopicResource[]
+  resources: TopicResource[],
+  linkedAssessments: LinkedAssessment[] = []
 ): { parts: ContentPart[]; leftover: TopicResource[] } {
-  const strippedContent = content.replace(ASSESSMENT_MARKER, "");
+  const assessmentsById = new Map(linkedAssessments.map((a) => [a.id, a]));
   const byId = new Map(resources.map((r) => [r.id, r]));
   const usedIds = new Set<string>();
   const parts: ContentPart[] = [];
 
+  // Two marker shapes can appear interleaved in the same content string
+  // ([[resource:...]] and [[assessment:...]]), so both regexes have to be
+  // walked together in document order -- running RESOURCE_MARKER over the
+  // whole string first (as the old ASSESSMENT_MARKER-strip-then-
+  // RESOURCE_MARKER-split approach effectively did) would have been fine
+  // only because assessment markers were being deleted outright; now that
+  // they render as real content, deleting them first would silently
+  // reorder them to "not present" instead of "in the right place".
+  const combined = new RegExp(`${RESOURCE_MARKER.source}|${ASSESSMENT_MARKER.source}`, "g");
   let lastIndex = 0;
   let match: RegExpExecArray | null;
-  RESOURCE_MARKER.lastIndex = 0;
+  combined.lastIndex = 0;
 
-  while ((match = RESOURCE_MARKER.exec(strippedContent))) {
-    const textChunk = strippedContent.slice(lastIndex, match.index);
+  while ((match = combined.exec(content))) {
+    const textChunk = content.slice(lastIndex, match.index);
     if (textChunk.trim()) parts.push({ type: "text", value: textChunk });
 
-    const resource = byId.get(match[1]);
-    if (resource) {
-      const size = (match[2] as ImageSize | undefined) || undefined;
-      const align = (match[3] as ImageAlign | undefined) || undefined;
-      parts.push({ type: "resource", resource, size, align });
-      usedIds.add(resource.id);
+    if (match[1]) {
+      // Resource marker: groups 1-3 are id/size/align.
+      const resource = byId.get(match[1]);
+      if (resource) {
+        const size = (match[2] as ImageSize | undefined) || undefined;
+        const align = (match[3] as ImageAlign | undefined) || undefined;
+        parts.push({ type: "resource", resource, size, align });
+        usedIds.add(resource.id);
+      }
+      // An unmatched marker (resource deleted, or id typo) is silently
+      // dropped from the rendered output rather than left as literal
+      // "[[resource:...]]" text on the page.
+    } else if (match[4]) {
+      // Assessment marker: group 4 is the id.
+      const assessment = assessmentsById.get(match[4]);
+      if (assessment) parts.push({ type: "assessment", assessment });
+      // Same silent-drop behavior for a deleted/inaccessible assessment
+      // (e.g. RLS denies it, or it was removed after the note was
+      // published) -- no broken "[[assessment:...]]" text on the page.
     }
-    // An unmatched marker (resource deleted, or id typo) is silently
-    // dropped from the rendered output rather than left as literal
-    // "[[resource:...]]" text on the page.
 
     lastIndex = match.index + match[0].length;
   }
 
-  const remainder = strippedContent.slice(lastIndex);
+  const remainder = content.slice(lastIndex);
   if (remainder.trim()) parts.push({ type: "text", value: remainder });
 
   // Any resource never referenced by a marker still needs to show up
@@ -123,11 +161,13 @@ export function splitContentByMarkers(
 export function TopicContent({
   content,
   resources,
+  linkedAssessments = [],
 }: {
   content: string;
   resources: TopicResource[];
+  linkedAssessments?: LinkedAssessment[];
 }) {
-  const { parts, leftover } = splitContentByMarkers(content, resources);
+  const { parts, leftover } = splitContentByMarkers(content, resources, linkedAssessments);
 
   return (
     <div>
@@ -141,6 +181,8 @@ export function TopicContent({
               {part.value}
             </ReactMarkdown>
           </div>
+        ) : part.type === "assessment" ? (
+          <AssessmentLink key={part.assessment.id} assessment={part.assessment} />
         ) : (
           <TopicResourceItem
             key={part.resource.id}
@@ -155,6 +197,34 @@ export function TopicContent({
         <TopicResourceItem key={resource.id} resource={resource} />
       ))}
     </div>
+  );
+}
+
+// Quiz-backed assessments have a real per-student page to deep-link to
+// (start/continue the timed attempt). Non-quiz assessments (tests, exams,
+// etc.) are graded manually by a teacher and only ever surface in the
+// aggregate grades list -- there's no per-assessment student route for
+// those, so the link falls back to that list rather than a 404.
+function AssessmentLink({ assessment }: { assessment: LinkedAssessment }) {
+  const href = assessment.quizId
+    ? `/dashboard/student/quizzes/${assessment.quizId}/attempt`
+    : "/dashboard/student/grades";
+  return (
+    <Link
+      href={href}
+      className="my-4 flex items-center gap-3 rounded-xl border border-rule bg-white p-3 transition hover:border-marigold"
+    >
+      <span aria-hidden className="text-xl">
+        {ASSESSMENT_TYPE_ICON[assessment.assessment_type] ?? "📊"}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium text-ink">{assessment.title}</span>
+        <span className="block text-xs text-ink-soft">
+          {assessment.assessment_type.replace(/_/g, " ")}
+          {assessment.quizId ? " · Start quiz" : " · View in grades"}
+        </span>
+      </span>
+    </Link>
   );
 }
 

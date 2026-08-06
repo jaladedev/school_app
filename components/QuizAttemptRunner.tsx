@@ -336,9 +336,15 @@ export function QuizAttemptRunner({
               <div className="space-y-2">
                 {q.options.map((o) => (
                   <div key={o.id} className="flex items-center gap-2 text-sm">
-                    <span className="flex-1 rounded-lg border border-rule bg-paper px-3 py-2">
-                      {o.matchPrompt}
-                    </span>
+                    <div className="flex-1 rounded-lg border border-rule bg-paper px-3 py-2">
+                      {/* Native <select><option> renders text only, no
+                          HTML/KaTeX -- that's a browser limitation, not
+                          fixable client-side, so the match/answer list
+                          below stays plain text. The prompt side has no
+                          such constraint and now renders properly instead
+                          of showing raw "$...$" markup. */}
+                      <QuestionText text={o.matchPrompt ?? ""} className="inline" />
+                    </div>
                     <span className="text-ink-soft">→</span>
                     <select
                       value={matchedAnswers[q.id]?.[o.id] ?? ""}
