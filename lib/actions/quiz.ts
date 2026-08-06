@@ -166,6 +166,184 @@ export async function getQuizPreviewQuestions(quizId: string) {
   return data;
 }
 
+export type QuestionAnalytics = {
+  questionId: string;
+  questionText: string;
+  questionType: QuestionInput["questionType"];
+  points: number;
+  sequenceOrder: number;
+  attemptedCount: number; // submitted attempts that answered this question
+  skippedCount: number; // submitted attempts that left it blank
+  // mcq/true_false only: how many picked each option, correct one flagged.
+  optionBreakdown?: { optionId: string; text: string; isCorrect: boolean; count: number }[];
+  // fill_blank/matching/mcq/true_false: fraction who got full points.
+  correctCount?: number;
+  // essay only: how many of the attempted answers have been graded yet.
+  gradedCount?: number;
+  // Average points earned on this question across attempts that
+  // answered it (ungraded essays count as 0 until graded).
+  avgPoints: number;
+};
+
+// Aggregates per-question performance across every *submitted* attempt on
+// a quiz: how many picked each option (mcq/true_false), how many got full
+// credit (fill_blank/matching), average points earned, and how many
+// skipped the question entirely. Read-only — runs on the caller's own
+// session, same RLS staff policies (can_grade_quiz/is_quiz_owner/is_admin)
+// that already gate quiz_questions/quiz_options/quiz_answers reads for
+// the quiz detail page, so a teacher who doesn't own or teach this quiz's
+// subject just gets nothing back rather than an authorization error.
+export async function getQuizQuestionAnalytics(quizId: string): Promise<{
+  totalSubmitted: number;
+  questions: QuestionAnalytics[];
+}> {
+  await assertRole(["admin", "teacher"], "Only an admin or teacher can view quiz analytics.");
+  const supabase = createClient();
+
+  const { data: questions, error: qError } = await supabase
+    .from("quiz_questions")
+    .select(
+      "id, question_text, question_type, points, sequence_order, quiz_options(id, option_text, match_prompt, is_correct, sequence_order)"
+    )
+    .eq("quiz_id", quizId)
+    .order("sequence_order", { ascending: true });
+  if (qError) throw new Error(qError.message);
+
+  const { data: submittedAttempts, error: aError } = await supabase
+    .from("quiz_attempts")
+    .select("id")
+    .eq("quiz_id", quizId)
+    .not("submitted_at", "is", null);
+  if (aError) throw new Error(aError.message);
+
+  const attemptIds = (submittedAttempts ?? []).map((a) => a.id);
+  const totalSubmitted = attemptIds.length;
+
+  type AnswerRow = {
+    attempt_id: string;
+    question_id: string;
+    selected_option_id: string | null;
+    answer_text: string | null;
+    matched_pairs: Record<string, string> | null;
+    points_awarded: number | null;
+  };
+
+  const { data: answers, error: ansError } = attemptIds.length
+    ? await supabase
+        .from("quiz_answers")
+        .select(
+          "attempt_id, question_id, selected_option_id, answer_text, matched_pairs, points_awarded"
+        )
+        .in("attempt_id", attemptIds)
+    : { data: [] as AnswerRow[], error: null };
+  if (ansError) throw new Error(ansError.message);
+
+  const answersByQuestion = new Map<string, AnswerRow[]>();
+  for (const row of answers ?? []) {
+    if (!answersByQuestion.has(row.question_id)) answersByQuestion.set(row.question_id, []);
+    answersByQuestion.get(row.question_id)!.push(row);
+  }
+
+  const result: QuestionAnalytics[] = (questions ?? []).map((q) => {
+    const qAnswers = answersByQuestion.get(q.id) ?? [];
+    const attemptedCount = qAnswers.length;
+    const skippedCount = Math.max(0, totalSubmitted - attemptedCount);
+    const options = (q.quiz_options ?? []).sort((a, b) => a.sequence_order - b.sequence_order);
+
+    if (q.question_type === "mcq" || q.question_type === "true_false") {
+      const counts = new Map<string, number>();
+      for (const a of qAnswers) {
+        if (!a.selected_option_id) continue;
+        counts.set(a.selected_option_id, (counts.get(a.selected_option_id) ?? 0) + 1);
+      }
+      const correctCount = qAnswers.filter(
+        (a) =>
+          a.selected_option_id && options.find((o) => o.id === a.selected_option_id)?.is_correct
+      ).length;
+      return {
+        questionId: q.id,
+        questionText: q.question_text,
+        questionType: q.question_type,
+        points: q.points,
+        sequenceOrder: q.sequence_order,
+        attemptedCount,
+        skippedCount,
+        correctCount,
+        optionBreakdown: options.map((o) => ({
+          optionId: o.id,
+          text: o.option_text,
+          isCorrect: o.is_correct,
+          count: counts.get(o.id) ?? 0,
+        })),
+        avgPoints: attemptedCount ? (correctCount / attemptedCount) * q.points : 0,
+      };
+    }
+
+    if (q.question_type === "fill_blank") {
+      const accepted = options
+        .filter((o) => o.is_correct)
+        .map((o) => o.option_text.trim().toLowerCase());
+      const correctCount = qAnswers.filter(
+        (a) => a.answer_text && accepted.includes(a.answer_text.trim().toLowerCase())
+      ).length;
+      return {
+        questionId: q.id,
+        questionText: q.question_text,
+        questionType: q.question_type,
+        points: q.points,
+        sequenceOrder: q.sequence_order,
+        attemptedCount,
+        skippedCount,
+        correctCount,
+        avgPoints: attemptedCount ? (correctCount / attemptedCount) * q.points : 0,
+      };
+    }
+
+    if (q.question_type === "matching") {
+      // Same all-or-nothing rule as submit_quiz_attempt: every canonical
+      // pair (option_id -> option_text) must appear correctly in
+      // matched_pairs for the attempt to count as correct.
+      const correctCount = qAnswers.filter((a) => {
+        if (!a.matched_pairs || !options.length) return false;
+        return options.every(
+          (o) =>
+            (a.matched_pairs?.[o.id] ?? "").trim().toLowerCase() ===
+            o.option_text.trim().toLowerCase()
+        );
+      }).length;
+      return {
+        questionId: q.id,
+        questionText: q.question_text,
+        questionType: q.question_type,
+        points: q.points,
+        sequenceOrder: q.sequence_order,
+        attemptedCount,
+        skippedCount,
+        correctCount,
+        avgPoints: attemptedCount ? (correctCount / attemptedCount) * q.points : 0,
+      };
+    }
+
+    // essay: no auto-correctness, average whatever has been graded so
+    // far (ungraded answers contribute 0, same as submit-time scoring).
+    const gradedCount = qAnswers.filter((a) => a.points_awarded !== null).length;
+    const totalAwarded = qAnswers.reduce((sum, a) => sum + (a.points_awarded ?? 0), 0);
+    return {
+      questionId: q.id,
+      questionText: q.question_text,
+      questionType: q.question_type,
+      points: q.points,
+      sequenceOrder: q.sequence_order,
+      attemptedCount,
+      skippedCount,
+      gradedCount,
+      avgPoints: attemptedCount ? totalAwarded / attemptedCount : 0,
+    };
+  });
+
+  return { totalSubmitted, questions: result };
+}
+
 export async function setQuizPublished(quizId: string, isPublished: boolean) {
   await assertRole(["admin", "teacher"], "Only an admin or teacher can do this.");
   const admin = createAdminClient();

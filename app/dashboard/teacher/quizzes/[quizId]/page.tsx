@@ -91,12 +91,20 @@ export default async function TeacherQuizDetailPage({
         <PublishToggle quizId={quiz.id} isPublished={quiz.is_published} />
       </div>
 
-      <Link
-        href={`/dashboard/teacher/quizzes/${quiz.id}/preview`}
-        className="mb-6 inline-block rounded-lg border border-rule px-3 py-2 text-sm font-medium text-ink hover:bg-paper"
-      >
-        Preview / dry-run this quiz
-      </Link>
+      <div className="mb-6 flex flex-wrap gap-2">
+        <Link
+          href={`/dashboard/teacher/quizzes/${quiz.id}/preview`}
+          className="inline-block rounded-lg border border-rule px-3 py-2 text-sm font-medium text-ink hover:bg-paper"
+        >
+          Preview / dry-run this quiz
+        </Link>
+        <Link
+          href={`/dashboard/teacher/quizzes/${quiz.id}/analytics`}
+          className="inline-block rounded-lg border border-rule px-3 py-2 text-sm font-medium text-ink hover:bg-paper"
+        >
+          View analytics
+        </Link>
+      </div>
 
       <div className="mb-6 rounded-xl border border-rule bg-white p-4 text-sm text-ink-soft">
         Scores are submitted with moderation status{" "}

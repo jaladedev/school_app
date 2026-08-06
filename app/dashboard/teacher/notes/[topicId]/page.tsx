@@ -214,7 +214,9 @@ export default async function TeacherNoteEditPage({
         {topic?.subjects?.name} · {topic && formatLevel(topic.education_level, topic.level_number)}{" "}
         · Term {topic?.term}
       </p>
-      <h1 className="mb-6 font-display text-2xl font-semibold text-ink print:hidden">{topic?.title}</h1>
+      <h1 className="mb-6 font-display text-2xl font-semibold text-ink print:hidden">
+        {topic?.title}
+      </h1>
 
       {note?.status === "published" && (
         <div className="mb-4 flex flex-wrap items-center gap-3 print:hidden">
