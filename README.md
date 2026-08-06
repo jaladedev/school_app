@@ -1,6 +1,6 @@
 # School Management App
 
-A Next.js 14 + Supabase school management application for a Nigerian school workflow. The app is organized around admin, teacher, student, and parent roles, with a notebook-style UI and data-driven pages for academics, attendance, fees, messaging, and report cards.
+A Next.js 15 + Supabase school management application for a Nigerian school workflow. The app is organized around admin, teacher, student, and parent roles, with a notebook-style UI and data-driven pages for academics, attendance, fees, messaging, and report cards.
 
 ## Overview
 
@@ -28,6 +28,9 @@ The app currently covers:
 
 The codebase is already beyond the early scaffold phase. The most recent work includes:
 
+- security/correctness hardening pass: deactivated-user blocking at the middleware layer, an access guard on report-card reads, an overpayment guard on manual fee entry, and a timezone fix for library loan due dates
+- report-card scoring now treats a subject as incomplete (rather than silently averaging over just the graded assessments) until every 1st CA / 2nd CA / Exam component has a grade
+- centralized Supabase Storage bucket names instead of redeclaring them across several files
 - stronger temporary-password generation and account-cleanup safeguards
 - targeted role and RLS hardening across academic and parent flows
 - announcement read-state UX polish
@@ -38,13 +41,46 @@ This README describes the current app state rather than the original starter-era
 
 ## Tech stack
 
-- Next.js: 14.2.5
-- React: 18
-- TypeScript: 5
-- Tailwind CSS: 3
-- Supabase SSR / Supabase JS
-- Zod validation
-- Mermaid rendering for curriculum notes
+**Core**
+
+- [Next.js](https://nextjs.org/) 15 (App Router, Server Components, Server Actions)
+- [React](https://react.dev/) 18
+- [TypeScript](https://www.typescriptlang.org/) 5
+- [Tailwind CSS](https://tailwindcss.com/) 3
+
+**Backend & data**
+
+- [Supabase](https://supabase.com/) — Postgres, Auth, Storage, and Row Level Security
+- `@supabase/ssr` + `@supabase/supabase-js` for server/browser Supabase clients
+- [Zod](https://zod.dev/) for server-side env and input validation
+- Custom Next.js middleware (`proxy.ts`) for auth/role gating and forced-password-change redirects
+
+**Rich content & editing**
+
+- [Tiptap](https://tiptap.dev/) (ProseMirror-based) for the curriculum note editor — tables, task lists, text alignment, subscript/superscript, and Markdown import/export via `tiptap-markdown`
+- [react-markdown](https://github.com/remarkjs/react-markdown) + `remark-gfm` for rendering saved notes, with `rehype-highlight` / `highlight.js` for code blocks
+- [isomorphic-dompurify](https://github.com/kkomelin/isomorphic-dompurify) for sanitizing rendered HTML
+
+**Math & diagrams**
+
+- [KaTeX](https://katex.org/) + `rehype-katex` / `remark-math` for inline and block math rendering
+- [MathLive](https://cortexjs.io/mathlive/) for interactive math input in notes and quizzes
+- [Mermaid](https://mermaid.js.org/) for flowcharts and diagrams embedded in curriculum notes
+
+**Maps**
+
+- [Leaflet](https://leafletjs.com/) + `react-leaflet` for transport route mapping
+
+**Payments & email**
+
+- [Paystack](https://paystack.com/) for online fee payments, verified server-side
+- [Resend](https://resend.com/) for bulk email (announcements, fee reminders)
+
+**Tooling**
+
+- [Vitest](https://vitest.dev/) for unit tests (`lib/report-card-scoring.ts`, `types/database.ts`, and other pure logic)
+- ESLint (`eslint-config-next`) + Prettier (`prettier-plugin-tailwindcss`) for linting/formatting
+- `undici` for the server-side fetch dispatcher used by the Supabase client wrapper
 
 ## Local development
 
@@ -66,7 +102,15 @@ NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=your-paystack-public-key
 PAYSTACK_SECRET_KEY=your-paystack-secret-key
 ```
 
-These values come from your Supabase project in the Project Settings → API section and your Paystack dashboard settings.
+These values come from your Supabase project in the Project Settings → API section and your Paystack dashboard settings. `PAYSTACK_SECRET_KEY` is validated on startup (`lib/env.server.ts`) and must start with `sk_`.
+
+Optional — only needed if you're testing bulk email (announcements, fee reminders):
+
+```env
+RESEND_API_KEY=your-resend-api-key
+```
+
+`RESEND_API_KEY` isn't part of the validated env schema, so the app runs fine without it; email sending will just fail when attempted.
 
 ### 3. Start the app
 
@@ -122,7 +166,7 @@ npm run format:check
 
 ### Reporting
 
-- Weighted grade calculation paths
+- Subject scoring from graded assessments (weighted by explicit `weight_percent`, or by `max_score` ratios for the standard CA + Exam set), only once every assessment for that subject has a grade
 - Report-card generation
 - Class ranking and grade moderation support
 
@@ -133,7 +177,9 @@ app/                  — App Router pages and role-driven dashboard routes
 components/          — reusable UI components and forms
 lib/                 — server actions, helpers, validators, and Supabase integration
 types/               — shared database typing
-proxy.ts             — local request/proxy entry point used during development
+proxy.ts             — Next.js middleware: session refresh, role/auth gating, and
+                       forced-password-change redirects on /dashboard, /login, and
+                       /change-password (runs in every environment, not just locally)
 ```
 
 ## Notes for contributors

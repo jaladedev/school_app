@@ -144,7 +144,7 @@ export async function recordPayment(input: {
     p_method: input.method,
     p_reference: input.reference?.trim() || null,
     p_verified_by: id,
-    p_enforce_balance: false,
+    p_enforce_balance: true,
   });
 
   if (error) throw new Error(error.message);
