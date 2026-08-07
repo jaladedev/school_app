@@ -33,15 +33,17 @@ export default async function TeacherGradesPage() {
 
   const { data: timetableEntries } = await supabase
     .from("timetable_entries")
-    .select("class_id, classes(id, name, arm)")
+    .select("subject_id, classes(id, name, arm)")
     .eq("teacher_id", profile.id);
 
-  const classMap = new Map<string, { id: string; name: string; arm: string | null }>();
+  const classesBySubject = new Map<string, { id: string; name: string; arm: string | null }[]>();
   for (const entry of timetableEntries ?? []) {
     const cls = entry.classes;
-    if (cls) classMap.set(cls.id, cls);
+    if (!cls) continue;
+    const list = classesBySubject.get(entry.subject_id) ?? [];
+    if (!list.some((c) => c.id === cls.id)) list.push(cls);
+    classesBySubject.set(entry.subject_id, list);
   }
-  const classes = [...classMap.values()];
 
   const { data: moderationAssessments } =
     teacherProfile?.staff_role === "hod" && subjectIds.length
@@ -75,7 +77,10 @@ export default async function TeacherGradesPage() {
             Assessments you&apos;ve created. Select one to enter or review scores.
           </p>
         </div>
-        <CreateAssessmentForm teacherId={profile.id} subjects={subjects ?? []} classes={classes} />
+        <CreateAssessmentForm
+          subjects={subjects ?? []}
+          classesBySubject={Object.fromEntries(classesBySubject)}
+        />
       </div>
 
       <div className="space-y-2">

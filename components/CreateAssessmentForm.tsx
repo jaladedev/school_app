@@ -15,19 +15,18 @@ const CUSTOM_ASSESSMENT_TYPES: { value: AssessmentType; label: string }[] = [
 ];
 
 export function CreateAssessmentForm({
-  teacherId,
   subjects,
-  classes,
+  classesBySubject,
 }: {
-  teacherId: string;
   subjects: { id: string; name: string }[];
-  classes: { id: string; name: string; arm: string | null }[];
+  classesBySubject: Record<string, { id: string; name: string; arm: string | null }[]>;
 }) {
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
   const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
-  const [classId, setClassId] = useState(classes[0]?.id ?? "");
+  const classesForSubject = classesBySubject[subjectId] ?? [];
+  const [classId, setClassId] = useState(classesForSubject[0]?.id ?? "");
   const [term, setTerm] = useState(1);
   const [academicYear, setAcademicYear] = useState(defaultAcademicYear());
   const [customType, setCustomType] = useState<AssessmentType>("other");
@@ -36,7 +35,7 @@ export function CreateAssessmentForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ kind: "success" | "info"; text: string } | null>(null);
 
   function defaultAcademicYear() {
     const now = new Date();
@@ -71,11 +70,14 @@ export function CreateAssessmentForm({
         });
 
         if (!created.length) {
-          setMessage("1st CA, 2nd CA, and Exam already exist for this subject/class/term.");
+          setMessage({
+            kind: "info",
+            text: "1st CA, 2nd CA, and Exam already exist for this subject/class/term.",
+          });
           return;
         }
 
-        setMessage(`Created: ${created.join(", ")}.`);
+        setMessage({ kind: "success", text: `Created: ${created.join(", ")}.` });
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -119,7 +121,10 @@ export function CreateAssessmentForm({
           maxScore: customMaxScore,
         });
 
-        setMessage(`Created "${customTitle}" (${customMaxScore} marks).`);
+        setMessage({
+          kind: "success",
+          text: `Created "${customTitle}" (${customMaxScore} marks).`,
+        });
         setCustomTitle("");
         router.refresh();
       } catch (e) {
@@ -144,7 +149,11 @@ export function CreateAssessmentForm({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <select
           value={subjectId}
-          onChange={(e) => setSubjectId(e.target.value)}
+          onChange={(e) => {
+            const nextSubjectId = e.target.value;
+            setSubjectId(nextSubjectId);
+            setClassId(classesBySubject[nextSubjectId]?.[0]?.id ?? "");
+          }}
           className="rounded-lg border border-rule px-3 py-2 text-sm"
         >
           {subjects.map((s) => (
@@ -157,8 +166,10 @@ export function CreateAssessmentForm({
           value={classId}
           onChange={(e) => setClassId(e.target.value)}
           className="rounded-lg border border-rule px-3 py-2 text-sm"
+          disabled={classesForSubject.length === 0}
         >
-          {classes.map((c) => (
+          {classesForSubject.length === 0 && <option value="">No classes for this subject</option>}
+          {classesForSubject.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name} {c.arm}
             </option>
@@ -227,6 +238,7 @@ export function CreateAssessmentForm({
             <input
               type="number"
               min={1}
+              max={200}
               value={customMaxScore}
               onChange={(e) => setCustomMaxScore(Number(e.target.value))}
               className="w-24 rounded-lg border border-rule px-3 py-2 text-sm"
@@ -255,7 +267,11 @@ export function CreateAssessmentForm({
         </button>
       </div>
 
-      {message && <p className="text-sm text-leaf">{message}</p>}
+      {message && (
+        <p className={`text-sm ${message.kind === "success" ? "text-leaf" : "text-ink-soft"}`}>
+          {message.text}
+        </p>
+      )}
       {error && <p className="text-sm text-clay">{error}</p>}
     </div>
   );

@@ -59,7 +59,12 @@ export const createAssessmentSchema = z.object({
     .enum(["first_ca", "second_ca", "exam", "test", "assignment", "project", "practical", "other"])
     .optional(),
   customTitle: z.string().trim().optional(),
-  customMaxScore: z.coerce.number().int().min(1, "Max score must be at least 1.").optional(),
+  customMaxScore: z.coerce
+    .number()
+    .int()
+    .min(1, "Max score must be at least 1.")
+    .max(200, "Max score can't exceed 200.")
+    .optional(),
 });
 export type CreateAssessmentInput = z.infer<typeof createAssessmentSchema>;
 
