@@ -12,12 +12,33 @@ export const createStudentSchema = z.object({
 });
 export type CreateStudentInput = z.infer<typeof createStudentSchema>;
 
-export const createTeacherSchema = z.object({
-  fullName: z.string().trim().min(2, "Enter the teacher's full name."),
-  email: z.string().trim().email("Enter a valid email address."),
-  temporaryPassword: z.string().min(8, "Password must be at least 8 characters."),
-  subjectIds: z.array(z.string()).min(1, "Select at least one subject."),
-});
+export const createTeacherSchema = z
+  .object({
+    fullName: z.string().trim().min(2, "Enter the staff member's full name."),
+    email: z.string().trim().email("Enter a valid email address."),
+    temporaryPassword: z.string().min(8, "Password must be at least 8 characters."),
+    staffRole: z.enum([
+      "teacher",
+      "hod",
+      "bursar",
+      "librarian",
+      "house_parent",
+      "transport_officer",
+      "driver",
+    ]),
+    subjectIds: z.array(z.string()),
+  })
+  // Only teaching roles (teacher/HOD) need at least one subject --
+  // bursar/librarian/house_parent/transport_officer/driver aren't
+  // assigned subjects at all, so the picker doesn't apply to them.
+  .refine(
+    (data) =>
+      data.staffRole !== "teacher" && data.staffRole !== "hod" ? true : data.subjectIds.length > 0,
+    {
+      message: "Select at least one subject.",
+      path: ["subjectIds"],
+    }
+  );
 export type CreateTeacherInput = z.infer<typeof createTeacherSchema>;
 
 export const createClassSchema = z.object({

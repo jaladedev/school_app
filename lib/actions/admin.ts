@@ -224,6 +224,7 @@ export async function createTeacherAccount(input: {
   fullName: string;
   email: string;
   temporaryPassword: string;
+  staffRole: StaffRole;
   subjectIds: string[];
 }) {
   await assertRole(["admin"], "Only an admin can perform this action.");
@@ -255,9 +256,16 @@ export async function createTeacherAccount(input: {
 
   await insertProfileContact(admin, userId, input.email);
 
+  // Only teaching roles (teacher/HOD) carry subjects_taught -- every
+  // other staff role (bursar, librarian, house parent, transport
+  // officer, driver) isn't assigned subjects at all, so store an empty
+  // array for them regardless of what the form happened to send.
+  const isTeachingRole = input.staffRole === "teacher" || input.staffRole === "hod";
+
   const { error: teacherError } = await admin.from("teacher_profiles").insert({
     id: userId,
-    subjects_taught: input.subjectIds,
+    staff_role: input.staffRole,
+    subjects_taught: isTeachingRole ? input.subjectIds : [],
     hire_date: new Date().toISOString().slice(0, 10),
   });
 

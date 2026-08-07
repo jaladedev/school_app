@@ -4,17 +4,37 @@ import { useState, useTransition } from "react";
 import { createTeacherAccount } from "@/lib/actions/admin";
 import { createTeacherSchema, fieldErrorsFrom } from "@/lib/validation";
 import { SubjectPicker, type PickableSubject } from "@/components/SubjectPicker";
+import type { StaffRole } from "@/types/database";
+
+const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
+  teacher: "Teacher",
+  hod: "HOD",
+  bursar: "Bursar",
+  librarian: "Librarian",
+  house_parent: "House parent",
+  transport_officer: "Transport officer",
+  driver: "Driver",
+};
+
+// Only these two are assigned subjects -- every other staff role
+// doesn't teach, so the subject picker is hidden (and not required)
+// for them. Keep in sync with the isTeachingRole check in
+// createTeacherAccount (lib/actions/admin.ts).
+const TEACHING_ROLES: StaffRole[] = ["teacher", "hod"];
 
 export function CreateTeacherForm({ subjects }: { subjects: PickableSubject[] }) {
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [staffRole, setStaffRole] = useState<StaffRole>("teacher");
   const [subjectIds, setSubjectIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [created, setCreated] = useState<string | null>(null);
+
+  const isTeachingRole = TEACHING_ROLES.includes(staffRole);
 
   function toggleSubject(id: string) {
     setSubjectIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
@@ -25,7 +45,13 @@ export function CreateTeacherForm({ subjects }: { subjects: PickableSubject[] })
     setError(null);
     setCreated(null);
 
-    const input = { fullName, email, temporaryPassword, subjectIds };
+    const input = {
+      fullName,
+      email,
+      temporaryPassword,
+      staffRole,
+      subjectIds: isTeachingRole ? subjectIds : [],
+    };
     const errors = fieldErrorsFrom(createTeacherSchema, input);
     if (errors) {
       setFieldErrors(errors);
@@ -40,6 +66,7 @@ export function CreateTeacherForm({ subjects }: { subjects: PickableSubject[] })
         setFullName("");
         setEmail("");
         setTemporaryPassword("");
+        setStaffRole("teacher");
         setSubjectIds([]);
       } catch (err: any) {
         setError(err.message ?? "Something went wrong.");
@@ -53,7 +80,7 @@ export function CreateTeacherForm({ subjects }: { subjects: PickableSubject[] })
         onClick={() => setOpen(true)}
         className="rounded-lg bg-marigold px-4 py-2 text-sm font-medium text-ink hover:bg-marigold-dark"
       >
-        + Add teacher
+        + Add staff
       </button>
     );
   }
@@ -86,9 +113,25 @@ export function CreateTeacherForm({ subjects }: { subjects: PickableSubject[] })
       </div>
 
       <div>
+        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">Role</p>
+        <select
+          value={staffRole}
+          onChange={(e) => setStaffRole(e.target.value as StaffRole)}
+          className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+        >
+          {(Object.keys(STAFF_ROLE_LABELS) as StaffRole[]).map((value) => (
+            <option key={value} value={value}>
+              {STAFF_ROLE_LABELS[value]}
+            </option>
+          ))}
+        </select>
+        {fieldErrors.staffRole && <p className="mt-1 text-xs text-clay">{fieldErrors.staffRole}</p>}
+      </div>
+
+      <div>
         <input
           type="text"
-          placeholder="Temporary password (share with the teacher directly)"
+          placeholder="Temporary password (share with them directly)"
           value={temporaryPassword}
           onChange={(e) => setTemporaryPassword(e.target.value)}
           className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
@@ -98,15 +141,17 @@ export function CreateTeacherForm({ subjects }: { subjects: PickableSubject[] })
         )}
       </div>
 
-      <div>
-        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-          Subjects taught
-        </p>
-        <SubjectPicker subjects={subjects} selectedIds={subjectIds} onToggle={toggleSubject} />
-        {fieldErrors.subjectIds && (
-          <p className="mt-1 text-xs text-clay">{fieldErrors.subjectIds}</p>
-        )}
-      </div>
+      {isTeachingRole && (
+        <div>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
+            Subjects taught
+          </p>
+          <SubjectPicker subjects={subjects} selectedIds={subjectIds} onToggle={toggleSubject} />
+          {fieldErrors.subjectIds && (
+            <p className="mt-1 text-xs text-clay">{fieldErrors.subjectIds}</p>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-2">
         <button

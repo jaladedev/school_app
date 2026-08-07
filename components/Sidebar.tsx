@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { UserRole, StaffRole } from "@/types/database";
@@ -176,6 +177,18 @@ export function Sidebar({
   const activeHref = findActiveHref(pathname, items);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Closing the drawer via a plain setMobileOpen(false) inside a nav
+  // link's onClick looked like it did nothing until the new page had
+  // fully loaded: Next's <Link> wraps its own navigation in
+  // startTransition, and a state update fired in that same click
+  // handler gets swept into that transition too -- so React deferred
+  // actually painting the closed drawer until the navigation/transition
+  // finished, instead of immediately. flushSync forces this specific
+  // update to apply synchronously, ahead of/outside that transition.
+  function closeMobileNav() {
+    flushSync(() => setMobileOpen(false));
+  }
+
   const activeSectionName = ADMIN_NAV_SECTIONS.find((g) =>
     g.items.some((i) => i.href === activeHref)
   )?.section;
@@ -321,7 +334,7 @@ export function Sidebar({
                               key={item.href}
                               href={item.href}
                               aria-current={isActive ? "page" : undefined}
-                              onClick={() => setMobileOpen(false)}
+                              onClick={closeMobileNav}
                               className={`block rounded-lg px-3 py-1.5 text-sm transition ${
                                 isActive
                                   ? "bg-leaf-soft font-medium text-leaf"
@@ -346,7 +359,7 @@ export function Sidebar({
                       key={item.href}
                       href={item.href}
                       aria-current={isActive ? "page" : undefined}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={closeMobileNav}
                       className={`block rounded-lg px-3 py-2 text-sm transition ${
                         isActive
                           ? "bg-leaf-soft font-medium text-leaf"
