@@ -61,13 +61,6 @@ export type Profile = {
   created_at: string;
 };
 
-// Split out of `profiles` deliberately: `phone`/`email` are the only
-// columns on this table that shouldn't be broadly readable (Postgres RLS
-// is row-level only, it can't mask individual columns within a row a
-// policy already grants access to — see profile_contacts RLS in the
-// matching migration). Everything else on `profiles` (name, avatar, role)
-// is fine for any authenticated user or staff member to read for directory
-// / embedded-join purposes; contact info is not.
 export type ProfileContact = {
   id: string;
   email: string;
@@ -161,10 +154,6 @@ export type TopicNote = {
   updated_at: string;
 };
 
-// Periodic-autosave scratch row (#13 of markdown-editor-todo.md) --
-// one per (topic_id, author_id), never versioned like TopicNote itself.
-// See the 2026_08_03_topic_note_drafts.sql migration for why this is a
-// separate table rather than another TopicNote row.
 export type TopicNoteDraft = {
   topic_id: string;
   author_id: string;
@@ -180,9 +169,6 @@ export type TopicResource = {
   title: string | null;
   content: string | null;
   file_url: string | null;
-  // og:description (or the meta-description fallback) for `link`
-  // resources specifically -- see createLinkResource in teacher.ts.
-  // Every other resource type leaves this null.
   description: string | null;
   sequence_order: number;
   uploaded_by: string | null;
@@ -232,10 +218,10 @@ export type HomeworkSubmission = {
   file_url: string;
   file_name: string | null;
   submitted_at: string;
-  status: HomeworkSubmissionStatus;
   teacher_remark: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  status: HomeworkSubmissionStatus;
 };
 
 export type Assessment = {
@@ -306,6 +292,9 @@ export type ReportCardRemark = {
   admin_remark: string | null;
   updated_by: string | null;
   updated_at: string;
+  moderation_status: "pending" | "approved";
+  approved_by: string | null;
+  approved_at: string | null;
 };
 
 export type GradeScaleEntry = { grade: string; min: number };
@@ -424,13 +413,10 @@ export type LibraryLoan = {
 
 export function isLoanOverdue(loan: Pick<LibraryLoan, "due_at" | "returned_at">): boolean {
   if (loan.returned_at) return false;
-
   const [year, month, day] = loan.due_at.split("-").map(Number);
   const dueAtLocalMidnight = new Date(year, month - 1, day);
-
   const now = new Date();
   const todayLocalMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
   return dueAtLocalMidnight < todayLocalMidnight;
 }
 
@@ -641,8 +627,6 @@ export type QuizOption = {
   id: string;
   question_id: string;
   option_text: string;
-  // Left-side prompt for a "matching" question's pair; null for every
-  // other question type.
   match_prompt: string | null;
   is_correct: boolean;
   sequence_order: number;
@@ -664,17 +648,12 @@ export type QuizAnswer = {
   attempt_id: string;
   question_id: string;
   selected_option_id: string | null;
-  // fill_blank / essay free-text answer
   answer_text: string | null;
-  // matching: { [optionId]: chosenRightSideText }
   matched_pairs: Record<string, string> | null;
-  // essay only: manual score from grade_quiz_essay_answers(), null until graded
   points_awarded: number | null;
   answered_at: string;
 };
 
-// Shape returned by the get_quiz_attempt_questions() RPC — deliberately
-// has no is_correct field, see the anti-cheat note in the migration.
 export type QuizAttemptQuestionRow = {
   question_id: string;
   question_text: string;
@@ -1228,6 +1207,13 @@ export type Database = {
           {
             foreignKeyName: "report_card_remarks_updated_by_fkey";
             columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "report_card_remarks_approved_by_fkey";
+            columns: ["approved_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -1818,17 +1804,11 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       borrow_library_book: {
-        Args: {
-          p_book_id: string;
-          p_student_id: string;
-          p_due_at: string;
-        };
+        Args: { p_book_id: string; p_student_id: string; p_due_at: string };
         Returns: LibraryLoan;
       };
       return_library_book: {
-        Args: {
-          p_loan_id: string;
-        };
+        Args: { p_loan_id: string };
         Returns: (LibraryLoan & { overdue_days: number; fine_kobo: number })[];
       };
       current_scheme_week: {
@@ -1836,10 +1816,7 @@ export type Database = {
         Returns: number | null;
       };
       invoice_dashboard_totals: {
-        Args: {
-          p_academic_year?: string | null;
-          p_term?: number | null;
-        };
+        Args: { p_academic_year?: string | null; p_term?: number | null };
         Returns: {
           total_billed: number;
           total_collected: number;

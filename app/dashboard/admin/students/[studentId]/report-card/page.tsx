@@ -2,6 +2,7 @@ import { getReportCardData } from "@/lib/report-card";
 import { ReportCardView } from "@/components/ReportCardView";
 import { TermYearSelector } from "@/components/TermYearSelector";
 import { RemarkForm } from "@/components/RemarkForm";
+import { ApproveReportCardButton } from "@/components/ApproveReportCardButton";
 
 function defaultAcademicYear() {
   const now = new Date();
@@ -24,6 +25,7 @@ export default async function AdminStudentReportCardPage({
   const academicYear = resolvedSearchParams.year ?? defaultAcademicYear();
 
   const data = await getReportCardData(resolvedParams.studentId, term, academicYear);
+  const isApproved = data?.remark?.moderationStatus === "approved";
 
   return (
     <div>
@@ -34,13 +36,24 @@ export default async function AdminStudentReportCardPage({
         <ReportCardView
           data={data}
           editRemarkSlot={
-            <RemarkForm
-              studentId={resolvedParams.studentId}
-              term={term}
-              academicYear={academicYear}
-              initialClassTeacherRemark={data.remark?.classTeacherRemark ?? null}
-              initialAdminRemark={data.remark?.adminRemark ?? null}
-            />
+            <div>
+              <RemarkForm
+                studentId={resolvedParams.studentId}
+                term={term}
+                academicYear={academicYear}
+                initialClassTeacherRemark={data.remark?.classTeacherRemark ?? null}
+                initialAdminRemark={data.remark?.adminRemark ?? null}
+              />
+              {/* Saving a remark resets moderation_status to pending — the
+                  admin must re-approve after any edit. This button sits below
+                  the form so the natural flow is: edit → save → approve. */}
+              <ApproveReportCardButton
+                studentId={resolvedParams.studentId}
+                term={term}
+                academicYear={academicYear}
+                isApproved={isApproved}
+              />
+            </div>
           }
         />
       ) : (

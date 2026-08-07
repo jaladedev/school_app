@@ -80,5 +80,9 @@ export type ReportCardData = {
     classSize: number;
   };
   attendance: { present: number; absent: number; late: number; excused: number; total: number };
-  remark: { classTeacherRemark: string | null; adminRemark: string | null } | null;
+  remark: {
+    classTeacherRemark: string | null;
+    adminRemark: string | null;
+    moderationStatus: "pending" | "approved";
+  } | null;
 };

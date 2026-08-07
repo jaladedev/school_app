@@ -10,11 +10,6 @@ import {
   type ReportCardData,
 } from "@/lib/report-card-scoring";
 
-// Re-exported so nothing importing from "@/lib/report-card" needs to
-// change — the pure logic now lives in lib/report-card-scoring.ts (no
-// Supabase imports there, so it can be unit-tested / imported without
-// server env vars being configured). This file keeps only the
-// data-fetching orchestration.
 export { ordinal, rankDescending, computeSubjectPercent };
 export type { SubjectResult, ReportCardData };
 
@@ -44,18 +39,6 @@ export async function getReportCardData(
   term: number,
   academicYear: string
 ): Promise<ReportCardData | null> {
-  // This function uses the admin (service-role) client for most of its
-  // reads, which bypasses RLS entirely — so it must not trust its callers
-  // to have already checked access. Every existing caller today happens
-  // to be protected upstream (role-gated layouts, or a parent/child link
-  // resolved server-side), but that's an easy invariant to break for a
-  // future caller (a new API route, a server action) that forgets the
-  // check. Enforce it here instead, once. assertRole (rather than
-  // getCurrentProfile) re-verifies the session against Supabase's Auth
-  // server with retry, re-reads the profile via the admin client instead
-  // of depending on RLS SELECT policies being airtight, and already
-  // rejects deactivated accounts — the same guard every other privileged
-  // action in this codebase uses.
   const requester = await assertRole(
     ["admin", "teacher", "parent", "student"],
     "You must be signed in to view a report card."
@@ -79,7 +62,6 @@ export async function getReportCardData(
   }
 
   const supabase = createClient();
-
   const admin = createAdminClient();
 
   const { data: settings } = await supabase
@@ -112,7 +94,7 @@ export async function getReportCardData(
     .select("id")
     .eq("class_id", classId);
 
-  const classmateIds = (classmates ?? []).map((c) => c.id);
+  const classmateIds = (classmates ?? []).map((c: { id: string }) => c.id);
 
   const { data: assessments } = await admin
     .from("assessments")
@@ -122,11 +104,8 @@ export async function getReportCardData(
     .eq("academic_year", academicYear)
     .returns<AssessmentWithSubject[]>();
 
-  const assessmentIds = (assessments ?? []).map((a) => a.id);
+  const assessmentIds = (assessments ?? []).map((a: { id: string }) => a.id);
 
-  // Only APPROVED grades count toward a report card — pending grades
-  // (not yet moderated) shouldn't affect an official document or a
-  // classmate's ranking.
   const { data: allGrades } = assessmentIds.length
     ? await admin
         .from("grades")
@@ -226,10 +205,10 @@ export async function getReportCardData(
 
   const relevantLessonIds = (lessons ?? [])
     .filter(
-      (l) =>
+      (l: LessonWithTimetableEntry) =>
         l.timetable_entries?.term === term && l.timetable_entries?.academic_year === academicYear
     )
-    .map((l) => l.id);
+    .map((l: LessonWithTimetableEntry) => l.id);
 
   const { data: attendanceRows } = relevantLessonIds.length
     ? await admin
@@ -254,7 +233,7 @@ export async function getReportCardData(
 
   const { data: remark } = await admin
     .from("report_card_remarks")
-    .select("class_teacher_remark, admin_remark")
+    .select("class_teacher_remark, admin_remark, moderation_status")
     .eq("student_id", studentId)
     .eq("term", term)
     .eq("academic_year", academicYear)
@@ -284,7 +263,22 @@ export async function getReportCardData(
     },
     attendance,
     remark: remark
-      ? { classTeacherRemark: remark.class_teacher_remark, adminRemark: remark.admin_remark }
+      ? {
+          classTeacherRemark: remark.class_teacher_remark,
+          adminRemark: remark.admin_remark,
+          moderationStatus: remark.moderation_status as "pending" | "approved",
+        }
       : null,
   };
+}
+
+export function isFutureTerm(
+  term: number,
+  academicYear: string,
+  currentTerm: number,
+  currentAcademicYear: string
+): boolean {
+  if (academicYear > currentAcademicYear) return true;
+  if (academicYear < currentAcademicYear) return false;
+  return term > currentTerm;
 }
