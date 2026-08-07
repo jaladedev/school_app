@@ -62,7 +62,10 @@ export default async function ClassTimetablePage({
 
   const termsWithData = [...new Set((termCounts ?? []).map((t) => t.term))].sort();
 
-  const { data: subjects } = await supabase.from("subjects").select("id, name").order("name");
+  const { data: subjects } = await supabase
+    .from("subjects")
+    .select("id, name, education_level")
+    .order("name");
 
   const { data: teacherProfiles } = await supabase
     .from("teacher_profiles")

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/EmptyState";
+import { levelLabel } from "@/lib/educationLevel";
 
 type TimetableRow = {
   id: string;
@@ -61,7 +62,11 @@ export default async function TeacherProfilePage({
   const subjectIds = teacherProfile.subjects_taught ?? [];
 
   const { data: subjects } = subjectIds.length
-    ? await supabase.from("subjects").select("id, name").in("id", subjectIds).order("name")
+    ? await supabase
+        .from("subjects")
+        .select("id, name, education_level")
+        .in("id", subjectIds)
+        .order("name")
     : { data: [] };
 
   const { data: classTeacherOf } = await supabase
@@ -191,6 +196,7 @@ export default async function TeacherProfilePage({
               className="rounded-full bg-paper px-3 py-1 text-xs font-medium text-ink-soft"
             >
               {s.name}
+              {s.education_level ? ` (${levelLabel(s.education_level)})` : ""}
             </span>
           ))}
           {!subjects?.length && <EmptyState message="No subjects assigned yet." />}

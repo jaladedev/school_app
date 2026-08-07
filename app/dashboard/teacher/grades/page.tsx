@@ -28,7 +28,7 @@ export default async function TeacherGradesPage() {
   const subjectIds = teacherProfile?.subjects_taught ?? [];
 
   const { data: subjects } = subjectIds.length
-    ? await supabase.from("subjects").select("id, name").in("id", subjectIds)
+    ? await supabase.from("subjects").select("id, name, education_level").in("id", subjectIds)
     : { data: [] };
 
   const { data: timetableEntries } = await supabase

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { timetableEntrySchema, fieldErrorsFrom } from "@/lib/validation";
+import { levelLabel } from "@/lib/educationLevel";
 
 const WEEKDAYS = [
   { value: 1, label: "Monday" },
@@ -23,7 +24,7 @@ export function TimetableEntryForm({
   classId: string;
   academicYear: string;
   term: number;
-  subjects: { id: string; name: string }[];
+  subjects: { id: string; name: string; education_level?: string | null }[];
   teachers: { id: string; full_name: string }[];
 }) {
   const router = useRouter();
@@ -211,6 +212,7 @@ export function TimetableEntryForm({
         {subjects.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name}
+            {s.education_level ? ` (${levelLabel(s.education_level)})` : ""}
           </option>
         ))}
       </select>

@@ -174,6 +174,7 @@ export async function saveGrade(
     .eq("teacher_id", teacherId)
     .eq("subject_id", assessment.subject_id)
     .eq("class_id", assessment.class_id)
+    .limit(1)
     .maybeSingle();
 
   if (!assignment) {
@@ -241,6 +242,7 @@ export async function importGrades(
     .eq("teacher_id", teacherId)
     .eq("subject_id", assessment.subject_id)
     .eq("class_id", assessment.class_id)
+    .limit(1)
     .maybeSingle();
 
   if (!assignment) throw new Error("You aren't assigned to this assessment's class and subject.");
@@ -298,12 +300,18 @@ async function assertTeacherAssignedTo(
   subjectId: string,
   classId: string
 ) {
+  // A teacher can have multiple timetable periods for the same
+  // subject/class (e.g. Mon period 2 + Wed period 4), so this can
+  // legitimately match more than one row — use limit(1) instead of
+  // maybeSingle(), which errors out (and was being silently swallowed
+  // here) whenever more than one row matched.
   const { data: assignment } = await supabase
     .from("timetable_entries")
     .select("id")
     .eq("teacher_id", teacherId)
     .eq("subject_id", subjectId)
     .eq("class_id", classId)
+    .limit(1)
     .maybeSingle();
 
   if (!assignment) {
@@ -311,30 +319,33 @@ async function assertTeacherAssignedTo(
   }
 }
 
-export async function createStandardAssessmentSet(input: {
-  subjectId: string;
-  classId: string;
-  term: number;
-  academicYear: string;
-}) {
-  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can create assessments.");
+const STANDARD_ASSESSMENTS = [
+  { title: "1st CA", max_score: 20, assessment_type: "first_ca" as const },
+  { title: "2nd CA", max_score: 20, assessment_type: "second_ca" as const },
+  { title: "Exam", max_score: 60, assessment_type: "exam" as const },
+];
 
-  const supabase = createClient();
-  await assertTeacherAssignedTo(supabase, teacherId, input.subjectId, input.classId);
-
-  const STANDARD_ASSESSMENTS = [
-    { title: "1st CA", max_score: 20, assessment_type: "first_ca" as const },
-    { title: "2nd CA", max_score: 20, assessment_type: "second_ca" as const },
-    { title: "Exam", max_score: 60, assessment_type: "exam" as const },
-  ];
-
+// Shared by createStandardAssessmentSet (single subject/class) and
+// createStandardAssessmentSetForAllMyClasses (bulk, one call per
+// distinct timetabled subject/class combo). Caller is responsible for
+// the assertTeacherAssignedTo check -- the bulk path derives its combos
+// directly from timetable_entries, so it's already guaranteed assigned
+// and re-checking per combo would just be a redundant round trip.
+async function createStandardSetFor(
+  supabase: ReturnType<typeof createClient>,
+  teacherId: string,
+  subjectId: string,
+  classId: string,
+  term: number,
+  academicYear: string
+) {
   const { data: existing } = await supabase
     .from("assessments")
     .select("assessment_type")
-    .eq("subject_id", input.subjectId)
-    .eq("class_id", input.classId)
-    .eq("term", input.term)
-    .eq("academic_year", input.academicYear);
+    .eq("subject_id", subjectId)
+    .eq("class_id", classId)
+    .eq("term", term)
+    .eq("academic_year", academicYear);
 
   const existingTypes = new Set((existing ?? []).map((a) => a.assessment_type));
   const toCreate = STANDARD_ASSESSMENTS.filter((a) => !existingTypes.has(a.assessment_type));
@@ -347,13 +358,13 @@ export async function createStandardAssessmentSet(input: {
     .from("assessments")
     .insert(
       toCreate.map((a) => ({
-        subject_id: input.subjectId,
-        class_id: input.classId,
+        subject_id: subjectId,
+        class_id: classId,
         title: a.title,
         assessment_type: a.assessment_type,
         max_score: a.max_score,
-        term: input.term,
-        academic_year: input.academicYear,
+        term,
+        academic_year: academicYear,
         created_by: teacherId,
       }))
     )
@@ -375,18 +386,113 @@ export async function createStandardAssessmentSet(input: {
         metadata: {
           kind: "standard_set",
           title: assessment.title,
-          subject_id: input.subjectId,
-          class_id: input.classId,
-          term: input.term,
-          academic_year: input.academicYear,
+          subject_id: subjectId,
+          class_id: classId,
+          term,
+          academic_year: academicYear,
         },
       })
     )
   );
 
+  return { created: toCreate.map((a) => `${a.title} (${a.max_score})`) };
+}
+
+export async function createStandardAssessmentSet(input: {
+  subjectId: string;
+  classId: string;
+  term: number;
+  academicYear: string;
+}) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can create assessments.");
+
+  const supabase = createClient();
+  await assertTeacherAssignedTo(supabase, teacherId, input.subjectId, input.classId);
+
+  const result = await createStandardSetFor(
+    supabase,
+    teacherId,
+    input.subjectId,
+    input.classId,
+    input.term,
+    input.academicYear
+  );
+
   revalidatePath("/dashboard/teacher/grades");
   revalidatePath("/dashboard/admin/grades");
-  return { created: toCreate.map((a) => `${a.title} (${a.max_score})`) };
+  return result;
+}
+
+export type BulkStandardSetResult = {
+  subjectId: string;
+  className: string;
+  subjectName: string;
+  created: string[];
+};
+
+// Creates the standard set (1st CA + 2nd CA + Exam) for every distinct
+// subject/class the calling teacher is timetabled for this term, in one
+// call, instead of requiring the teacher to repeat the single-subject
+// flow above once per subject. Combos derive straight from
+// timetable_entries (the same source assertTeacherAssignedTo checks
+// against), so there's no risk of creating assessments for a subject/
+// class the teacher isn't actually assigned to.
+export async function createStandardAssessmentSetForAllMyClasses(input: {
+  term: number;
+  academicYear: string;
+}) {
+  const { id: teacherId } = await assertRole(["teacher"], "Only teachers can create assessments.");
+  const supabase = createClient();
+
+  const { data: entries, error } = await supabase
+    .from("timetable_entries")
+    .select("subject_id, class_id, subjects(name), classes(name, arm)")
+    .eq("teacher_id", teacherId);
+
+  if (error) throw new Error(error.message);
+
+  // A teacher can have several periods a week for the same subject/class
+  // (e.g. Mon + Wed) -- dedupe down to distinct subject/class combos
+  // before creating anything, so we don't attempt the same combo twice.
+  const seen = new Map<
+    string,
+    { subjectId: string; classId: string; subjectName: string; className: string }
+  >();
+  for (const e of entries ?? []) {
+    const key = `${e.subject_id}:${e.class_id}`;
+    if (seen.has(key)) continue;
+    const className = e.classes
+      ? `${e.classes.name}${e.classes.arm ? ` ${e.classes.arm}` : ""}`
+      : "";
+    seen.set(key, {
+      subjectId: e.subject_id,
+      classId: e.class_id,
+      subjectName: e.subjects?.name ?? "",
+      className,
+    });
+  }
+
+  const results: BulkStandardSetResult[] = [];
+  for (const combo of seen.values()) {
+    const { created } = await createStandardSetFor(
+      supabase,
+      teacherId,
+      combo.subjectId,
+      combo.classId,
+      input.term,
+      input.academicYear
+    );
+    results.push({
+      subjectId: combo.subjectId,
+      subjectName: combo.subjectName,
+      className: combo.className,
+      created,
+    });
+  }
+
+  revalidatePath("/dashboard/teacher/grades");
+  revalidatePath("/dashboard/admin/grades");
+  return { results };
 }
 
 export async function createCustomAssessment(input: {

@@ -2,8 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createStandardAssessmentSet, createCustomAssessment } from "@/lib/actions/teacher";
+import {
+  createStandardAssessmentSet,
+  createCustomAssessment,
+  createStandardAssessmentSetForAllMyClasses,
+  type BulkStandardSetResult,
+} from "@/lib/actions/teacher";
 import { createAssessmentSchema, fieldErrorsFrom } from "@/lib/validation";
+import { levelLabel } from "@/lib/educationLevel";
 import type { AssessmentType } from "@/types/database";
 
 const CUSTOM_ASSESSMENT_TYPES: { value: AssessmentType; label: string }[] = [
@@ -18,7 +24,7 @@ export function CreateAssessmentForm({
   subjects,
   classesBySubject,
 }: {
-  subjects: { id: string; name: string }[];
+  subjects: { id: string; name: string; education_level?: string | null }[];
   classesBySubject: Record<string, { id: string; name: string; arm: string | null }[]>;
 }) {
   const router = useRouter();
@@ -35,7 +41,30 @@ export function CreateAssessmentForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<{ kind: "success" | "info"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ kind: "success" | "warning"; text: string } | null>(
+    null
+  );
+  const [isBulkPending, startBulkTransition] = useTransition();
+  const [bulkResults, setBulkResults] = useState<BulkStandardSetResult[] | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+
+  function handleCreateStandardSetForAllMyClasses() {
+    setBulkError(null);
+    setBulkResults(null);
+
+    startBulkTransition(async () => {
+      try {
+        const { results } = await createStandardAssessmentSetForAllMyClasses({
+          term,
+          academicYear,
+        });
+        setBulkResults(results);
+        router.refresh();
+      } catch (e) {
+        setBulkError(e instanceof Error ? e.message : "Something went wrong.");
+      }
+    });
+  }
 
   function defaultAcademicYear() {
     const now = new Date();
@@ -71,7 +100,7 @@ export function CreateAssessmentForm({
 
         if (!created.length) {
           setMessage({
-            kind: "info",
+            kind: "warning",
             text: "1st CA, 2nd CA, and Exam already exist for this subject/class/term.",
           });
           return;
@@ -159,6 +188,7 @@ export function CreateAssessmentForm({
           {subjects.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
+              {s.education_level ? ` (${levelLabel(s.education_level)})` : ""}
             </option>
           ))}
         </select>
@@ -200,13 +230,46 @@ export function CreateAssessmentForm({
         <p className="mb-2 text-sm font-medium text-ink">
           Standard set: 1st CA (20) + 2nd CA (20) + Exam (60)
         </p>
-        <button
-          onClick={handleCreateStandardSet}
-          disabled={isPending}
-          className="rounded-lg bg-leaf px-3 py-2 text-sm font-medium text-white hover:bg-leaf/90 disabled:opacity-60"
-        >
-          {isPending ? "Creating…" : "Create standard set"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleCreateStandardSet}
+            disabled={isPending}
+            className="rounded-lg bg-leaf px-3 py-2 text-sm font-medium text-white hover:bg-leaf/90 disabled:opacity-60"
+          >
+            {isPending ? "Creating…" : "Create standard set"}
+          </button>
+          <button
+            onClick={handleCreateStandardSetForAllMyClasses}
+            disabled={isBulkPending}
+            title="Create the standard set for every subject/class you're timetabled for this term"
+            className="rounded-lg border border-leaf px-3 py-2 text-sm font-medium text-leaf hover:bg-leaf/10 disabled:opacity-60"
+          >
+            {isBulkPending ? "Creating for all…" : "Create for all my subjects"}
+          </button>
+        </div>
+        {bulkError && <p className="mt-2 text-sm text-clay">{bulkError}</p>}
+        {bulkResults && (
+          <div className="mt-2 space-y-1 text-sm">
+            {bulkResults.length === 0 ? (
+              <p className="text-ink-soft">
+                You aren't timetabled for any subject/class yet this term.
+              </p>
+            ) : (
+              bulkResults.map((r) => (
+                <p key={`${r.subjectId}-${r.className}`}>
+                  <span className="font-medium text-ink">
+                    {r.subjectName} · {r.className}:
+                  </span>{" "}
+                  {r.created.length ? (
+                    <span className="text-leaf">Created {r.created.join(", ")}.</span>
+                  ) : (
+                    <span className="text-clay">Already existed.</span>
+                  )}
+                </p>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleCreateCustom} className="rounded-lg bg-paper p-3">
@@ -268,7 +331,7 @@ export function CreateAssessmentForm({
       </div>
 
       {message && (
-        <p className={`text-sm ${message.kind === "success" ? "text-leaf" : "text-ink-soft"}`}>
+        <p className={`text-sm ${message.kind === "success" ? "text-leaf" : "text-clay"}`}>
           {message.text}
         </p>
       )}
