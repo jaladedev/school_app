@@ -56,7 +56,6 @@
         "lib/report-card.ts",
         "app/dashboard/admin/id-cards/print/page.tsx",
         "app/dashboard/admin/students/\\[studentId\\]/page.tsx",
-        "app/dashboard/student/topics/\\[topicId\\]/page.tsx",
         "app/dashboard/teacher/homework/page.tsx",
         "app/dashboard/teacher/notes/\\[topicId\\]/page.tsx"
       ],

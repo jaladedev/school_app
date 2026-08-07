@@ -2,9 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { TopicContent } from "@/components/TopicContent";
 import { formatLevel } from "@/types/database";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { signTopicResourceUrls } from "@/lib/actions/topicResources";
 import { EmptyState } from "@/components/EmptyState";
-import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
 
 // Matches lib/tiptap/assessment-node.tsx's marker shape and
 // TopicContent's own ASSESSMENT_MARKER regex -- kept in sync manually
@@ -68,16 +67,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
         .order("sequence_order", { ascending: true })
     : { data: [] };
 
-  const admin = createAdminClient();
-  const displayResources = await Promise.all(
-    (resources ?? []).map(async (resource) => {
-      if (!resource.file_url || resource.file_url.startsWith("http")) return resource;
-      const { data: signed } = await admin.storage
-        .from(TOPIC_RESOURCE_BUCKET)
-        .createSignedUrl(resource.file_url, 6 * 60 * 60);
-      return { ...resource, file_url: signed?.signedUrl ?? null };
-    })
-  );
+  const displayResources = await signTopicResourceUrls(resources ?? []);
 
   const assessmentIds = [...(note?.content ?? "").matchAll(ASSESSMENT_MARKER_ID)].map((m) => m[1]);
   const { data: rawLinkedAssessments } =
