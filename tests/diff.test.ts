@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeWordDiff } from "@/lib/diff";
+import { computeWordDiff, stripMarkdownForDiff } from "@/lib/diff";
 
 function reconstruct(tokens: ReturnType<typeof computeWordDiff>, keep: ("equal" | "added")[]) {
   return tokens
@@ -49,5 +49,74 @@ describe("computeWordDiff", () => {
     const newText = "line one\n\nline two with  double space, extended";
     const tokens = computeWordDiff(oldText, newText);
     expect(reconstruct(tokens, ["equal", "added"])).toBe(newText);
+  });
+});
+
+describe("stripMarkdownForDiff", () => {
+  it("drops heading markers but keeps the heading text", () => {
+    expect(stripMarkdownForDiff("## States of matter")).toBe("States of matter");
+  });
+
+  it("unwraps bold, italic, and bold-italic text", () => {
+    expect(stripMarkdownForDiff("**bold** and *italic* and ***both***")).toBe(
+      "bold and italic and both"
+    );
+    expect(stripMarkdownForDiff("__bold__ and _italic_")).toBe("bold and italic");
+  });
+
+  it("unwraps inline code", () => {
+    expect(stripMarkdownForDiff("run `npm install` first")).toBe("run npm install first");
+  });
+
+  it("keeps link/image text and drops the url", () => {
+    expect(stripMarkdownForDiff("see [the docs](https://example.com/docs)")).toBe("see the docs");
+    expect(stripMarkdownForDiff("![a diagram](https://example.com/img.png)")).toBe(
+      "[Image: a diagram]"
+    );
+    expect(stripMarkdownForDiff("![](https://example.com/img.png)")).toBe("[Image]");
+  });
+
+  it("drops blockquote and list markers without losing the content", () => {
+    expect(stripMarkdownForDiff("> a quoted line")).toBe("a quoted line");
+    expect(stripMarkdownForDiff("- first\n- second")).toBe("first\nsecond");
+    expect(stripMarkdownForDiff("1. first\n2. second")).toBe("first\nsecond");
+    expect(stripMarkdownForDiff("- [ ] todo\n- [x] done")).toBe("todo\ndone");
+  });
+
+  it("drops horizontal rules", () => {
+    expect(stripMarkdownForDiff("above\n\n---\n\nbelow")).toBe("above\n\nbelow");
+  });
+
+  it("keeps LaTeX source but drops the $ / $$ delimiters", () => {
+    expect(stripMarkdownForDiff("the formula $x^2 + y^2 = z^2$ here")).toBe(
+      "the formula [Math: x^2 + y^2 = z^2] here"
+    );
+    expect(stripMarkdownForDiff("\n$$\nx^2 + y^2 = z^2\n$$\n")).toBe("\n[Math: x^2 + y^2 = z^2]\n");
+  });
+
+  it("replaces resource/assessment/topic markers with a short readable label", () => {
+    expect(stripMarkdownForDiff("[[resource:8f14e45fceea167a5a36dedd4bea2543]]")).toBe(
+      "[Resource 8f14e45f]"
+    );
+    expect(stripMarkdownForDiff("[[resource:8f14e45fceea167a5a36dedd4bea2543#full]]")).toBe(
+      "[Resource 8f14e45f]"
+    );
+    expect(stripMarkdownForDiff("[[assessment:8f14e45fceea167a5a36dedd4bea2543]]")).toBe(
+      "[Assessment 8f14e45f]"
+    );
+    expect(stripMarkdownForDiff("[[topic:8f14e45fceea167a5a36dedd4bea2543]]")).toBe(
+      "[Linked topic 8f14e45f]"
+    );
+  });
+
+  it("still shows a resource swap as a change, since different ids keep different short labels", () => {
+    const before = stripMarkdownForDiff("[[resource:8f14e45fceea167a5a36dedd4bea2543]]");
+    const after = stripMarkdownForDiff("[[resource:aaaaaaaaceea167a5a36dedd4bea2543]]");
+    expect(before).not.toBe(after);
+  });
+
+  it("leaves plain prose completely untouched", () => {
+    const prose = "Photosynthesis converts light energy into chemical energy.";
+    expect(stripMarkdownForDiff(prose)).toBe(prose);
   });
 });

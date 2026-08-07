@@ -82,7 +82,7 @@ export const DiagramPanel = forwardRef<HTMLElement, DiagramPanelProps>(function 
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
             Mermaid code

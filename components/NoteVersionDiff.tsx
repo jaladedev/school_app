@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getTopicNoteVersionContent } from "@/lib/actions/teacher";
-import { computeWordDiff, type DiffToken } from "@/lib/diff";
+import { computeWordDiff, stripMarkdownForDiff, type DiffToken } from "@/lib/diff";
 
 type VersionSummary = {
   id: string;
@@ -40,7 +40,9 @@ export function NoteVersionDiff({ versions }: { versions: VersionSummary[] }) {
     Promise.all([getTopicNoteVersionContent(fromId), getTopicNoteVersionContent(toId)])
       .then(([fromContent, toContent]) => {
         if (cancelled) return;
-        setTokens(computeWordDiff(fromContent, toContent));
+        setTokens(
+          computeWordDiff(stripMarkdownForDiff(fromContent), stripMarkdownForDiff(toContent))
+        );
       })
       .catch((err: any) => {
         if (cancelled) return;
@@ -99,7 +101,7 @@ export function NoteVersionDiff({ versions }: { versions: VersionSummary[] }) {
           {error && <p className="text-sm text-clay">{error}</p>}
 
           {tokens && !loading && (
-            <div className="whitespace-pre-wrap rounded-lg bg-paper p-4 font-mono text-xs leading-relaxed text-ink">
+            <div className="whitespace-pre-wrap rounded-lg bg-paper p-4 font-body text-sm leading-relaxed text-ink">
               {tokens.length ? (
                 tokens.map((token, i) => (
                   <span key={i} className={tokenClassName(token.type)}>

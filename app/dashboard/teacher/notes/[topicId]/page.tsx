@@ -269,7 +269,7 @@ export default async function TeacherNoteEditPage({
               }
             : undefined
         }
-        placeholder={`Write about "${topic?.title}" here. Use tables for summaries, and the ∑ button for math.`}
+        placeholder={`Write about "${topic?.title}" here. Use tables for summaries, and ∑ / ∑∑ for math.`}
         todaysEntries={(todaysEntries ?? []).map((entry) => ({
           id: entry.id,
           periodNumber: entry.period_number,

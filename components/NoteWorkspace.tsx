@@ -82,11 +82,11 @@ export function NoteWorkspace({
 
   return (
     <div>
-      <div className="mb-3 inline-flex rounded-lg border border-rule bg-paper p-1 print:hidden">
+      <div className="mb-3 flex gap-1 overflow-x-auto rounded-lg border border-rule bg-paper p-1 print:hidden">
         <button
           type="button"
           onClick={() => setMode("edit")}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+          className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ${
             mode === "edit" ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"
           }`}
         >
@@ -95,7 +95,7 @@ export function NoteWorkspace({
         <button
           type="button"
           onClick={() => setMode("preview")}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+          className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ${
             mode === "preview" ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"
           }`}
         >
@@ -106,7 +106,7 @@ export function NoteWorkspace({
           onClick={() => setMode("student")}
           disabled={!noteId}
           title={!noteId ? "Save the note once before viewing as a student" : undefined}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40 ${
+          className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40 ${
             mode === "student" ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"
           }`}
         >
@@ -117,7 +117,7 @@ export function NoteWorkspace({
           onClick={() => setMode("present")}
           disabled={!noteId}
           title={!noteId ? "Save the note once before presenting" : undefined}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40 ${
+          className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40 ${
             mode === "present" ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"
           }`}
         >
@@ -128,7 +128,7 @@ export function NoteWorkspace({
           onClick={() => setMode("handout")}
           disabled={!noteId}
           title={!noteId ? "Save the note once before printing a handout" : undefined}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40 ${
+          className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40 ${
             mode === "handout" ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"
           }`}
         >

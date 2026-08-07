@@ -101,7 +101,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     resources = [],
     assessments = [],
     topics = [],
-    placeholder = "Write the topic explanation here. Use tables for summaries, and the ∑ button for math.",
+    placeholder = "Write the topic explanation here. Use tables for summaries, and ∑ / ∑∑ for math.",
     onResourcesChange,
     mobileTab: controlledMobileTab,
     onMobileTabChange,
