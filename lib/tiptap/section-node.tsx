@@ -1,5 +1,5 @@
 /**
- * Block-Based Editing (#10 of markdown-editor-todo.md), v1.
+ * Block-Based Editing.
  *
  * A `section` node wraps one heading plus every block that follows it,
  * up to (but not including) the next heading. That grouping is what
@@ -22,29 +22,6 @@
  * heading-to-next-heading run into a `section` node via a single
  * `addToHistory: false` transaction so it doesn't show up as an undo step.
  *
- * Known v1 limitations (documented rather than silently glossed over):
- * - Typing a new heading inside an existing section's body does NOT
- *   auto-split it into a new section -- there's no input rule watching
- *   for that yet. Use the "Section" slash command / toolbar button to
- *   explicitly insert a new section instead. Auto-split is a plausible
- *   follow-up but needs care to avoid fighting mid-typing undo steps.
- * - Content before the first heading (if any) is left ungrouped at the
- *   top level, same as it would render today.
- *
- * Heading nesting (h3 under its parent h2, etc.) IS handled -- see
- * groupIntoSections below. `content: "heading block*"` already
- * schema-permits a nested `section` as a child (Section itself has
- * `group: "block"`, so it's already one of the things `block*`
- * matches) -- the only actual gap was that the original grouping walk
- * treated every heading as starting a new *top-level* section
- * regardless of level, flattening a doc's outline instead of nesting
- * it. `groupIntoSections` now tracks a stack of open sections keyed by
- * heading level: a heading strictly deeper than the currently-open
- * section nests inside it; a heading at the same or shallower level
- * closes sections back up to (and including) that level first. Same
- * "no markdown fence syntax" property holds either way -- `serialize`
- * already recurses through `renderContent`, so a nested section
- * flattens back out through its parent's flattening for free.
  */
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from "@tiptap/react";
@@ -258,6 +235,21 @@ export function groupIntoSections(schema: Schema, doc: PMNode): PMNode {
     }
   }
   while (stack.length) closeTopFrame();
-
   return schema.nodes.doc.create(doc.attrs, result);
+}
+
+/**
+ * Wraps the document's top-level content into `Section` nodes -- the boxes
+ * with the drag handle/duplicate/delete controls in the editor. This has
+ * to run any time the doc is replaced wholesale (initial load, restoring
+ * an autosave draft), or the content renders flat with no section chrome.
+ * Lives here (not in NoteEditor.tsx, where it originated) so both
+ * NoteEditor and useNoteAutosave's restoreDraft can call it without
+ * either importing the other.
+ */
+export function applySectionGrouping(editor: Editor) {
+  const grouped = groupIntoSections(editor.schema, editor.state.doc);
+  const tr = editor.state.tr.replaceWith(0, editor.state.doc.content.size, grouped.content);
+  tr.setMeta("addToHistory", false);
+  editor.view.dispatch(tr);
 }

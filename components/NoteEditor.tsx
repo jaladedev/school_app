@@ -28,7 +28,7 @@ import { TaskItem } from "@tiptap/extension-task-item";
 import { CodeBlock } from "@/lib/tiptap/code-block";
 import "highlight.js/styles/github-dark.css";
 import { Callout } from "@/lib/tiptap/callout-node";
-import { Section, groupIntoSections } from "@/lib/tiptap/section-node";
+import { Section, applySectionGrouping } from "@/lib/tiptap/section-node";
 import { BlockReorderShortcuts } from "@/lib/tiptap/block-reorder";
 import { SlashCommand, slashCommandBridge } from "@/lib/tiptap/slash-command";
 import { CharacterCount } from "@tiptap/extension-character-count";
@@ -46,9 +46,6 @@ import {
   createVideoEmbedResource,
   createLinkResource,
   uploadTopicResource,
-  saveTopicNoteDraft,
-  getTopicNoteDraft,
-  clearTopicNoteDraft,
 } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
@@ -56,8 +53,10 @@ import { ResourceChip } from "@/lib/tiptap/resource-node";
 import { AssessmentChip, type LinkableAssessment } from "@/lib/tiptap/assessment-node";
 import { TopicLinkChip, type LinkableTopic } from "@/lib/tiptap/topic-link-node";
 import { EmojiPicker } from "@/components/EmojiPicker";
-import { SymbolPicker } from "@/components/SymbolPicker";
 import { clampPopoverToEditor } from "@/lib/tiptap/popover-position";
+import { useNoteAutosave } from "@/lib/hooks/useNoteAutosave";
+import { useNoteSearch } from "@/lib/hooks/useNoteSearch";
+import { NoteToolbar } from "@/components/NoteToolbar";
 import {
   AddRowAboveIcon,
   AddRowBelowIcon,
@@ -72,8 +71,6 @@ import {
 } from "@/components/TableIcons";
 import { MathInline, MathBlock } from "@/lib/tiptap/math-nodes";
 import type { TopicResource } from "@/types/database";
-
-type SearchMatch = { from: number; to: number };
 
 const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
   image: "Image",
@@ -99,21 +96,6 @@ function isBareHttpUrl(text: string): boolean {
     return false;
   }
 }
-
-const TEXT_COLORS = [
-  "#1f2937",
-  "#475569",
-  "#dc2626",
-  "#ea580c",
-  "#ca8a04",
-  "#16a34a",
-  "#0891b2",
-  "#2563eb",
-  "#4f46e5",
-  "#7c3aed",
-  "#c026d3",
-  "#db2777",
-];
 
 // Starter templates for the "Generate Mermaid diagram" panel
 const DIAGRAM_TEMPLATES: { label: string; code: string }[] = [
@@ -164,17 +146,6 @@ const TabTrap = Extension.create({
     };
   },
 });
-
-// Wraps the document's top-level content into `Section` nodes -- the boxes
-// with the drag handle/duplicate/delete controls in the editor. This has to
-// run any time the doc is replaced wholesale (initial load, restoring an
-// autosave draft), or the content renders flat with no section chrome.
-function applySectionGrouping(editor: Editor) {
-  const grouped = groupIntoSections(editor.schema, editor.state.doc);
-  const tr = editor.state.tr.replaceWith(0, editor.state.doc.content.size, grouped.content);
-  tr.setMeta("addToHistory", false);
-  editor.view.dispatch(tr);
-}
 
 // Imperative surface exposed to parents (namely `ResourceSidebar` via
 // `NoteWorkspace`) so a persistent sidebar living outside this component
@@ -324,12 +295,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const [linkPreviewOpen, setLinkPreviewOpen] = useState(false);
   const [linkPreviewUrl, setLinkPreviewUrl] = useState("");
   const [isSavingLinkPreview, setIsSavingLinkPreview] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [replaceTerm, setReplaceTerm] = useState("");
-  const [matchCase, setMatchCase] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
 
+  // Deliberately no dependency array -- this is meant to rerun and
+  // reassign on every render, not just on mount. slashCommandBridge is a
+  // plain module-level object (see lib/tiptap/slash-command.ts) shared
+  // with the ProseMirror plugin, which can't reach React state/props
+  // directly; these closures are how it calls back into this component.
+  // Giving this `[]` would freeze the closures to their first-render
+  // values (e.g. state setters would still work since setState is
+  // stable, but any render-scoped value these ever start capturing
+  // would go stale). The three setters below cost nothing to reassign,
+  // so rerunning every render is cheap insurance against that class of
+  // bug rather than something to "optimize" away.
   useEffect(() => {
     slashCommandBridge.openResourcePicker = () => setPickerOpen(true);
     slashCommandBridge.openDiagramPanel = () => setDiagramPanelOpen(true);
@@ -355,7 +333,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const emojiPopupRef = useRef<HTMLDivElement | null>(null);
   const diagramSectionRef = useRef<HTMLDivElement | null>(null);
   const noteContainerRef = useRef<HTMLDivElement | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // The resource picker still needs the old scroll-to-toolbar treatment --
   // it has no cursor-relative anchor point the way emoji insertion does
@@ -570,68 +547,24 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     });
   }, [editor, spellcheckEnabled]);
 
-  // Keep positions rather than decorating every result: a selection is
-  // enough to show the active match, and it avoids modifying a teacher's
-  // document merely to display search results.
-  function getSearchMatches(): SearchMatch[] {
-    if (!editor || !searchTerm) return [];
-    const needle = matchCase ? searchTerm : searchTerm.toLocaleLowerCase();
-    const matches: SearchMatch[] = [];
-
-    editor.state.doc.descendants((node, pos) => {
-      if (!node.isText || !node.text) return true;
-      const haystack = matchCase ? node.text : node.text.toLocaleLowerCase();
-      let index = haystack.indexOf(needle);
-      while (index !== -1) {
-        matches.push({ from: pos + index, to: pos + index + searchTerm.length });
-        index = haystack.indexOf(needle, index + searchTerm.length);
-      }
-      return true;
-    });
-    return matches;
-  }
-
-  const searchMatches = getSearchMatches();
-
-  function selectSearchMatch(direction: 1 | -1 = 1) {
-    if (!editor || searchMatches.length === 0) return;
-    const { from, to } = editor.state.selection;
-    const selectedIndex = searchMatches.findIndex(
-      (match) => match.from === from && match.to === to
-    );
-    const nextIndex =
-      selectedIndex === -1
-        ? direction === 1
-          ? 0
-          : searchMatches.length - 1
-        : (selectedIndex + direction + searchMatches.length) % searchMatches.length;
-    const match = searchMatches[nextIndex];
-    editor.chain().focus().setTextSelection(match).scrollIntoView().run();
-  }
-
-  function replaceSearchMatch() {
-    if (!editor || searchMatches.length === 0) return;
-    const { from, to } = editor.state.selection;
-    const match =
-      searchMatches.find((candidate) => candidate.from === from && candidate.to === to) ??
-      searchMatches[0];
-    const chain = editor.chain().focus().setTextSelection(match);
-    if (replaceTerm) chain.insertContent(replaceTerm);
-    else chain.deleteSelection();
-    chain.scrollIntoView().run();
-  }
-
-  function replaceAllSearchMatches() {
-    if (!editor || searchMatches.length === 0) return;
-    // Work backwards so each replacement leaves the positions of earlier
-    // matches valid. One transaction also makes Replace all one undo step.
-    let transaction = editor.state.tr;
-    for (const match of [...searchMatches].reverse()) {
-      transaction = transaction.insertText(replaceTerm, match.from, match.to);
-    }
-    editor.view.dispatch(transaction);
-    editor.commands.focus();
-  }
+  // In-note find/replace -- extracted into useNoteSearch
+  // (lib/hooks/useNoteSearch.ts). Placed after `editor` exists since the
+  // hook needs the live instance to walk the doc for matches.
+  const {
+    searchOpen,
+    setSearchOpen,
+    searchTerm,
+    setSearchTerm,
+    replaceTerm,
+    setReplaceTerm,
+    matchCase,
+    setMatchCase,
+    searchInputRef,
+    searchMatches,
+    selectSearchMatch,
+    replaceSearchMatch,
+    replaceAllSearchMatches,
+  } = useNoteSearch(editor);
 
   function enterFocusMode() {
     setSearchOpen(false);
@@ -660,10 +593,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     document.addEventListener("fullscreenchange", update);
     return () => document.removeEventListener("fullscreenchange", update);
   }, []);
-
-  useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus();
-  }, [searchOpen]);
 
   useEffect(() => {
     slashCommandBridge.openEmojiPicker = () => {
@@ -777,122 +706,27 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     [editor, editor?.state.doc, localResources]
   );
 
-  const initialMarkdown = useMemo(() => initialContent, [initialContent]);
-  const [lastSavedContent, setLastSavedContent] = useState(initialMarkdown);
-  const [isDirty, setIsDirty] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-
-  useEffect(() => {
-    if (!editor) return;
-    function onUpdate() {
-      setIsDirty(getMarkdown() !== lastSavedContent);
-    }
-    editor.on("update", onUpdate);
-    return () => {
-      editor.off("update", onUpdate);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor, lastSavedContent]);
-
-  // --- Offline detection --------------------------------------
-  // Autosave and the explicit Save/Publish buttons both need to know
-  // this: there's no point firing a save attempt (autosave) or letting
-  // someone click Publish (explicit) when the request can't possibly
-  // reach the server, and either would otherwise surface as a confusing
-  // generic network-error toast rather than the clearer "you're offline"
-  // state this drives instead.
-  const [isOnline, setIsOnline] = useState(true);
-  useEffect(() => {
-    setIsOnline(navigator.onLine);
-    function handleOnline() {
-      setIsOnline(true);
-    }
-    function handleOffline() {
-      setIsOnline(false);
-    }
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
-  // --- Periodic autosave ---------------------------------------
-  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle"
-  );
-  const [lastAutosaveAt, setLastAutosaveAt] = useState<Date | null>(null);
-  const isDirtyRef = useRef(isDirty);
-  isDirtyRef.current = isDirty;
-  const isOnlineRef = useRef(isOnline);
-  isOnlineRef.current = isOnline;
-
-  useEffect(() => {
-    if (!editor) return;
-    const interval = setInterval(() => {
-      if (!isDirtyRef.current || !isOnlineRef.current) return;
-      const content = getMarkdown();
-      setAutosaveStatus("saving");
-      saveTopicNoteDraft(topicId, content)
-        .then(() => {
-          setAutosaveStatus("saved");
-          setLastAutosaveAt(new Date());
-        })
-        .catch(() => {
-          setAutosaveStatus("error");
-        });
-    }, 20_000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor, topicId]);
-
-  // --- Draft recovery banner -----------------------------------
-  // Checked once on mount. The existing `beforeunload` warning only
-  // catches a clean in-app navigation attempt -- it can't do anything
-  // about a crashed tab, a dead battery, or a network drop right as
-  // someone closed the laptop lid. If an autosave tick from one of those
-  // situations is sitting in `topic_note_drafts` and differs from what
-  // this page loaded with, offer to restore it instead of silently
-  // discarding a teacher's unsaved work.
-  const [draftBanner, setDraftBanner] = useState<{ content: string; updatedAt: string } | null>(
-    null
-  );
-  useEffect(() => {
-    let cancelled = false;
-    getTopicNoteDraft(topicId)
-      .then((draft) => {
-        if (!cancelled && draft && draft.content !== initialMarkdown) {
-          setDraftBanner(draft);
-        }
-      })
-      .catch(() => {
-        // No draft, or couldn't check -- fine either way, nothing to recover.
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topicId]);
-
-  function restoreDraft() {
-    if (!editor || !draftBanner) return;
-    editor.commands.setContent(draftBanner.content);
-    // setContent parses the raw markdown flat -- re-apply the same
-    // section-grouping pass used on initial load, or the section
-    // boxes/controls vanish even though the content itself is intact.
-    requestAnimationFrame(() => {
-      applySectionGrouping(editor);
-    });
-    setDraftBanner(null);
-  }
-
-  function discardDraft() {
-    setDraftBanner(null);
-    clearTopicNoteDraft(topicId).catch(() => {
-      // Non-critical -- worst case the banner reappears next load.
-    });
-  }
+  // Dirty-state, autosave, offline detection, and unsaved-draft recovery
+  // -- extracted into useNoteAutosave (lib/hooks/useNoteAutosave.ts).
+  // setIsDirty/setLastSavedContent/setLastSavedAt are still called
+  // directly from this component (handleSave, ensureNoteId,
+  // handleSaveDiagram, uploadDroppedFiles) since marking a real save as
+  // clean is this component's job, not the hook's -- see the hook's own
+  // top comment for why the split lands there.
+  const {
+    isDirty,
+    setIsDirty,
+    lastSavedContent,
+    setLastSavedContent,
+    lastSavedAt,
+    setLastSavedAt,
+    autosaveStatus,
+    lastAutosaveAt,
+    isOnline,
+    draftBanner,
+    restoreDraft,
+    discardDraft,
+  } = useNoteAutosave(editor, topicId, initialContent);
 
   function handleSave(status: "draft" | "published") {
     if (!editor) return;
@@ -1120,16 +954,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [a11yMenuOpen]);
-
-  useEffect(() => {
-    if (!isDirty) return;
-    function handleBeforeUnload(e: BeforeUnloadEvent) {
-      e.preventDefault();
-      e.returnValue = "";
-    }
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isDirty]);
 
   function promptForLink() {
     if (!editor) return;
@@ -1972,462 +1796,41 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
             </div>
           )}
 
-          {/* Toolbar — hidden on mobile except while actually writing; always shown on desktop, unless forcePreview (#11) turns this into a pure read view */}
           {!focusMode && !forcePreview && (
-            <div
-              role="toolbar"
-              aria-label="Note formatting"
-              className={`mb-2 ${mobileTab !== "write" ? "hidden md:flex" : "flex"} flex-wrap items-center gap-1 rounded-lg border border-rule bg-paper p-1`}
-            >
-              <button
-                type="button"
-                title="Undo (Ctrl/Cmd+Z)"
-                onClick={() => editor.chain().focus().undo().run()}
-                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-              >
-                ↺
-              </button>
-              <button
-                type="button"
-                title="Redo (Ctrl/Cmd+Shift+Z)"
-                onClick={() => editor.chain().focus().redo().run()}
-                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-              >
-                ↻
-              </button>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <button
-                type="button"
-                title="Search and replace (Ctrl/Cmd+F)"
-                onClick={() => setSearchOpen(true)}
-                aria-label="Search and replace"
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${searchOpen ? "bg-white" : ""}`}
-              >
-                <span aria-hidden="true"> Find ⌕</span>
-              </button>
-              <button
-                type="button"
-                title="Focus mode"
-                aria-label="Enter focus mode"
-                onClick={enterFocusMode}
-                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-              >
-                <span aria-hidden="true">⛶</span>
-              </button>
-              <button
-                type="button"
-                title="Bold (Ctrl/Cmd+B)"
-                onClick={() => editor.chain().focus().toggleBold().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm font-semibold hover:bg-white ${editor.isActive("bold") ? "bg-white" : ""}`}
-              >
-                B
-              </button>
-              <button
-                type="button"
-                title="Italic (Ctrl/Cmd+I)"
-                onClick={() => editor.chain().focus().toggleItalic().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm italic hover:bg-white ${editor.isActive("italic") ? "bg-white" : ""}`}
-              >
-                I
-              </button>
-              <button
-                type="button"
-                title="Underline (Ctrl/Cmd+U)"
-                onClick={() => editor.chain().focus().toggleUnderline().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm underline hover:bg-white ${editor.isActive("underline") ? "bg-white" : ""}`}
-              >
-                U
-              </button>
-              <button
-                type="button"
-                title="Strikethrough"
-                onClick={() => editor.chain().focus().toggleStrike().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm line-through hover:bg-white ${editor.isActive("strike") ? "bg-white" : ""}`}
-              >
-                S
-              </button>
-              <div className="relative" ref={colorPickerRef}>
-                <button
-                  type="button"
-                  title="Text color"
-                  aria-label="Choose text color"
-                  onClick={() => setColorPickerOpen((open) => !open)}
-                  className={`relative min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${colorPickerOpen ? "bg-white" : ""}`}
-                >
-                  A
-                  <span
-                    className="absolute bottom-0.5 left-2 right-2 h-0.5 rounded"
-                    style={{
-                      backgroundColor: editor.getAttributes("textStyle").color || "#1f2937",
-                    }}
-                  />
-                </button>
-                {colorPickerOpen && (
-                  <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-rule bg-white p-2 shadow-lg">
-                    <div className="mb-2 flex items-center justify-between px-0.5">
-                      <span className="text-xs font-medium text-ink">Text color</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          editor.chain().focus().unsetColor().run();
-                          setColorPickerOpen(false);
-                        }}
-                        className="text-xs text-ink-soft hover:text-ink"
-                      >
-                        Reset
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {TEXT_COLORS.map((color) => {
-                        const selected = editor.getAttributes("textStyle").color === color;
-                        return (
-                          <button
-                            key={color}
-                            type="button"
-                            aria-label={`Set text color to ${color}`}
-                            title={color}
-                            onClick={() => {
-                              editor.chain().focus().setColor(color).run();
-                              setColorPickerOpen(false);
-                            }}
-                            className={`flex h-7 w-7 items-center justify-center rounded-full border-2 ${selected ? "border-ink ring-2 ring-marigold/40" : "border-white hover:border-rule"}`}
-                            style={{ backgroundColor: color }}
-                          >
-                            {selected && <span className="text-xs font-bold text-white">✓</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                title="Highlight"
-                onClick={() => editor.chain().focus().toggleHighlight().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("highlight") ? "bg-white" : ""}`}
-              >
-                ▧
-              </button>
-              <button
-                type="button"
-                title="Superscript"
-                onClick={() => editor.chain().focus().toggleSuperscript().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("superscript") ? "bg-white" : ""}`}
-              >
-                x²
-              </button>
-              <button
-                type="button"
-                title="Subscript"
-                onClick={() => editor.chain().focus().toggleSubscript().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("subscript") ? "bg-white" : ""}`}
-              >
-                x₂
-              </button>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <select
-                title="Paragraph style"
-                value={
-                  editor.isActive("heading", { level: 1 })
-                    ? "h1"
-                    : editor.isActive("heading", { level: 2 })
-                      ? "h2"
-                      : editor.isActive("heading", { level: 3 })
-                        ? "h3"
-                        : "p"
-                }
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const chain = editor.chain().focus();
-                  if (value === "p") chain.setParagraph().run();
-                  else chain.toggleHeading({ level: Number(value.slice(1)) as 1 | 2 | 3 }).run();
-                }}
-                className="rounded-md border-none bg-transparent px-2 py-1 text-sm hover:bg-white"
-              >
-                <option value="p">Paragraph</option>
-                <option value="h1">Heading 1</option>
-                <option value="h2">Heading 2</option>
-                <option value="h3">Heading 3</option>
-              </select>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <button
-                type="button"
-                title="Bulleted list"
-                onClick={() => editor.chain().focus().toggleBulletList().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("bulletList") ? "bg-white" : ""}`}
-              >
-                •
-              </button>
-              <button
-                type="button"
-                title="Numbered list"
-                onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("orderedList") ? "bg-white" : ""}`}
-              >
-                1.
-              </button>
-              <button
-                type="button"
-                title="Blockquote"
-                onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("blockquote") ? "bg-white" : ""}`}
-              >
-                &ldquo;
-              </button>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <button
-                type="button"
-                title="Align left"
-                onClick={() => editor.chain().focus().setTextAlign("left").run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "left" }) ? "bg-white" : ""}`}
-              >
-                ⟸
-              </button>
-              <button
-                type="button"
-                title="Align center"
-                onClick={() => editor.chain().focus().setTextAlign("center").run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "center" }) ? "bg-white" : ""}`}
-              >
-                ⟺
-              </button>
-              <button
-                type="button"
-                title="Align right"
-                onClick={() => editor.chain().focus().setTextAlign("right").run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "right" }) ? "bg-white" : ""}`}
-              >
-                ⟹
-              </button>
-              <button
-                type="button"
-                title="Justify"
-                onClick={() => editor.chain().focus().setTextAlign("justify").run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive({ textAlign: "justify" }) ? "bg-white" : ""}`}
-              >
-                ☰
-              </button>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <button
-                type="button"
-                title="Checklist"
-                onClick={() => editor.chain().focus().toggleTaskList().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("taskList") ? "bg-white" : ""}`}
-              >
-                ☑
-              </button>
-              <button
-                type="button"
-                title="Outdent (Shift+Tab)"
-                onClick={() => {
-                  const itemType = editor.isActive("taskItem") ? "taskItem" : "listItem";
-                  editor.chain().focus().liftListItem(itemType).run();
-                }}
-                disabled={
-                  !editor.can().liftListItem("listItem") && !editor.can().liftListItem("taskItem")
-                }
-                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white disabled:opacity-40"
-              >
-                ⇤
-              </button>
-              <button
-                type="button"
-                title="Indent (Tab)"
-                onClick={() => {
-                  const itemType = editor.isActive("taskItem") ? "taskItem" : "listItem";
-                  editor.chain().focus().sinkListItem(itemType).run();
-                }}
-                disabled={
-                  !editor.can().sinkListItem("listItem") && !editor.can().sinkListItem("taskItem")
-                }
-                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white disabled:opacity-40"
-              >
-                ⇥
-              </button>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <button
-                type="button"
-                title="Horizontal rule"
-                onClick={() => editor.chain().focus().setHorizontalRule().run()}
-                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-              >
-                ―
-              </button>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <button
-                type="button"
-                title="Code block"
-                onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-                className={`min-w-[2rem] rounded-md px-2 py-1 font-mono text-sm hover:bg-white ${editor.isActive("codeBlock") ? "bg-white" : ""}`}
-              >
-                {"</>"}
-              </button>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <button
-                type="button"
-                title="Callout (Tip/Warning/etc. — type '/' for more options)"
-                onClick={() =>
-                  editor
-                    .chain()
-                    .focus()
-                    .insertContent({
-                      type: "callout",
-                      attrs: { calloutType: "tip" },
-                      content: [{ type: "paragraph" }],
-                    })
-                    .run()
-                }
-                className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${editor.isActive("callout") ? "bg-white" : ""}`}
-              >
-                💡
-              </button>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <button
-                type="button"
-                title="Inline math (LaTeX)"
-                onClick={() => insertMath(false)}
-                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-              >
-                ∑
-              </button>
-              <button
-                type="button"
-                title="Block math (LaTeX)"
-                onClick={() => insertMath(true)}
-                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-              >
-                ∑∑
-              </button>
-              <button
-                type="button"
-                title="Insert table"
-                onClick={insertTable}
-                className="min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white"
-              >
-                Table
-              </button>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <div className="relative" ref={emojiPickerRef}>
-                <button
-                  type="button"
-                  title="Insert emoji"
-                  onClick={() => {
-                    setEmojiPickerPos(null); // toolbar-anchored, not cursor-anchored
-                    setEmojiPickerOpen((open) => !open);
-                  }}
-                  className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${emojiPickerOpen ? "bg-white" : ""}`}
-                >
-                  😀
-                </button>
-                {emojiPickerOpen && !emojiPickerPos && (
-                  <div className="absolute left-0 top-full z-20 mt-1">
-                    <EmojiPicker onSelectAction={insertEmoji} />
-                  </div>
-                )}
-              </div>
-              <div className="relative" ref={symbolPickerRef}>
-                <button
-                  type="button"
-                  title="Insert maths, science, or Greek symbol"
-                  onClick={() => setSymbolPickerOpen((open) => !open)}
-                  className={`min-w-[2rem] rounded-md px-2 py-1 text-sm hover:bg-white ${symbolPickerOpen ? "bg-white" : ""}`}
-                >
-                  Ω
-                </button>
-                {symbolPickerOpen && (
-                  <div className="absolute right-0 top-full z-20 mt-1">
-                    <SymbolPicker onSelectAction={insertSymbol} />
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                title="Slash commands (Ctrl/Cmd+/)"
-                aria-label="Open slash commands"
-                onClick={openSlashCommands}
-                className="min-w-[2rem] rounded-md px-2 py-1 font-mono text-sm hover:bg-white"
-              >
-                /
-              </button>
-              <span className="mx-1 h-4 w-px bg-rule" />
-              <div className="relative" ref={a11yMenuRef}>
-                <button
-                  type="button"
-                  title="Reading & accessibility options"
-                  aria-label="Reading and accessibility options"
-                  aria-haspopup="true"
-                  aria-expanded={a11yMenuOpen}
-                  onClick={() => setA11yMenuOpen((open) => !open)}
-                  className={`min-w-[2rem] rounded-md px-2 py-1 text-sm font-medium hover:bg-white ${a11yMenuOpen ? "bg-white" : ""}`}
-                >
-                  Aa
-                </button>
-                {a11yMenuOpen && (
-                  <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-lg border border-rule bg-white p-3 text-sm shadow-lg">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                      Text size
-                    </p>
-                    <div
-                      className="mb-3 flex items-center gap-1"
-                      role="group"
-                      aria-label="Text size"
-                    >
-                      {([0.9, 1, 1.15, 1.3] as const).map((scale, i) => (
-                        <button
-                          key={scale}
-                          type="button"
-                          aria-pressed={fontScale === scale}
-                          aria-label={["Small", "Normal", "Large", "Extra large"][i] + " text"}
-                          onClick={() => setFontScale(scale)}
-                          style={{ fontSize: `${0.75 + i * 0.1}rem` }}
-                          className={`flex-1 rounded-md border px-2 py-1 ${
-                            fontScale === scale
-                              ? "border-marigold bg-marigold/15 font-semibold text-ink"
-                              : "border-rule text-ink-soft hover:bg-paper"
-                          }`}
-                        >
-                          A
-                        </button>
-                      ))}
-                    </div>
-
-                    <label className="mb-2 flex items-center justify-between gap-2">
-                      <span>High contrast</span>
-                      <input
-                        type="checkbox"
-                        checked={highContrast}
-                        onChange={(e) => setHighContrast(e.target.checked)}
-                        aria-label="High contrast note text"
-                      />
-                    </label>
-                    <label className="mb-2 flex items-center justify-between gap-2">
-                      <span>Dyslexia-friendly font</span>
-                      <input
-                        type="checkbox"
-                        checked={dyslexiaFont}
-                        onChange={(e) => setDyslexiaFont(e.target.checked)}
-                        aria-label="Use dyslexia-friendly font"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between gap-2">
-                      <span>Spell check</span>
-                      <input
-                        type="checkbox"
-                        checked={spellcheckEnabled}
-                        onChange={(e) => setSpellcheckEnabled(e.target.checked)}
-                        aria-label="Underline misspelled words as you type"
-                      />
-                    </label>
-                    <p className="mt-2 text-xs text-ink-soft">
-                      These only change how the note looks to you — nothing here is saved into the
-                      note.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
+            <NoteToolbar
+              editor={editor}
+              mobileTab={mobileTab}
+              searchOpen={searchOpen}
+              onOpenSearch={() => setSearchOpen(true)}
+              onEnterFocusMode={enterFocusMode}
+              colorPickerOpen={colorPickerOpen}
+              setColorPickerOpen={setColorPickerOpen}
+              colorPickerRef={colorPickerRef}
+              emojiPickerOpen={emojiPickerOpen}
+              setEmojiPickerOpen={setEmojiPickerOpen}
+              emojiPickerPos={emojiPickerPos}
+              setEmojiPickerPos={setEmojiPickerPos}
+              emojiPickerRef={emojiPickerRef}
+              onInsertEmoji={insertEmoji}
+              symbolPickerOpen={symbolPickerOpen}
+              setSymbolPickerOpen={setSymbolPickerOpen}
+              symbolPickerRef={symbolPickerRef}
+              onInsertSymbol={insertSymbol}
+              onOpenSlashCommands={openSlashCommands}
+              onInsertMath={insertMath}
+              onInsertTable={insertTable}
+              a11yMenuOpen={a11yMenuOpen}
+              setA11yMenuOpen={setA11yMenuOpen}
+              a11yMenuRef={a11yMenuRef}
+              fontScale={fontScale}
+              setFontScale={setFontScale}
+              highContrast={highContrast}
+              setHighContrast={setHighContrast}
+              dyslexiaFont={dyslexiaFont}
+              setDyslexiaFont={setDyslexiaFont}
+              spellcheckEnabled={spellcheckEnabled}
+              setSpellcheckEnabled={setSpellcheckEnabled}
+            />
           )}
 
           {emojiPickerOpen && emojiPickerPos && (
