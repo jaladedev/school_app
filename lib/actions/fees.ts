@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient, getUserWithRetry } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { assertRole } from "@/lib/actions/authGuards";
+import { assertRole, getAuthenticatedUser } from "@/lib/actions/authGuards";
 import type { EducationLevel, PaymentMethod } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
 import { computeInvoiceStatus } from "@/lib/invoiceStatus";
@@ -254,22 +254,13 @@ export async function voidInvoice(invoiceId: string, reason: string) {
 // payment. This is the same trust model a webhook would use, just
 // triggered by the client instead of by Paystack calling back to you.
 export async function verifyPaystackPayment(input: { reference: string; invoiceId: string }) {
-  const supabase = createClient();
-  // See lib/actions/authGuards.ts's assertRole for why this uses
-  // getUserWithRetry instead of a bare getUser() call: a transient network
-  // fetch failure and "not signed in" both come back as `user: null`, so
-  // an unguarded call here would wrongly reject a real payment-verification
-  // attempt from a legitimately signed-in student/parent during a network
-  // blip -- worse here than most call sites, since it's mid-payment.
-  const { user, error: getUserError, isTransient } = await getUserWithRetry(supabase);
-
-  if (getUserError && isTransient) {
-    throw new Error("Couldn't verify your session right now — check your connection and retry.", {
-      cause: getUserError,
-    });
-  }
-
-  if (!user) throw new Error("You must be signed in.");
+  // getAuthenticatedUser() (authGuards.ts) handles the transient-network-
+  // vs-actually-signed-out distinction that used to be duplicated here
+  // inline -- worth calling out that it matters especially at this call
+  // site, since a false "not signed in" here would wrongly reject a real
+  // payment-verification attempt from a legitimately signed-in
+  // student/parent during a network blip, mid-payment.
+  const user = await getAuthenticatedUser();
 
   const admin = createAdminClient();
 

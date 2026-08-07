@@ -113,8 +113,18 @@ export async function sendBulkEmailToAudience({
 
   const trimmedSubject = subject.trim();
   // The editor leaves stray "<br>"/empty tags behind when "cleared" -- treat
-  // that as empty rather than sending a blank-looking email.
-  const bodyIsEmpty = body.replace(/<[^>]*>/g, "").trim() === "";
+  // that as empty rather than sending a blank-looking email. Stripping
+  // tags alone isn't enough: a lone "&nbsp;" (a common leftover when
+  // someone deletes all visible text but a non-breaking space survives)
+  // has no tags to strip and isn't whitespace by .trim()'s definition,
+  // so it used to sail through this check as "non-empty" while looking
+  // completely blank to anyone reading the sent email. Decode the common
+  // whitespace-producing entities before the emptiness check.
+  const bodyIsEmpty =
+    body
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;|&#160;|&#xa0;|&ensp;|&emsp;|&thinsp;/gi, " ")
+      .trim() === "";
   if (!trimmedSubject) throw new Error("Enter a subject.");
   if (bodyIsEmpty) throw new Error("Enter a message body.");
   if (audience.roles.length === 0) throw new Error("Select at least one recipient group.");

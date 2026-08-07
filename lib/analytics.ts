@@ -22,6 +22,31 @@ function capToRecentTerms<T extends { label: string }>(points: T[]): T[] {
   return sorted.slice(-TERM_TREND_CAP);
 }
 
+// A single `.in("col", ids)` becomes one GET request with every id
+// serialized into the query string (PostgREST's `?col=in.(id1,id2,...)`
+// format) -- fine for a handful of ids, but getAverageGradesBySubject and
+// getTeacherPunctuality below both build their `ids` list from *every*
+// assessment/lesson school-wide for a term first, which for a school with
+// enough subjects/classes/periods can run into the thousands. Past a
+// few hundred UUIDs (~36 chars each) that URL can exceed what a typical
+// reverse proxy allows (nginx's default is 8KB) and the request just
+// fails outright, not slowly -- this batches the `.in()` into chunks and
+// merges the results instead of one unbounded request.
+const IN_CLAUSE_BATCH_SIZE = 200;
+
+async function selectInBatches<TRow>(
+  ids: string[],
+  runQuery: (batch: string[]) => PromiseLike<{ data: TRow[] | null }>
+): Promise<TRow[]> {
+  const results: TRow[] = [];
+  for (let i = 0; i < ids.length; i += IN_CLAUSE_BATCH_SIZE) {
+    const batch = ids.slice(i, i + IN_CLAUSE_BATCH_SIZE);
+    const { data } = await runQuery(batch);
+    if (data) results.push(...data);
+  }
+  return results;
+}
+
 export async function getEnrollmentTrend(
   supabase: SupabaseServerClient
 ): Promise<EnrollmentTrendPoint[]> {
@@ -105,11 +130,15 @@ export async function getAverageGradesBySubject(
   const assessmentIds = (assessments ?? []).map((a) => a.id);
   if (!assessmentIds.length) return [];
 
-  const { data: grades } = await supabase
-    .from("grades")
-    .select("assessment_id, score")
-    .in("assessment_id", assessmentIds)
-    .eq("moderation_status", "approved");
+  const grades = await selectInBatches<{ assessment_id: string; score: number }>(
+    assessmentIds,
+    (batch) =>
+      supabase
+        .from("grades")
+        .select("assessment_id, score")
+        .in("assessment_id", batch)
+        .eq("moderation_status", "approved")
+  );
 
   const assessmentById = new Map((assessments ?? []).map((a) => [a.id, a]));
   // Keyed by subject_id + class_id together — this is the actual change
@@ -120,7 +149,7 @@ export async function getAverageGradesBySubject(
     { subjectName: string; className: string; totalPercent: number; count: number }
   >();
 
-  for (const g of grades ?? []) {
+  for (const g of grades) {
     const assessment = assessmentById.get(g.assessment_id);
     if (!assessment || !assessment.max_score) continue;
     const subjectName = assessment.subjects?.name ?? "Unknown subject";
@@ -325,15 +354,15 @@ export async function getTeacherPunctuality(
   const lessonIds = (lessons ?? []).map((l) => l.id);
   if (!lessonIds.length) return [];
 
-  const { data: attendanceRows } = await supabase
-    .from("attendance")
-    .select("lesson_id, marked_at")
-    .in("lesson_id", lessonIds);
+  const attendanceRows = await selectInBatches<{ lesson_id: string; marked_at: string }>(
+    lessonIds,
+    (batch) => supabase.from("attendance").select("lesson_id, marked_at").in("lesson_id", batch)
+  );
 
   // Earliest mark per lesson — that's the moment attendance-taking
   // actually started, regardless of how many students were marked.
   const earliestMarkByLesson = new Map<string, string>();
-  for (const row of attendanceRows ?? []) {
+  for (const row of attendanceRows) {
     if (!row.lesson_id || !row.marked_at) continue;
     const existing = earliestMarkByLesson.get(row.lesson_id);
     if (!existing || row.marked_at < existing) {

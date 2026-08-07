@@ -76,6 +76,22 @@ export async function voidHostelFeeStructure(id: string, hostelId: string) {
 export async function generateHostelInvoices(
   hostelFeeStructureId: string
 ): Promise<{ created: number; alreadyInvoiced: number }> {
+  // Authorize BEFORE touching the DB for anything sensitive -- this used
+  // to read the fee structure (via the service-role admin client, which
+  // bypasses RLS) first and only check permissions afterward. Nothing in
+  // that data was ever returned to an unauthorized caller, so it wasn't
+  // a live leak, but it's the wrong order on principle: an unauthorized
+  // request shouldn't cause a real read against hostel-fee data at all,
+  // and every other fee-management action in this codebase (see
+  // installments.ts's createOrReplaceInstallmentPlan) authorizes first.
+  // assertRole alone can't do the whole check here (house-parent-of-this-
+  // specific-hostel isn't a role), so a role gate happens up front and
+  // the hostel-scoped part happens right after we have hostel_id.
+  await assertRole(
+    ["admin", "teacher"],
+    "Only an admin or that hostel's house parent can do this."
+  );
+
   const admin = createAdminClient();
 
   const { data: feeStructure } = await admin

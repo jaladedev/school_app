@@ -356,6 +356,27 @@ export async function markStudentPickup(input: {
   const { actorId } = await assertCanUpdateTrip(input.routeId);
   const admin = createAdminClient();
 
+  // Without this, a bogus studentId only ever surfaces as a raw
+  // Postgres foreign-key-violation message from the upsert below
+  // (transport_pickup_logs.student_id references student_profiles) --
+  // not a data-integrity risk since the FK already blocks it, but an
+  // ugly error rather than a clean one. More importantly, this also
+  // catches a *valid* student id that just isn't assigned to *this*
+  // route: assertCanUpdateTrip only authorizes the driver against the
+  // route itself, not the student-route pairing, so without this a
+  // driver could otherwise mark pickup/dropoff for any real student in
+  // the system, not just the ones actually on their route.
+  const { data: assignment } = await admin
+    .from("transport_assignments")
+    .select("id")
+    .eq("student_id", input.studentId)
+    .eq("route_id", input.routeId)
+    .is("unassigned_at", null)
+    .maybeSingle();
+  if (!assignment) {
+    throw new Error("That student isn't currently assigned to this route.");
+  }
+
   const now = new Date().toISOString();
   const { error } =
     input.event === "picked_up"

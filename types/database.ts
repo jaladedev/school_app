@@ -1931,6 +1931,14 @@ export type Database = {
         };
         Returns: string;
       };
+      replace_invoice_installments: {
+        Args: {
+          p_invoice_id: string;
+          p_created_by: string;
+          p_installments: { due_date: string; amount_kobo: number }[];
+        };
+        Returns: void;
+      };
       send_fee_reminders: {
         Args: { p_min_days_between?: number };
         Returns: { reminders_sent: number; invoices_considered: number }[];

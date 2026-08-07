@@ -46,50 +46,30 @@ export async function createOrReplaceInstallmentPlan(
     }
   }
 
-  const { data: invoice } = await admin
-    .from("invoices")
-    .select("total_amount_kobo, discount_kobo, voided_at")
-    .eq("id", invoiceId)
-    .single();
-
-  if (!invoice) throw new Error("Invoice not found.");
-  if (invoice.voided_at) throw new Error("This invoice has been voided.");
-
-  const netPayableKobo = invoice.total_amount_kobo - invoice.discount_kobo;
-  const scheduleTotalKobo = installments.reduce((sum, i) => sum + i.amountKobo, 0);
-
-  if (scheduleTotalKobo !== netPayableKobo) {
-    throw new Error(
-      `The installments add up to ${(scheduleTotalKobo / 100).toLocaleString("en-NG", {
-        style: "currency",
-        currency: "NGN",
-      })}, but the invoice's net payable amount (after any discount) is ${(
-        netPayableKobo / 100
-      ).toLocaleString("en-NG", { style: "currency", currency: "NGN" })}. They must match exactly.`
-    );
-  }
-
   // Sequence order comes from the due-date sort, not submission order --
   // "installment 1" should always mean "the one due soonest", regardless
   // of what order rows were added in the form.
   const sorted = [...installments].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const scheduleTotalKobo = sorted.reduce((sum, i) => sum + i.amountKobo, 0);
 
-  const { error: deleteError } = await admin
-    .from("invoice_installments")
-    .delete()
-    .eq("invoice_id", invoiceId);
-  if (deleteError) throw new Error(deleteError.message);
-
-  const { error: insertError } = await admin.from("invoice_installments").insert(
-    sorted.map((inst, index) => ({
-      invoice_id: invoiceId,
-      sequence_order: index + 1,
+  // One RPC call = one Postgres transaction (see
+  // 2026_08_07_atomic_installment_plan_replace.sql) -- delete-then-insert
+  // used to be two separate Supabase calls here; if the insert failed
+  // after the delete had already succeeded, the invoice was left with
+  // an empty plan and no way back. The RPC re-validates the amount-sum
+  // check itself against a fresh read of the invoice (never trusting a
+  // client-computed total for something this consequential), so a
+  // mismatch there also just rolls back cleanly instead of leaving a
+  // partial write.
+  const { error } = await admin.rpc("replace_invoice_installments", {
+    p_invoice_id: invoiceId,
+    p_created_by: actorId,
+    p_installments: sorted.map((inst) => ({
       due_date: inst.dueDate,
       amount_kobo: inst.amountKobo,
-      created_by: actorId,
-    }))
-  );
-  if (insertError) throw new Error(insertError.message);
+    })),
+  });
+  if (error) throw new Error(error.message);
 
   await writeAuditLog({
     entityType: "invoice",

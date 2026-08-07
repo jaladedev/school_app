@@ -58,6 +58,8 @@ export function IssueTestimonialForm({
           value={leavingYear}
           onChange={(e) => setLeavingYear(e.target.value)}
           placeholder="e.g. 2025/2026"
+          pattern="\d{4}/\d{4}"
+          title='Enter the session as "2025/2026"'
           className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
         />
       </label>

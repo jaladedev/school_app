@@ -7,8 +7,17 @@ import { assertRole } from "@/lib/actions/authGuards";
 function generateTempPassword(): string {
   // Not meant to be memorable — must_change_password forces a real
   // password on first login, same as every other account type this app
-  // creates. This is just enough entropy to hand to the driver once.
-  return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  // creates. Uses getRandomValues directly rather than slicing a
+  // randomUUID() string: a v4 UUID has two non-random nibbles baked in
+  // (the version nibble fixed to '4' and the variant nibble constrained
+  // to one of 8/9/a/b), which land at fixed positions in the
+  // dash-stripped string -- a naive .slice(0, N) can end up including
+  // one or both depending on N, quietly losing a few bits of the
+  // entropy the length suggests. 8 raw random bytes -> 16 hex chars is
+  // unambiguously 64 bits, no fixed positions to reason about.
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
