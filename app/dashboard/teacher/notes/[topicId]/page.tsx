@@ -286,10 +286,10 @@ export default async function TeacherNoteEditPage({
             {versions.map((version, i) => (
               <div
                 key={version.id}
-                className="flex items-center justify-between rounded-lg bg-paper px-3 py-2 text-sm"
+                className="flex flex-col gap-2 rounded-lg bg-paper px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
               >
                 <span className="font-medium text-ink">Version {version.version}</span>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <span className="text-xs text-ink-soft">
                     {/* `profiles` comes back as an array from this join
                         shape even though author_id -> profiles is a

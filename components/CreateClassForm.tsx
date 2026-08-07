@@ -109,7 +109,7 @@ export function CreateClassForm() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
             {stageLabel} level

@@ -90,7 +90,7 @@ export function ClassRow({
           currentArm={arm}
           currentAcademicYear={academicYear}
           isArchived={isArchived}
-          onClose={() => setEditing(false)}
+          onCloseAction={() => setEditing(false)}
         />
       )}
     </div>

@@ -145,7 +145,7 @@ export default async function TeacherProfilePage({
         ))}
       </div>
 
-      <div className="mb-6 grid grid-cols-3 gap-3">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-rule bg-white p-4">
           <p className="text-xs uppercase tracking-wide text-ink-soft">Subjects taught</p>
           <p className="font-display text-lg font-semibold text-ink">{subjects?.length ?? 0}</p>

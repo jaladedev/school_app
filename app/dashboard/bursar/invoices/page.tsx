@@ -115,7 +115,7 @@ export default async function BursarInvoicesPage({
         </p>
       )}
 
-      <div className="mb-6 grid grid-cols-4 gap-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-rule bg-white p-4">
           <p className="text-xs uppercase tracking-wide text-ink-soft">Total billed</p>
           <p className="font-display text-lg font-semibold text-ink">{formatKobo(totalBilled)}</p>

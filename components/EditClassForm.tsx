@@ -10,14 +10,14 @@ export function EditClassForm({
   currentArm,
   currentAcademicYear,
   isArchived,
-  onClose,
+  onCloseAction,
 }: {
   classId: string;
   currentName: string;
   currentArm: string | null;
   currentAcademicYear: string;
   isArchived: boolean;
-  onClose: () => void;
+  onCloseAction: () => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -43,7 +43,7 @@ export function EditClassForm({
         return;
       }
 
-      onClose();
+      onCloseAction();
       router.refresh();
     });
   }
@@ -61,7 +61,7 @@ export function EditClassForm({
         return;
       }
 
-      onClose();
+      onCloseAction();
       router.refresh();
     });
   }
@@ -71,7 +71,7 @@ export function EditClassForm({
       onSubmit={handleSave}
       className="mt-2 space-y-2 rounded-lg border border-rule bg-paper p-3"
     >
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -110,7 +110,7 @@ export function EditClassForm({
         </button>
         <button
           type="button"
-          onClick={onClose}
+          onClick={onCloseAction}
           className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink-soft"
         >
           Cancel

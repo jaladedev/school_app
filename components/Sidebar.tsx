@@ -321,6 +321,7 @@ export function Sidebar({
                               key={item.href}
                               href={item.href}
                               aria-current={isActive ? "page" : undefined}
+                              onClick={() => setMobileOpen(false)}
                               className={`block rounded-lg px-3 py-1.5 text-sm transition ${
                                 isActive
                                   ? "bg-leaf-soft font-medium text-leaf"
@@ -345,6 +346,7 @@ export function Sidebar({
                       key={item.href}
                       href={item.href}
                       aria-current={isActive ? "page" : undefined}
+                      onClick={() => setMobileOpen(false)}
                       className={`block rounded-lg px-3 py-2 text-sm transition ${
                         isActive
                           ? "bg-leaf-soft font-medium text-leaf"

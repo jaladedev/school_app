@@ -141,7 +141,7 @@ export function CreateStudentForm({
         {fieldErrors.classId && <p className="mt-1 text-xs text-clay">{fieldErrors.classId}</p>}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <input
           placeholder="Admission no. (optional)"
           value={admissionNo}

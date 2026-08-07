@@ -44,7 +44,7 @@ export default async function ParentAttendancePage({
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Attendance</h1>
       <ChildSwitcher linkedChildren={children} selectedChildId={selected.id} />
 
-      <div className="mb-6 grid grid-cols-4 gap-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-rule bg-white p-4 text-center">
           <p className="font-display text-xl font-semibold text-leaf">{summary.present}</p>
           <p className="text-xs text-ink-soft">Present</p>
