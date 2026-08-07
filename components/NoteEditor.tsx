@@ -13,33 +13,11 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
-import { Extension, type Editor } from "@tiptap/core";
+import { type Editor } from "@tiptap/core";
 import { BubbleMenu } from "@tiptap/react/menus";
-import StarterKit from "@tiptap/starter-kit";
-import { Table } from "@tiptap/extension-table";
-import { TableRow } from "@tiptap/extension-table-row";
-import { TableHeader } from "@tiptap/extension-table-header";
-import { TableCell } from "@tiptap/extension-table-cell";
-import { Placeholder } from "@tiptap/extension-placeholder";
-import { Color } from "@tiptap/extension-color";
-import { TextAlign } from "@tiptap/extension-text-align";
-import { TaskList } from "@tiptap/extension-task-list";
-import { TaskItem } from "@tiptap/extension-task-item";
-import { CodeBlock } from "@/lib/tiptap/code-block";
-import "highlight.js/styles/github-dark.css";
-import { Callout } from "@/lib/tiptap/callout-node";
-import { Section, applySectionGrouping } from "@/lib/tiptap/section-node";
-import { BlockReorderShortcuts } from "@/lib/tiptap/block-reorder";
-import { SlashCommand, slashCommandBridge } from "@/lib/tiptap/slash-command";
-import { CharacterCount } from "@tiptap/extension-character-count";
-import {
-  HighlightMarkdown,
-  SubscriptMarkdown,
-  SuperscriptMarkdown,
-  TextStyleMarkdown,
-} from "@/lib/tiptap/format-marks";
-import { Markdown } from "tiptap-markdown";
-import "katex/dist/katex.min.css";
+import { applySectionGrouping } from "@/lib/tiptap/section-node";
+import { slashCommandBridge } from "@/lib/tiptap/slash-command";
+import { buildNoteEditorExtensions } from "@/lib/tiptap/editor-extensions";
 import {
   saveTopicNote,
   createMermaidResource,
@@ -48,13 +26,16 @@ import {
   uploadTopicResource,
 } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
-import { MermaidDiagram } from "@/components/MermaidDiagram";
-import { ResourceChip } from "@/lib/tiptap/resource-node";
-import { AssessmentChip, type LinkableAssessment } from "@/lib/tiptap/assessment-node";
-import { TopicLinkChip, type LinkableTopic } from "@/lib/tiptap/topic-link-node";
+import { DiagramPanel } from "@/components/note-editor/DiagramPanel";
+import { VideoEmbedPopover } from "@/components/note-editor/VideoEmbedPopover";
+import { LinkPreviewPopover } from "@/components/note-editor/LinkPreviewPopover";
+import type { LinkableAssessment } from "@/lib/tiptap/assessment-node";
+import type { LinkableTopic } from "@/lib/tiptap/topic-link-node";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { clampPopoverToEditor } from "@/lib/tiptap/popover-position";
 import { useNoteAutosave } from "@/lib/hooks/useNoteAutosave";
+import { useResourceInsertion } from "@/lib/hooks/useResourceInsertion";
+import { useNoteFileUpload } from "@/lib/hooks/useNoteFileUpload";
 import { useNoteSearch } from "@/lib/hooks/useNoteSearch";
 import { NoteToolbar } from "@/components/NoteToolbar";
 import {
@@ -69,7 +50,6 @@ import {
   HeaderRowIcon,
   DeleteTableIcon,
 } from "@/components/TableIcons";
-import { MathInline, MathBlock } from "@/lib/tiptap/math-nodes";
 import type { TopicResource } from "@/types/database";
 
 const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
@@ -81,13 +61,6 @@ const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
   audio: "Audio",
 };
 
-const DEFAULT_MERMAID = "flowchart TD\n  A[Start] --> B[End]";
-
-// Used by the paste handler to decide whether a paste is "just a URL"
-// (triggers the link-preview auto-fetch) versus a URL embedded in
-// other text (pastes as plain text, unchanged). Deliberately narrower
-// than a general URL-detection regex: the whole trimmed string must
-// parse as one http(s) URL with nothing else around it.
 function isBareHttpUrl(text: string): boolean {
   try {
     const url = new URL(text);
@@ -97,61 +70,6 @@ function isBareHttpUrl(text: string): boolean {
   }
 }
 
-// Starter templates for the "Generate Mermaid diagram" panel
-const DIAGRAM_TEMPLATES: { label: string; code: string }[] = [
-  {
-    label: "Flowchart",
-    code: "flowchart TD\n  A[Start] --> B{Decision}\n  B -->|Yes| C[Do this]\n  B -->|No| D[Do that]",
-  },
-  {
-    label: "Mind map",
-    code: "mindmap\n  root((Topic))\n    Idea 1\n      Detail A\n      Detail B\n    Idea 2\n    Idea 3",
-  },
-  {
-    label: "Timeline",
-    code: "timeline\n  title A Sequence of Events\n  Step 1 : First thing happens\n  Step 2 : Then this\n  Step 3 : Finally this",
-  },
-  {
-    label: "Cycle",
-    code: "flowchart LR\n  A[Stage 1] --> B[Stage 2]\n  B --> C[Stage 3]\n  C --> D[Stage 4]\n  D --> A",
-  },
-  {
-    label: "Org chart",
-    code: "flowchart TD\n  Head[Head Teacher]\n  Head --> A[Deputy A]\n  Head --> B[Deputy B]\n  A --> A1[Teacher]\n  B --> B1[Teacher]",
-  },
-  {
-    label: "Sequence diagram",
-    code: "sequenceDiagram\n  participant Teacher\n  participant Student\n  Teacher->>Student: Asks a question\n  Student-->>Teacher: Gives an answer",
-  },
-];
-
-const ACCEPTED_RESOURCE_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/pdf",
-  "audio/mpeg",
-  "audio/wav",
-  "audio/ogg",
-  "video/mp4",
-  "video/webm",
-]);
-
-const TabTrap = Extension.create({
-  name: "tabTrap",
-  addKeyboardShortcuts() {
-    return {
-      Tab: () => true,
-      "Shift-Tab": () => true,
-    };
-  },
-});
-
-// Imperative surface exposed to parents (namely `ResourceSidebar` via
-// `NoteWorkspace`) so a persistent sidebar living outside this component
-// can insert an existing resource or upload+insert a new one without
-// duplicating `ensureNoteId`/`insertResourceMarker`/`uploadDroppedFiles`'s
-// note-creation and refresh logic here.
 export type NoteEditorHandle = {
   insertResource: (resource: TopicResource) => void;
   uploadFiles: (files: File[]) => Promise<void>;
@@ -165,42 +83,12 @@ type NoteEditorProps = {
   initialContent: string;
   initialStatus: "draft" | "published" | "archived" | "unwritten";
   resources?: TopicResource[];
-  // Assessments available to link (not embed) into this note via #16's
-  // AssessmentChip -- see lib/tiptap/assessment-node.tsx. Server-fetched,
-  // scoped to the topic's subject (see page.tsx); unlike `resources`,
-  // nothing here is ever created from inside the editor, so there's no
-  // matching `onAssessmentsChange`/local-merge state the way resources
-  // has for session-created uploads/diagrams.
   assessments?: LinkableAssessment[];
-  // Other topics (same subject) available to link into this note via
-  // TopicLinkChip -- see lib/tiptap/topic-link-node.tsx. Same shape as
-  // `assessments`: server-fetched, nothing here is ever created from
-  // inside the editor.
   topics?: LinkableTopic[];
   placeholder?: string;
-  // Fired whenever the live (server + locally-created-this-session)
-  // resource list changes, so a sidebar rendered by the parent can stay
-  // in sync without waiting for a full `router.refresh()` round trip.
   onResourcesChange?: (resources: TopicResource[]) => void;
-  // #32 Resources tab: the mobile Write/Preview/Resources tab bar lives
-  // here (it's rendered alongside the toolbar), but the actual Resources
-  // *content* is `ResourceSidebar`, which NoteWorkspace renders as a
-  // sibling of this component, not a child -- so the "which tab is
-  // active" state needs to live in NoteWorkspace and be passed down as a
-  // controlled pair, rather than living only in this component's own
-  // state, or NoteWorkspace would have no way to know when to show the
-  // sidebar on mobile. Falls back to internal state if omitted, so this
-  // component still works standalone / in tests without a parent wiring
-  // this up.
   mobileTab?: MobileTab;
   onMobileTabChange?: (tab: MobileTab) => void;
-  // #11 Better Preview: a desktop-visible, always-on read view, distinct
-  // from the mobile-only Write/Preview tab bar above. NoteWorkspace owns
-  // the mode switch (Edit/Preview/Present) and sets this when the
-  // teacher picks "Preview" -- forces the same setEditable(false) the
-  // mobile tab already used, but regardless of breakpoint, and hides the
-  // toolbar/search/mobile-tab-bar chrome that a read-only view has no use
-  // for instead of leaving them clickable over a non-editable doc.
   forcePreview?: boolean;
 };
 
@@ -224,22 +112,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [assessmentPickerOpen, setAssessmentPickerOpen] = useState(false);
   const [assessmentFilter, setAssessmentFilter] = useState("");
-  const [topicPickerOpen, setTopicPickerOpen] = useState(false);
   const [topicFilter, setTopicFilter] = useState("");
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const [symbolPickerOpen, setSymbolPickerOpen] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [a11yMenuOpen, setA11yMenuOpen] = useState(false);
   const a11yMenuRef = useRef<HTMLDivElement | null>(null);
-  // Note-reading accessibility prefs (#37) -- a per-browser display
-  // preference, not note content, so localStorage (not the DB) is the
-  // right home for it: it should follow "how this teacher likes to
-  // read/write," not travel with the note itself. Read lazily so SSR
-  // and the first client render agree (no window on the server).
   const [fontScale, setFontScale] = useState<0.9 | 1 | 1.15 | 1.3>(() => {
     if (typeof window === "undefined") return 1;
     const saved = Number(window.localStorage.getItem("noteEditor:fontScale"));
@@ -255,13 +133,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("noteEditor:dyslexiaFont") === "1";
   });
-  // #27 Spell Check, first pass: the browser's own native spellcheck
-  // (red squiggly underlines) rather than anything server-side --
-  // Tiptap/ProseMirror don't touch spelling at all, this is purely the
-  // `spellcheck` attribute on the underlying contentEditable element.
-  // Same per-browser preference reasoning as the three toggles above;
-  // defaults ON (absent localStorage key reads as enabled) since that
-  // matches what a plain contentEditable does with no attribute set.
   const [spellcheckEnabled, setSpellcheckEnabled] = useState(() => {
     if (typeof window === "undefined") return true;
     const saved = window.localStorage.getItem("noteEditor:spellcheck");
@@ -280,14 +151,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   useEffect(() => {
     window.localStorage.setItem("noteEditor:spellcheck", spellcheckEnabled ? "1" : "0");
   }, [spellcheckEnabled]);
-  // Set only when the picker is opened via the slash command -- gives it a
-  // cursor-anchored `position: fixed` spot instead of the toolbar-anchored
-  // dropdown, so picking an emoji while typing deep in a long note doesn't
-  // require jumping your eyes up to the toolbar and back. Left `null` for
-  // the toolbar button's own click, which anchors to itself instead (you
-  // just clicked it, so it's already where you're looking).
-  const [emojiPickerPos, setEmojiPickerPos] = useState<{ top: number; left: number } | null>(null);
-  const [diagramPanelOpen, setDiagramPanelOpen] = useState(false);
+
   const [videoEmbedOpen, setVideoEmbedOpen] = useState(false);
   const [videoUrl, setVideoUrl] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
@@ -297,32 +161,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const [isSavingLinkPreview, setIsSavingLinkPreview] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
 
-  // Deliberately no dependency array -- this is meant to rerun and
-  // reassign on every render, not just on mount. slashCommandBridge is a
-  // plain module-level object (see lib/tiptap/slash-command.ts) shared
-  // with the ProseMirror plugin, which can't reach React state/props
-  // directly; these closures are how it calls back into this component.
-  // Giving this `[]` would freeze the closures to their first-render
-  // values (e.g. state setters would still work since setState is
-  // stable, but any render-scoped value these ever start capturing
-  // would go stale). The three setters below cost nothing to reassign,
-  // so rerunning every render is cheap insurance against that class of
-  // bug rather than something to "optimize" away.
   useEffect(() => {
     slashCommandBridge.openResourcePicker = () => setPickerOpen(true);
     slashCommandBridge.openDiagramPanel = () => setDiagramPanelOpen(true);
     slashCommandBridge.openLinkPreviewPanel = () => setLinkPreviewOpen(true);
   });
-  const [diagramTitle, setDiagramTitle] = useState("");
-  const [diagramCode, setDiagramCode] = useState(DEFAULT_MERMAID);
-  const [isSavingDiagram, setIsSavingDiagram] = useState(false);
   const [internalMobileTab, setInternalMobileTab] = useState<MobileTab>("write");
   const mobileTab = controlledMobileTab ?? internalMobileTab;
   const setMobileTab = onMobileTabChange ?? setInternalMobileTab;
   const [isSavingDraft, setIsSavingDraft] = useState(false);
-  const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const [uploadingCount, setUploadingCount] = useState(0);
-  const dragDepthRef = useRef(0);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const assessmentPickerRef = useRef<HTMLDivElement | null>(null);
   const topicPickerRef = useRef<HTMLDivElement | null>(null);
@@ -334,32 +181,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const diagramSectionRef = useRef<HTMLDivElement | null>(null);
   const noteContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // The resource picker still needs the old scroll-to-toolbar treatment --
-  // it has no cursor-relative anchor point the way emoji insertion does
-  // (you're picking a whole attachment, not something that lands at the
-  // caret), so bringing the toolbar into view is the right fix there.
-  useEffect(() => {
-    if (pickerOpen) pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [pickerOpen]);
-
-  useEffect(() => {
-    if (diagramPanelOpen) {
-      diagramSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [diagramPanelOpen]);
-
   const [currentNoteId, setCurrentNoteId] = useState(noteId);
   useEffect(() => setCurrentNoteId(noteId), [noteId]);
 
-  // Mutex for the "no note exists yet" window. handleSave (first save)
-  // and ensureNoteId (drag-drop resource insert / diagram generation) can
-  // both fire while currentNoteId is still null -- e.g. a teacher drags a
-  // file in at the exact moment they click "Save draft". Without this,
-  // both paths independently call saveTopicNote and, since notes are
-  // append-only, that creates two brand-new rows instead of one. Whoever
-  // gets here first performs the actual insert and stores the in-flight
-  // promise here; whoever arrives second just awaits it and reuses the
-  // resulting id instead of racing a duplicate insert.
   const pendingNoteCreationRef = useRef<Promise<string> | null>(null);
 
   async function createFirstNoteIfNeeded(
@@ -382,26 +206,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       setCurrentNoteId(id);
       return { id, createdHere: true };
     } finally {
-      // Only clear once this call's own creation settles -- concurrent
-      // callers already captured the same promise reference above and
-      // will resolve from it regardless of when this ref is cleared.
       pendingNoteCreationRef.current = null;
     }
   }
 
   const [localResources, setLocalResources] = useState(resources);
-  // NOT a plain `setLocalResources(resources)` -- ensureNoteId() calls
-  // router.refresh() when it creates the note (e.g. the first thing
-  // saved in a fresh note is a Diagram), and that refresh's server
-  // snapshot is taken *before* the resource that triggered it exists.
-  // If it lands after createMermaidResource()/insertResourceMarker()
-  // have already added the resource locally, a blind overwrite here
-  // erases it again -- the chip's NodeView then finds no match on its
-  // next render and falls back to "Missing resource", which also makes
-  // its edit-title UI unreachable (ResourceChipDefaultView only renders
-  // the rename form when `resource` is non-null). Merging keeps any
-  // local-only resource until a later, genuinely up-to-date refresh
-  // includes it from the server.
+
   useEffect(() => {
     setLocalResources((prev) => {
       const incomingIds = new Set(resources.map((r) => r.id));
@@ -410,11 +220,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     });
   }, [resources]);
 
-  // Kept in a ref rather than a `useEffect` dependency -- the callback
-  // itself changes identity on nearly every parent render (it's an inline
-  // closure over `setSidebarResources`), and depending on it directly
-  // would refire this effect on every unrelated re-render. Only an actual
-  // `localResources` change should notify the parent.
   const onResourcesChangeRef = useRef(onResourcesChange);
   useEffect(() => {
     onResourcesChangeRef.current = onResourcesChange;
@@ -423,15 +228,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     onResourcesChangeRef.current?.(localResources);
   }, [localResources]);
 
-  // handlePickResource/uploadDroppedFiles are `function` declarations
-  // further down this component and hoisted within scope, so referencing
-  // them here (before their textual definition) is safe.
-  // No dependency array -- handlePickResource/uploadDroppedFiles are
-  // plain function declarations recreated every render (they close over
-  // render-scoped state like `currentNoteId`/`editor`), so memoizing this
-  // against them would just recompute on every render anyway. Cheap
-  // either way; this avoids the exhaustive-deps churn of wrapping both
-  // in their own useCallback just to satisfy the lint rule.
   useImperativeHandle(ref, () => ({
     insertResource: handlePickResource,
     uploadFiles: uploadDroppedFiles,
@@ -439,43 +235,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [
-      TabTrap,
-      BlockReorderShortcuts,
-      StarterKit.configure({
-        link: { openOnClick: false, autolink: true },
-        codeBlock: false,
-      }),
-      CodeBlock,
-      Callout,
-      Section,
-      SlashCommand,
-      CharacterCount,
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      Placeholder.configure({
-        placeholder,
-      }),
-      TextStyleMarkdown,
-      Color,
-      HighlightMarkdown.configure({ multicolor: true }),
-      SubscriptMarkdown,
-      SuperscriptMarkdown,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      ResourceChip,
-      AssessmentChip,
-      TopicLinkChip,
-      MathInline,
-      MathBlock,
-      Markdown.configure({
-        html: false,
-        transformPastedText: true,
-      }),
-    ],
+    extensions: buildNoteEditorExtensions(placeholder),
     content: initialContent,
     // @ts-expect-error -- provided by the Markdown extension
     contentType: "markdown",
@@ -496,12 +256,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           return true;
         }
 
-        // #22 Link Preview "on paste": only when the *entire* clipboard
-        // payload is one bare URL and nothing else (trimmed exact
-        // match, not just "contains a URL somewhere") -- pasting a URL
-        // as part of a sentence ("see https://example.com for more")
-        // should still paste as plain text, not get swapped for a
-        // resource card the teacher didn't ask for.
         const pastedText = event.clipboardData?.getData("text/plain")?.trim() ?? "";
         if (pastedText && isBareHttpUrl(pastedText)) {
           event.preventDefault();
@@ -525,15 +279,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     selector: ({ editor }) => editor?.state,
   });
 
-  // editorProps.attributes only gets applied once, at creation -- unlike
-  // fontScale/highContrast/dyslexiaFont (plain CSS classes on a wrapper,
-  // which just re-render), the `spellcheck` attribute lives directly on
-  // ProseMirror's own contentEditable DOM node, so toggling it after
-  // mount needs an explicit setOptions call to actually reach that node.
-  // Spreading the existing editorProps first is required, not optional:
-  // setOptions *replaces* editorProps wholesale, so omitting that spread
-  // would silently drop handlePaste (image upload / link-preview paste
-  // handling) the moment this toggle changes.
   useEffect(() => {
     if (!editor) return;
     editor.setOptions({
@@ -547,9 +292,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     });
   }, [editor, spellcheckEnabled]);
 
-  // In-note find/replace -- extracted into useNoteSearch
-  // (lib/hooks/useNoteSearch.ts). Placed after `editor` exists since the
-  // hook needs the live instance to walk the doc for matches.
   const {
     searchOpen,
     setSearchOpen,
@@ -596,10 +338,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   useEffect(() => {
     slashCommandBridge.openEmojiPicker = () => {
-      // Read the caret's on-screen position right now, before React
-      // re-renders -- `editor.state.selection` reflects the document as it
-      // stands the instant this runs (the slash command's own deleteRange
-      // has already landed the cursor where "/emoji" used to be).
       const pos = editor?.state.selection.from;
       if (editor && pos != null) {
         const coords = editor.view.coordsAtPos(pos);
@@ -610,16 +348,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       setEmojiPickerOpen(true);
     };
   });
-
-  // Re-clamp the cursor-anchored emoji popup inside the editor's bounds
-  // whenever it opens -- same reasoning and helper as MathInline's floating
-  // popup (see math-nodes.tsx): opening near the editor's right/bottom edge
-  // would otherwise render partly off the visible note.
-  useLayoutEffect(() => {
-    if (emojiPickerOpen && emojiPickerPos && emojiPopupRef.current) {
-      clampPopoverToEditor(emojiPopupRef.current, editor?.view?.dom ?? null);
-    }
-  }, [emojiPickerOpen, emojiPickerPos, editor]);
 
   useEffect(() => {
     if (!editor) return;
@@ -641,16 +369,87 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;
 
-  // The mobile Write/Preview/Resources tab bar only renders below `md`
-  // (the tab bar itself is `md:hidden`), so this never fires from user
-  // interaction on desktop — mobileTab stays "write" there and editing is
-  // unaffected. Toggling real editability (not just a cosmetic class) is
-  // what makes "Preview" an actual read view: same TipTap content/node-views
-  // (tables, images, Mermaid, resource chips) render identically, just
-  // without a cursor or toolbar. "Resources" doesn't touch editability at
-  // all -- it just hides this component's own content area (see the
-  // `topic-prose` div's className below) so the sidebar NoteWorkspace
-  // renders alongside this component can take its place on a small screen.
+  const saveDraft = async (content: string) => {
+    await saveTopicNote(topicId, content, "draft");
+    setLastSavedContent(content);
+    setIsDirty(false);
+  };
+
+  const {
+    pickerOpen,
+    setPickerOpen,
+    assessmentPickerOpen,
+    setAssessmentPickerOpen,
+    topicPickerOpen,
+    setTopicPickerOpen,
+    emojiPickerOpen,
+    setEmojiPickerOpen,
+    emojiPickerPos,
+    setEmojiPickerPos,
+    symbolPickerOpen,
+    setSymbolPickerOpen,
+    diagramPanelOpen,
+    setDiagramPanelOpen,
+    diagramTitle,
+    setDiagramTitle,
+    diagramCode,
+    setDiagramCode,
+    isSavingDiagram,
+    insertResourceMarker,
+    handlePickResource,
+    handlePickAssessment,
+    handlePickTopic,
+    insertTable,
+    insertEmoji,
+    insertSymbol,
+    insertMath,
+    handleSaveDiagram,
+  } = useResourceInsertion({
+    editor,
+    topicId,
+    ensureNoteId,
+    getMarkdown,
+    currentNoteId,
+    saveDraft,
+    onResourceCreated: (resource) => setLocalResources((prev) => [...prev, resource]),
+    onAfterMutation: () => router.refresh(),
+  });
+
+  const {
+    isDraggingFile,
+    uploadingCount,
+    uploadDroppedFiles,
+    handleDragEnter,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = useNoteFileUpload({
+    topicId,
+    ensureNoteId,
+    getMarkdown,
+    currentNoteId,
+    saveDraft,
+    onResourceCreated: (resource) => setLocalResources((prev) => [...prev, resource]),
+    insertResourceMarker,
+    onAfterMutation: () => router.refresh(),
+  });
+
+  useEffect(() => {
+    if (pickerOpen) pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [pickerOpen]);
+
+  useEffect(() => {
+    if (diagramPanelOpen) {
+      diagramSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [diagramPanelOpen]);
+
+  useLayoutEffect(() => {
+    if (emojiPickerOpen && emojiPickerPos && emojiPopupRef.current) {
+      clampPopoverToEditor(emojiPopupRef.current, editor?.view?.dom ?? null);
+    }
+  }, [emojiPickerOpen, emojiPickerPos, editor]);
+
   useEffect(() => {
     editor?.setEditable(!forcePreview && mobileTab !== "preview");
   }, [editor, mobileTab, forcePreview]);
@@ -678,9 +477,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     });
     const words: number = ed.storage.characterCount.words();
     const characters: number = ed.storage.characterCount.characters();
-    // 200 wpm is the commonly-cited average adult silent-reading speed --
-    // good enough for a rough "how long will this take a student to
-    // read" estimate, not meant to be precise.
     const readingMinutes = Math.max(1, Math.round(words / 200));
     return {
       words,
@@ -695,24 +491,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     };
   }
 
-  // Recomputed only when the doc actually changes (editor.state.doc gets
-  // a new reference each transaction) rather than on every render -- this
-  // walks the entire doc via descendants(), which previously ran inline
-  // in JSX on every keystroke regardless of whether anything relevant to
-  // the stats had changed.
   const noteStats = useMemo(
     () => (editor ? computeNoteStats(editor) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [editor, editor?.state.doc, localResources]
   );
 
-  // Dirty-state, autosave, offline detection, and unsaved-draft recovery
-  // -- extracted into useNoteAutosave (lib/hooks/useNoteAutosave.ts).
-  // setIsDirty/setLastSavedContent/setLastSavedAt are still called
-  // directly from this component (handleSave, ensureNoteId,
-  // handleSaveDiagram, uploadDroppedFiles) since marking a real save as
-  // clean is this component's job, not the hook's -- see the hook's own
-  // top comment for why the split lands there.
   const {
     isDirty,
     setIsDirty,
@@ -742,42 +526,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       try {
         let noteId: string;
         if (isFirstSave) {
-          // Route the "note doesn't exist yet" case through the shared
-          // mutex -- a concurrent ensureNoteId() call (drag-drop insert,
-          // diagram generation) may already be creating it.
           const result = await createFirstNoteIfNeeded(content, status);
           noteId = result.id;
           if (!result.createdHere) {
-            // Someone else's concurrent call performed the actual insert
-            // (e.g. a dropped file's ensureNoteId(), which always saves as
-            // "draft"). If this click specifically asked for something
-            // else -- a real "Publish" -- apply it as a normal follow-up
-            // revision now that a note exists, so the requested status
-            // isn't silently lost. No race here: currentNoteId is set by
-            // this point, so this goes through the ordinary append-only
-            // path, not another first-save race.
             if (status === "published") {
               const note = await saveTopicNote(topicId, content, status);
               if (note?.id) noteId = note.id;
             }
           }
         } else {
-          // Not `if (isFirstSave)` -- notes are append-only (see
-          // saveTopicNote's own comment: "publishing a revision never
-          // overwrites an earlier draft or published copy"), so *every*
-          // save inserts a brand-new row with a brand-new id, not just the
-          // first. Any resource created after this point goes through
-          // ensureNoteId(), which returns currentNoteId as-is if it's
-          // already set -- so a stale id here silently attaches every
-          // subsequent diagram/upload to a superseded note version. The
-          // page always queries the *latest* version's resources
-          // (`.eq("note_id", note.id)` in page.tsx, intentionally scoped
-          // per note version, not per topic), so a resource attached to a
-          // stale id becomes permanently invisible the moment a newer
-          // version exists -- not just "not refreshed yet", genuinely
-          // orphaned in the database. This was the real cause of
-          // resources -- including ones from well before this session --
-          // silently disappearing after any second save.
           const note = await saveTopicNote(topicId, content, status);
           noteId = note?.id ?? currentNoteId!;
         }
@@ -832,11 +589,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     }
   }
 
-  // Shared by both the "Add link" panel and the paste-a-bare-URL
-  // shortcut below -- fetches title/description/image server-side
-  // (fetchLinkMetadata is SSRF-guarded, see lib/linkPreview.ts) and
-  // drops the result in as a resource chip the same way every other
-  // insert path here does.
   async function handleAddLinkPreview(url: string) {
     setIsSavingLinkPreview(true);
     try {
@@ -908,11 +660,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     if (!emojiPickerOpen) return;
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
-      // The cursor-anchored popup (emojiPopupRef) renders outside the
-      // toolbar wrapper's DOM subtree via `position: fixed`, so a click
-      // inside it wouldn't register as "inside emojiPickerRef" -- check
-      // both, or picking an emoji from the floating popup would
-      // immediately close itself before onSelectAction's own close ever ran.
       const insideToolbarAnchor = emojiPickerRef.current?.contains(target);
       const insideFloatingPopup = emojiPopupRef.current?.contains(target);
       if (!insideToolbarAnchor && !insideFloatingPopup) {
@@ -999,214 +746,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     return () => window.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, focusMode, searchOpen]);
-
-  function insertResourceMarker(resource: TopicResource) {
-    const storage = editor?.storage.resourceChip;
-    if (storage && !storage.resources.some((r) => r.id === resource.id)) {
-      storage.resources = [...storage.resources, resource];
-    }
-    editor
-      ?.chain()
-      .focus()
-      .insertContent({ type: "resourceChip", attrs: { id: resource.id } })
-      .run();
-  }
-
-  function handlePickResource(resource: TopicResource) {
-    insertResourceMarker(resource);
-    setPickerOpen(false);
-  }
-
-  function insertAssessmentMarker(assessment: LinkableAssessment) {
-    editor
-      ?.chain()
-      .focus()
-      .insertContent({ type: "assessmentChip", attrs: { id: assessment.id } })
-      .run();
-  }
-
-  function handlePickAssessment(assessment: LinkableAssessment) {
-    insertAssessmentMarker(assessment);
-    setAssessmentPickerOpen(false);
-  }
-
-  function insertTopicMarker(topic: LinkableTopic) {
-    editor
-      ?.chain()
-      .focus()
-      .insertContent({ type: "topicLinkChip", attrs: { id: topic.id } })
-      .run();
-  }
-
-  function handlePickTopic(topic: LinkableTopic) {
-    insertTopicMarker(topic);
-    setTopicPickerOpen(false);
-  }
-
-  function insertTable() {
-    editor?.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run();
-  }
-
-  function insertEmoji(emoji: string) {
-    // Emoji are just Unicode text, not a custom node -- inserting as
-    // plain content means they round-trip through markdown for free
-    // (no serialize/parse wiring needed, unlike MathInline/ResourceChip).
-    editor?.chain().focus().insertContent(emoji).run();
-    setEmojiPickerOpen(false);
-    setEmojiPickerPos(null);
-  }
-
-  function insertSymbol(symbol: string) {
-    editor?.chain().focus().insertContent(symbol).run();
-    setSymbolPickerOpen(false);
-  }
-
-  function insertMath(displayMode: boolean) {
-    editor
-      ?.chain()
-      .focus()
-      .insertContent({ type: displayMode ? "mathBlock" : "mathInline", attrs: { latex: "" } })
-      .run();
-  }
-
-  async function handleSaveDiagram() {
-    if (!diagramCode.trim()) {
-      emitToast("Write some Mermaid code before saving.", "error");
-      return;
-    }
-    setIsSavingDiagram(true);
-    try {
-      const neededNoteCreation = !currentNoteId;
-      const noteIdToUse = await ensureNoteId();
-      const resource = await createMermaidResource(
-        topicId,
-        noteIdToUse,
-        diagramTitle || "Diagram",
-        diagramCode
-      );
-      setLocalResources((prev) => [...prev, resource]);
-      insertResourceMarker(resource);
-      if (neededNoteCreation) {
-        const content = getMarkdown();
-        await saveTopicNote(topicId, content, "draft");
-        setLastSavedContent(content);
-        setIsDirty(false);
-      }
-      // ensureNoteId() already refreshes when it creates the note, but
-      // that's a different case (note didn't exist) from this one (note
-      // exists, a new resource was just added to it) -- without this,
-      // the sidebar TopicResourceList (page.tsx, fed from the Server
-      // Component's own `resources` prop, with zero connection to this
-      // component's client state) never learns the diagram exists until
-      // an unrelated navigation happens to reload the page. The earlier
-      // merge-not-overwrite fix on the `resources` prop-sync effect
-      // above is what makes calling this safe every time: a stale
-      // snapshot arriving mid-flight can no longer erase what was just
-      // added locally.
-      router.refresh();
-      emitToast("Diagram added to the note.");
-      setDiagramPanelOpen(false);
-      setDiagramTitle("");
-      setDiagramCode(DEFAULT_MERMAID);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Unable to save the diagram.";
-      emitToast(message, "error");
-    } finally {
-      setIsSavingDiagram(false);
-    }
-  }
-
-  async function uploadDroppedFiles(files: File[]) {
-    const accepted = files.filter((f) => ACCEPTED_RESOURCE_MIME_TYPES.has(f.type));
-    const rejected = files.length - accepted.length;
-    if (rejected > 0) {
-      emitToast(
-        `${rejected} file${rejected === 1 ? "" : "s"} skipped -- use an image, PDF, audio, or video file.`,
-        "error"
-      );
-    }
-    if (accepted.length === 0) return;
-
-    const neededNoteCreation = !currentNoteId;
-    let noteIdToUse: string;
-    try {
-      noteIdToUse = await ensureNoteId();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Could not create the note.";
-      emitToast(message, "error");
-      return;
-    }
-
-    setUploadingCount(accepted.length);
-    let failures = 0;
-    let insertedAny = false;
-    for (const file of accepted) {
-      const formData = new FormData();
-      formData.set("file", file);
-      formData.set("title", "");
-      try {
-        const resource = await uploadTopicResource(topicId, noteIdToUse, formData);
-        if (resource) {
-          setLocalResources((prev) => [...prev, resource]);
-          insertResourceMarker(resource);
-          insertedAny = true;
-        }
-      } catch (err: unknown) {
-        failures += 1;
-        const message = err instanceof Error ? err.message : `Could not upload "${file.name}".`;
-        emitToast(message, "error");
-      } finally {
-        setUploadingCount((count) => Math.max(0, count - 1));
-      }
-    }
-    if (neededNoteCreation && insertedAny) {
-      // One save for the whole batch
-      const content = getMarkdown();
-      await saveTopicNote(topicId, content, "draft");
-      setLastSavedContent(content);
-      setIsDirty(false);
-    }
-    // Same reasoning as handleSaveDiagram's router.refresh() -- the
-    // sidebar TopicResourceList only ever updates via a server
-    // round-trip, and ensureNoteId()'s refresh only covers the
-    // note-didn't-exist case, not "note exists, files were just
-    // uploaded to it".
-    if (insertedAny) router.refresh();
-    if (accepted.length - failures > 0) {
-      emitToast(
-        accepted.length - failures === 1
-          ? "File uploaded and inserted."
-          : `${accepted.length - failures} files uploaded and inserted.`
-      );
-    }
-  }
-
-  function handleDragEnter(e: DragEvent) {
-    if (!e.dataTransfer?.types.includes("Files")) return;
-    e.preventDefault();
-    dragDepthRef.current += 1;
-    setIsDraggingFile(true);
-  }
-
-  function handleDragOver(e: DragEvent) {
-    if (!e.dataTransfer?.types.includes("Files")) return;
-    e.preventDefault();
-  }
-
-  function handleDragLeave(e: DragEvent) {
-    if (!e.dataTransfer?.types.includes("Files")) return;
-    e.preventDefault();
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-    if (dragDepthRef.current === 0) setIsDraggingFile(false);
-  }
-
-  function handleDrop(e: DragEvent) {
-    if (!e.dataTransfer?.files?.length) return;
-    e.preventDefault();
-    dragDepthRef.current = 0;
-    setIsDraggingFile(false);
-    void uploadDroppedFiles(Array.from(e.dataTransfer.files));
-  }
 
   return (
     <div
@@ -1350,11 +889,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                   </button>
                   {assessmentPickerOpen && assessments.length > 0 && (
                     <div className="absolute right-0 z-10 mt-1 w-64 rounded-lg border border-rule bg-white py-1 shadow-lg">
-                      {/* With 20-30+ assessments once a subject/class has
-                          a term's worth, scrolling to find one by eye
-                          stopped being workable -- filter narrows the
-                          list as you type instead of just scrolling
-                          faster. */}
                       {assessments.length > 5 && (
                         <div className="px-2 pb-1">
                           <input
@@ -1512,158 +1046,38 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           )}
 
           {!focusMode && videoEmbedOpen && (
-            <section className="mb-4 rounded-xl border border-rule bg-white p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-display text-sm font-semibold text-ink">Embed video</h3>
-                <button
-                  type="button"
-                  onClick={() => setVideoEmbedOpen(false)}
-                  className="text-xs text-ink-soft hover:underline"
-                >
-                  Close
-                </button>
-              </div>
-              <p className="mb-3 text-sm text-ink-soft">
-                Paste a YouTube or Vimeo link. Uploaded video files remain available through Insert
-                resource.
-              </p>
-              <input
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=…"
-                type="url"
-                className="mb-2 w-full rounded-lg border border-rule p-2 text-sm outline-none focus-visible:border-marigold"
-              />
-              <input
-                value={videoTitle}
-                onChange={(e) => setVideoTitle(e.target.value)}
-                placeholder="Video title (optional)"
-                className="w-full rounded-lg border border-rule p-2 text-sm outline-none focus-visible:border-marigold"
-              />
-              <div className="mt-3 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleInsertVideoEmbed}
-                  disabled={isSavingVideoEmbed}
-                  className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
-                >
-                  {isSavingVideoEmbed ? "Embedding…" : "Insert video"}
-                </button>
-              </div>
-            </section>
+            <VideoEmbedPopover
+              videoUrl={videoUrl}
+              onVideoUrlChange={setVideoUrl}
+              videoTitle={videoTitle}
+              onVideoTitleChange={setVideoTitle}
+              isSaving={isSavingVideoEmbed}
+              onInsert={handleInsertVideoEmbed}
+              onClose={() => setVideoEmbedOpen(false)}
+            />
           )}
 
           {!focusMode && linkPreviewOpen && (
-            <section className="mb-4 rounded-xl border border-rule bg-white p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-display text-sm font-semibold text-ink">Add link</h3>
-                <button
-                  type="button"
-                  onClick={() => setLinkPreviewOpen(false)}
-                  className="text-xs text-ink-soft hover:underline"
-                >
-                  Close
-                </button>
-              </div>
-              <p className="mb-3 text-sm text-ink-soft">
-                Paste any link -- title, thumbnail, and description are fetched automatically.
-              </p>
-              <input
-                value={linkPreviewUrl}
-                onChange={(e) => setLinkPreviewUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isSavingLinkPreview) handleInsertLinkPreview();
-                }}
-                placeholder="https://example.com/article"
-                type="url"
-                className="w-full rounded-lg border border-rule p-2 text-sm outline-none focus-visible:border-marigold"
-              />
-              <div className="mt-3 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleInsertLinkPreview}
-                  disabled={isSavingLinkPreview}
-                  className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
-                >
-                  {isSavingLinkPreview ? "Fetching…" : "Add link"}
-                </button>
-              </div>
-            </section>
+            <LinkPreviewPopover
+              linkPreviewUrl={linkPreviewUrl}
+              onLinkPreviewUrlChange={setLinkPreviewUrl}
+              isSaving={isSavingLinkPreview}
+              onInsert={handleInsertLinkPreview}
+              onClose={() => setLinkPreviewOpen(false)}
+            />
           )}
 
           {!focusMode && diagramPanelOpen && (
-            <section
+            <DiagramPanel
               ref={diagramSectionRef}
-              className="mb-4 rounded-xl border border-rule bg-white p-4"
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-display text-sm font-semibold text-ink">
-                  Generate Mermaid diagram
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setDiagramPanelOpen(false)}
-                  className="text-xs text-ink-soft hover:underline"
-                >
-                  Close
-                </button>
-              </div>
-              <input
-                type="text"
-                value={diagramTitle}
-                onChange={(e) => setDiagramTitle(e.target.value)}
-                placeholder="Diagram title (optional)"
-                className="mb-2 w-full rounded-lg border border-rule bg-white p-2 text-sm text-ink outline-none focus-visible:border-marigold"
-              />
-              <div className="mb-3">
-                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-                  Start from a template
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {DIAGRAM_TEMPLATES.map((template) => (
-                    <button
-                      key={template.label}
-                      type="button"
-                      onClick={() => setDiagramCode(template.code)}
-                      className="rounded-full border border-rule px-2.5 py-1 text-xs text-ink hover:border-marigold hover:bg-paper"
-                    >
-                      {template.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-                    Mermaid code
-                  </p>
-                  <textarea
-                    value={diagramCode}
-                    onChange={(e) => setDiagramCode(e.target.value)}
-                    rows={10}
-                    className="w-full rounded-lg border border-rule bg-white p-3 font-mono text-sm text-ink outline-none focus-visible:border-marigold"
-                  />
-                </div>
-                <div>
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-                    Preview
-                  </p>
-                  <div className="h-full min-h-[10rem] rounded-lg border border-rule bg-paper p-2">
-                    <MermaidDiagram code={diagramCode} title={diagramTitle || undefined} />
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleSaveDiagram}
-                  disabled={isSavingDiagram}
-                  className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
-                >
-                  {isSavingDiagram ? "Saving…" : "Insert diagram into note"}
-                </button>
-              </div>
-            </section>
+              diagramTitle={diagramTitle}
+              onDiagramTitleChange={setDiagramTitle}
+              diagramCode={diagramCode}
+              onDiagramCodeChange={setDiagramCode}
+              isSaving={isSavingDiagram}
+              onSave={handleSaveDiagram}
+              onClose={() => setDiagramPanelOpen(false)}
+            />
           )}
 
           {/* Mobile write/preview toggle — md:hidden, desktop always shows toolbar + editable view */}
