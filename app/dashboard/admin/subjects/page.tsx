@@ -40,7 +40,7 @@ export default async function AdminSubjectsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Subjects</h1>
           <p className="text-sm text-ink-soft">

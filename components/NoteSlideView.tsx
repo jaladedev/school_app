@@ -223,6 +223,13 @@ export function NoteSlideView({
                     key={i}
                     remarkPlugins={[remarkGfm]}
                     rehypePlugins={[rehypeHighlight]}
+                    components={{
+                      table: ({ node: _node, ...props }) => (
+                        <div className="topic-table-scroll">
+                          <table {...props} />
+                        </div>
+                      ),
+                    }}
                   >
                     {part.value}
                   </ReactMarkdown>
@@ -247,7 +254,18 @@ export function NoteSlideView({
         <div className="topic-prose min-h-[20rem] flex-1 overflow-y-auto">
           {parts.map((part, i) =>
             part.type === "text" ? (
-              <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+              <ReactMarkdown
+                key={i}
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={{
+                  table: ({ node: _node, ...props }) => (
+                    <div className="topic-table-scroll">
+                      <table {...props} />
+                    </div>
+                  ),
+                }}
+              >
                 {part.value}
               </ReactMarkdown>
             ) : part.type === "resource" ? (

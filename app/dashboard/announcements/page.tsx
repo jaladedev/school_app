@@ -77,7 +77,7 @@ export default async function AnnouncementsPage({
 
   return (
     <div className="max-w-2xl">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Announcements</h1>
           <p className="text-sm text-ink-soft">Updates from the school, relevant to you.</p>

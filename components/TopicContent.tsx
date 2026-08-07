@@ -204,6 +204,20 @@ export function TopicContent({
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkMath]}
               rehypePlugins={[rehypeKatex, rehypeHighlight]}
+              components={{
+                // A CSS-only `table { display: block; overflow-x: auto }`
+                // hack doesn't reliably contain the scroll -- tables use
+                // their own layout algorithm, and a wide table's
+                // intrinsic width can leak past that box into the page,
+                // causing the *whole page* to scroll horizontally
+                // instead of just the table. A real wrapper div with its
+                // own overflow-x is the version that actually works.
+                table: ({ node: _node, ...props }) => (
+                  <div className="topic-table-scroll">
+                    <table {...props} />
+                  </div>
+                ),
+              }}
             >
               {part.value}
             </ReactMarkdown>

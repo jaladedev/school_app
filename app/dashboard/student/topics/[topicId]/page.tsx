@@ -117,14 +117,26 @@ export default async function TopicPage({ params }: { params: Promise<{ topicId:
         ← Back to {topic.subjects?.name ?? "subject"}
       </Link>
 
-      <h1 className="mb-1 font-display text-2xl font-semibold text-ink">{topic.title}</h1>
-      <p className="mb-6 text-sm text-ink-soft">
-        {topic.theme ? `${topic.theme} · ` : ""}Term {topic.term} ·{" "}
-        {topic.week_end_number > topic.week_number
-          ? `Weeks ${topic.week_number}–${topic.week_end_number}`
-          : `Week ${topic.week_number}`}{" "}
-        · {formatLevel(topic.education_level, topic.level_number)}
-      </p>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="mb-1 font-display text-2xl font-semibold text-ink">{topic.title}</h1>
+          <p className="text-sm text-ink-soft">
+            {topic.theme ? `${topic.theme} · ` : ""}Term {topic.term} ·{" "}
+            {topic.week_end_number > topic.week_number
+              ? `Weeks ${topic.week_number}–${topic.week_end_number}`
+              : `Week ${topic.week_number}`}{" "}
+            · {formatLevel(topic.education_level, topic.level_number)}
+          </p>
+        </div>
+        {note && (
+          <Link
+            href={`/dashboard/student/topics/${topic.id}/handout`}
+            className="inline-block shrink-0 rounded-lg border border-rule px-3 py-2 text-sm font-medium text-ink hover:bg-paper"
+          >
+            Print handout
+          </Link>
+        )}
+      </div>
 
       {note ? (
         <TopicContent

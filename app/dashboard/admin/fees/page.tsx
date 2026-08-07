@@ -21,14 +21,14 @@ export default async function AdminFeesPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Fee Structures</h1>
           <p className="text-sm text-ink-soft">
             Define fees per stage/term, then generate invoices for a class.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             href="/dashboard/admin/fees/invoices"
             className="rounded-lg border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-paper"

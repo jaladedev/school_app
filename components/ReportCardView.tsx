@@ -22,7 +22,7 @@ export function ReportCardView({
         <PrintButton />
       </div>
 
-      <div className="rounded-2xl border border-rule bg-white p-8 print:border-0 print:p-0 print:shadow-none">
+      <div className="rounded-2xl border border-rule bg-white p-4 sm:p-8 print:border-0 print:p-0 print:shadow-none">
         {/* Header */}
         <div className="mb-6 border-b-2 border-ink pb-4 text-center">
           {data.schoolLogoUrl && (
@@ -45,7 +45,7 @@ export function ReportCardView({
         </div>
 
         {/* Student info */}
-        <div className="mb-6 grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+        <div className="mb-6 grid grid-cols-1 gap-x-8 gap-y-1 text-sm sm:grid-cols-2 print:grid-cols-2">
           <div>
             <span className="text-ink-soft">Name: </span>
             <span className="font-medium text-ink">{data.student.fullName}</span>
@@ -104,7 +104,7 @@ export function ReportCardView({
         </div>
 
         {/* Overall + attendance summary */}
-        <div className="mb-6 grid grid-cols-2 gap-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 print:grid-cols-2">
           <div className="rounded-lg border border-rule bg-paper p-4">
             <p className="mb-1 text-xs uppercase tracking-wide text-ink-soft">Overall Average</p>
             <p className="font-display text-xl font-semibold text-ink">

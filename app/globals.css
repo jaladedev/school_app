@@ -80,14 +80,77 @@ h4 {
   margin-bottom: 0.25rem;
 }
 
-.topic-prose table {
-  display: block;
-  width: 100%;
+/* The actual horizontal-scroll container for wide tables. Rendered as a
+   real wrapping div (see the ReactMarkdown `table` component override in
+   TopicContent/NoteSlideView) rather than `table { display: block;
+   overflow-x: auto }` -- that CSS-only hack doesn't reliably contain the
+   scroll, since a table uses its own layout algorithm and its intrinsic
+   width can leak past the box into the page, causing the *whole page*
+   to scroll horizontally instead of just the table. */
+.topic-table-scroll {
   overflow-x: auto;
-  border-collapse: collapse;
-  margin: 1rem 0;
-  font-size: 0.9rem;
   -webkit-overflow-scrolling: touch;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+  border: 1px solid #d9d3c4;
+  scrollbar-width: thin;
+  scrollbar-color: #d9d3c4 transparent;
+}
+
+/* Thin, always-visible scrollbar (rather than the browser's default
+   chunky one, or an invisible overlay scrollbar on touch devices) so
+   it's obvious at a glance that there's more to see sideways. */
+.topic-table-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.topic-table-scroll::-webkit-scrollbar-thumb {
+  background-color: #d9d3c4;
+  border-radius: 3px;
+}
+
+.topic-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+/* The TipTap Table extension (resizable: true) renders its own
+   `.tableWrapper` div around the live, editable table -- a separate
+   element from `.topic-table-scroll` above, which only wraps the
+   read-only react-markdown output. Same reasoning applies here: contain
+   the scroll on this wrapper, not on the `<table>` itself. */
+.topic-prose .tableWrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+  border: 1px solid #d9d3c4;
+  scrollbar-width: thin;
+  scrollbar-color: #d9d3c4 transparent;
+}
+.topic-prose .tableWrapper::-webkit-scrollbar {
+  height: 6px;
+}
+.topic-prose .tableWrapper::-webkit-scrollbar-thumb {
+  background-color: #d9d3c4;
+  border-radius: 3px;
+}
+.topic-prose .tableWrapper table {
+  margin: 0;
+  border: none;
+}
+
+/* Column widths shrink-to-fit by default, which on a table like a
+   "Life Process / Living Thing Example / Description" summary table
+   squeezes every column down and wraps every cell instead of ever
+   triggering the table's own overflow-x: auto -- there's technically no
+   overflow to scroll, so readers just get cramped, heavily wrapped text
+   with no way to see more. Forcing a sensible floor per cell means the
+   table reliably overflows (and scrolls) on a narrow screen instead of
+   silently squishing. */
+.topic-prose td,
+.topic-prose th {
+  min-width: 8rem;
 }
 
 .topic-prose th {

@@ -6,8 +6,8 @@ import { NoteSlideView } from "@/components/NoteSlideView";
 import { TopicContent } from "@/components/TopicContent";
 import { BellTimer, type BellTimerEntry } from "@/components/BellTimer";
 import { ResourceSidebar } from "@/components/ResourceSidebar";
-import { PrintButton } from "@/components/PrintButton";
-import { formatLevel, type EducationLevel } from "@/types/database";
+import { HandoutView } from "@/components/HandoutView";
+import { type EducationLevel } from "@/types/database";
 import type { TopicResource } from "@/types/database";
 import type { LinkableAssessment } from "@/lib/tiptap/assessment-node";
 import type { LinkableTopic } from "@/lib/tiptap/topic-link-node";
@@ -204,39 +204,16 @@ export function NoteWorkspace({
         // reason (see the comment above this whole conditional) --
         // `initialContent` either way, not anything lifted from the live
         // editor.
-        <div className="max-w-2xl">
-          <div className="mb-4 flex items-center justify-between print:hidden">
-            <p className="text-sm text-ink-soft">
-              Printable version — resource embeds, math, and links render the same as Student view.
-            </p>
-            <PrintButton />
-          </div>
-          <div className="rounded-2xl border border-rule bg-white p-8 print:border-0 print:p-0 print:shadow-none">
-            {topicMeta && (
-              <div className="mb-6 border-b-2 border-ink pb-4">
-                <h1 className="font-display text-2xl font-semibold text-ink">{topicMeta.title}</h1>
-                <p className="mt-1 text-sm text-ink-soft">
-                  {[
-                    topicMeta.subjectName,
-                    formatLevel(topicMeta.educationLevel, topicMeta.levelNumber),
-                    `Term ${topicMeta.term}`,
-                    topicMeta.weekEndNumber > topicMeta.weekNumber
-                      ? `Weeks ${topicMeta.weekNumber}–${topicMeta.weekEndNumber}`
-                      : `Week ${topicMeta.weekNumber}`,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-            )}
-            <TopicContent
-              content={initialContent}
-              resources={resources}
-              linkedAssessments={assessments}
-              linkedTopics={topics}
-            />
-          </div>
-        </div>
+        //
+        // Shared with the student-facing handout route (see
+        // components/HandoutView.tsx) rather than kept inline here, so
+        // both stay in sync.
+        <HandoutView
+          content={initialContent}
+          resources={resources}
+          topics={topics}
+          topicMeta={topicMeta}
+        />
       ) : (
         <>
           {/* Bell timer sits above the slide content in Present mode
