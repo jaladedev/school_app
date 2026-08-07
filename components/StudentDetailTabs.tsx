@@ -13,17 +13,18 @@ export function StudentDetailTabs({ studentId }: { studentId: string }) {
     { label: "Grades", href: `${base}/grades` },
     { label: "Notes", href: `${base}/notes` },
     { label: "Report Card", href: `${base}/report-card` },
+    { label: "Testimonial", href: `${base}/testimonial` },
   ];
 
   return (
-    <div className="mb-6 flex gap-1 border-b border-rule">
+    <div className="mb-6 flex gap-1 overflow-x-auto border-b border-rule">
       {tabs.map((tab) => {
         const isActive = pathname === tab.href;
         return (
           <Link
             key={tab.href}
             href={tab.href}
-            className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
+            className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition ${
               isActive ? "border-leaf text-leaf" : "border-transparent text-ink-soft hover:text-ink"
             }`}
           >

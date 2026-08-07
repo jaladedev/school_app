@@ -548,7 +548,7 @@ export async function updateStudentAccount(input: {
   admissionNo?: string;
   guardianName?: string;
   guardianPhone?: string;
-  classId?: string;
+  classId?: string | null;
   gender?: "male" | "female" | "";
 }) {
   await assertRole(["admin"], "Only an admin can perform this action.");
@@ -568,7 +568,13 @@ export async function updateStudentAccount(input: {
       guardian_name: input.guardianName || null,
       guardian_phone: input.guardianPhone || null,
       gender: input.gender || null,
-      ...(input.classId ? { class_id: input.classId } : {}),
+      // classId is only present at all when the form detected an actual
+      // change (see EditStudentForm) -- undefined here means "leave the
+      // class alone", while an empty string is the admin explicitly
+      // picking "Unassigned" and must still clear class_id to null rather
+      // than being treated as falsy-and-skipped like the other fields
+      // above.
+      ...(input.classId !== undefined ? { class_id: input.classId || null } : {}),
     })
     .eq("id", input.studentId);
 

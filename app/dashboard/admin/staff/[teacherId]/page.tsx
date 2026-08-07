@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/EmptyState";
+import { EditTeacherRoleSelect } from "@/components/EditTeacherRoleSelect";
 import { levelLabel } from "@/lib/educationLevel";
 
 type TimetableRow = {
@@ -132,6 +133,10 @@ export default async function TeacherProfilePage({
             <p className="text-xs text-ink-soft">Staff ID: {teacherProfile.staff_id}</p>
           )}
         </div>
+        <EditTeacherRoleSelect
+          teacherId={resolvedParams.teacherId}
+          currentRole={teacherProfile.staff_role}
+        />
       </div>
 
       <div className="mb-6 flex gap-2">

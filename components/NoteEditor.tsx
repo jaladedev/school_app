@@ -118,26 +118,21 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [a11yMenuOpen, setA11yMenuOpen] = useState(false);
   const a11yMenuRef = useRef<HTMLDivElement | null>(null);
-  const [fontScale, setFontScale] = useState<0.9 | 1 | 1.15 | 1.3>(() => {
-    if (typeof window === "undefined") return 1;
-    const saved = Number(window.localStorage.getItem("noteEditor:fontScale"));
-    return ([0.9, 1, 1.15, 1.3] as const).includes(saved as any)
-      ? (saved as 0.9 | 1 | 1.15 | 1.3)
-      : 1;
-  });
-  const [highContrast, setHighContrast] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("noteEditor:highContrast") === "1";
-  });
-  const [dyslexiaFont, setDyslexiaFont] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("noteEditor:dyslexiaFont") === "1";
-  });
-  const [spellcheckEnabled, setSpellcheckEnabled] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const saved = window.localStorage.getItem("noteEditor:spellcheck");
-    return saved === null ? true : saved === "1";
-  });
+  const [fontScale, setFontScale] = useState<0.9 | 1 | 1.15 | 1.3>(1);
+  const [highContrast, setHighContrast] = useState(false);
+  const [dyslexiaFont, setDyslexiaFont] = useState(false);
+  const [spellcheckEnabled, setSpellcheckEnabled] = useState(true);
+
+  useEffect(() => {
+    const savedFontScale = Number(window.localStorage.getItem("noteEditor:fontScale"));
+    if (([0.9, 1, 1.15, 1.3] as const).includes(savedFontScale as any)) {
+      setFontScale(savedFontScale as 0.9 | 1 | 1.15 | 1.3);
+    }
+    setHighContrast(window.localStorage.getItem("noteEditor:highContrast") === "1");
+    setDyslexiaFont(window.localStorage.getItem("noteEditor:dyslexiaFont") === "1");
+    const savedSpellcheck = window.localStorage.getItem("noteEditor:spellcheck");
+    setSpellcheckEnabled(savedSpellcheck === null ? true : savedSpellcheck === "1");
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem("noteEditor:fontScale", String(fontScale));

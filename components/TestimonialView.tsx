@@ -33,7 +33,7 @@ export function TestimonialView({
         <PrintButton />
       </div>
 
-      <div className="rounded-2xl border border-rule bg-white p-10 print:border-0 print:p-0 print:shadow-none">
+      <div className="rounded-2xl border border-rule bg-white p-5 sm:p-10 print:border-0 print:p-0 print:shadow-none">
         <div className="mb-8 flex items-center gap-3 border-b-2 border-ink pb-4">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element

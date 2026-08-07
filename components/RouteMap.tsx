@@ -76,11 +76,19 @@ export function RouteMap({
   return (
     <div>
       <RouteMapInner lat={position.lat} lng={position.lng} label={label} />
-      {recordedAt && (
-        <p className="mt-1 text-xs text-ink-soft">
-          Last updated {new Date(recordedAt).toLocaleTimeString()}
-        </p>
-      )}
+      {recordedAt && <RecordedAtLabel recordedAt={recordedAt} />}
     </div>
+  );
+}
+
+function RecordedAtLabel({ recordedAt }: { recordedAt: string }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return null;
+  return (
+    <p className="mt-1 text-xs text-ink-soft">
+      Last updated {new Date(recordedAt).toLocaleTimeString()}
+    </p>
   );
 }

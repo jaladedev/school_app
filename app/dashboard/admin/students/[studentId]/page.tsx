@@ -54,12 +54,6 @@ export default async function StudentInfoPage({
               Print ID Card
             </Link>
             <Link
-              href={`/dashboard/admin/students/${resolvedParams.studentId}/admission-letter`}
-              className="whitespace-nowrap rounded-lg border border-rule px-3 py-1.5 text-sm font-medium text-ink hover:bg-leaf-soft"
-            >
-              Admission Letter
-            </Link>
-            <Link
               href={`/dashboard/admin/students/${resolvedParams.studentId}/testimonial`}
               className="whitespace-nowrap rounded-lg border border-rule px-3 py-1.5 text-sm font-medium text-ink hover:bg-leaf-soft"
             >
