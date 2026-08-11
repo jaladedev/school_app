@@ -215,21 +215,22 @@ const MathFieldInput = forwardRef<
   // Capture-phase stopPropagation for math-field to prevent Shadow DOM events
   // from escaping to the editor and breaking contentEditable
   useEffect(() => {
-    if (!fieldRef.current) return;
+    const field = fieldRef.current;
+    if (!field) return;
     const stopEvent = (e: Event) => {
       e.stopPropagation();
     };
-    fieldRef.current.addEventListener("mousedown", stopEvent, true);
-    fieldRef.current.addEventListener("mouseup", stopEvent, true);
-    fieldRef.current.addEventListener("click", stopEvent, true);
-    fieldRef.current.addEventListener("keydown", stopEvent, true);
-    fieldRef.current.addEventListener("keyup", stopEvent, true);
+    field.addEventListener("mousedown", stopEvent, true);
+    field.addEventListener("mouseup", stopEvent, true);
+    field.addEventListener("click", stopEvent, true);
+    field.addEventListener("keydown", stopEvent, true);
+    field.addEventListener("keyup", stopEvent, true);
     return () => {
-      fieldRef.current?.removeEventListener("mousedown", stopEvent, true);
-      fieldRef.current?.removeEventListener("mouseup", stopEvent, true);
-      fieldRef.current?.removeEventListener("click", stopEvent, true);
-      fieldRef.current?.removeEventListener("keydown", stopEvent, true);
-      fieldRef.current?.removeEventListener("keyup", stopEvent, true);
+      field.removeEventListener("mousedown", stopEvent, true);
+      field.removeEventListener("mouseup", stopEvent, true);
+      field.removeEventListener("click", stopEvent, true);
+      field.removeEventListener("keydown", stopEvent, true);
+      field.removeEventListener("keyup", stopEvent, true);
     };
   }, [ready]);
 

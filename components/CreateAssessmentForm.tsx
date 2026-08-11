@@ -252,7 +252,7 @@ export function CreateAssessmentForm({
           <div className="mt-2 space-y-1 text-sm">
             {bulkResults.length === 0 ? (
               <p className="text-ink-soft">
-                You aren't timetabled for any subject/class yet this term.
+                You aren&apos;t timetabled for any subject/class yet this term.
               </p>
             ) : (
               bulkResults.map((r) => (

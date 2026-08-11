@@ -134,8 +134,9 @@ export function QuizAttemptRunner({
   >({});
 
   useEffect(() => {
+    const timers = saveTimers.current;
     return () => {
-      Object.values(saveTimers.current).forEach(({ timer }) => clearTimeout(timer));
+      Object.values(timers).forEach(({ timer }) => clearTimeout(timer));
     };
   }, []);
 

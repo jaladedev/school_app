@@ -621,6 +621,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setPickerOpen is a stable state setter
   }, [pickerOpen]);
 
   useEffect(() => {
@@ -635,6 +636,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setAssessmentPickerOpen is a stable state setter
   }, [assessmentPickerOpen]);
 
   useEffect(() => {
@@ -649,6 +651,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTopicPickerOpen is a stable state setter
   }, [topicPickerOpen]);
 
   useEffect(() => {
@@ -664,6 +667,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setEmojiPickerOpen/setEmojiPickerPos are stable state setters
   }, [emojiPickerOpen]);
 
   useEffect(() => {
@@ -674,6 +678,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setSymbolPickerOpen is a stable state setter
   }, [symbolPickerOpen]);
 
   useEffect(() => {
