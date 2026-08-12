@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { isAuthRetryableFetchError, type User } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { edgeEnv } from "@/lib/env.edge";
+import { logger } from "@/lib/logger";
 
 type SupabaseMiddlewareClient = ReturnType<typeof createServerClient>;
 
@@ -39,6 +40,11 @@ async function handleDeactivation(
     .single();
 
   if (!activeCheck || activeCheck.is_active !== false) return null;
+
+  // Deactivation is a security-relevant, infrequent event -- worth a
+  // record of who got signed out and when, separate from the ordinary
+  // request/response flow.
+  logger.info("proxy: blocked deactivated user, signing out", { userId: user.id });
 
   // Clear the session so the stale-but-valid cookie can't keep granting
   // access on subsequent requests, then send them to login with a reason
@@ -85,14 +91,8 @@ function handleAuthRedirect(params: {
   user: User | null;
   mustChangePassword: boolean;
 }): NextResponse | null {
-  const {
-    request,
-    isDashboardRoute,
-    isLoginRoute,
-    isChangePasswordRoute,
-    user,
-    mustChangePassword,
-  } = params;
+  const { request, isDashboardRoute, isLoginRoute, isChangePasswordRoute, user, mustChangePassword } =
+    params;
 
   if (isDashboardRoute && mustChangePassword) {
     return NextResponse.redirect(new URL("/change-password", request.url));
@@ -184,6 +184,15 @@ export async function proxy(request: NextRequest) {
   }
 
   if (authCheckFailedTransiently) {
+    // This is the interesting case to have visibility into: auth checking
+    // is degraded for this request and we're deliberately not forcing a
+    // logout for it. One occurrence is a network blip; a cluster of these
+    // in the logs would mean Supabase Auth (or the network path to it)
+    // is having a bad time.
+    logger.warn("proxy: auth check failed transiently, continuing without a verified user", {
+      path: request.nextUrl.pathname,
+      error: getUserError,
+    });
     return response;
   }
 
