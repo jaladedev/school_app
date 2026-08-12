@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { createClient, getUserWithRetry } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserRole } from "@/types/database";
+import { throwDbError } from "@/lib/errors/db";
 
 /**
  * Resolves the JWT-validated current user, distinguishing a transient
@@ -81,5 +82,5 @@ export async function clearMustChangePassword() {
     .update({ must_change_password: false })
     .eq("id", user.id);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 }

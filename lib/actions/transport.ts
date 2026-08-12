@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import type { TripDirection, TripStatusValue } from "@/types/database";
+import { throwDbError } from "@/lib/errors/db";
 
 /** Admin or the transport officer — global, unlike the hostel version,
  * since there's normally just the one transport officer running the
@@ -93,7 +94,7 @@ export async function createVehicle(input: {
     driver_name: input.driverName?.trim() || null,
     driver_phone: input.driverPhone?.trim() || null,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
 }
@@ -125,7 +126,7 @@ export async function linkVehicleDriver(vehicleId: string, driverProfileId: stri
     .from("vehicles")
     .update({ driver_profile_id: driverProfileId })
     .eq("id", vehicleId);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
 }
@@ -144,7 +145,7 @@ export async function createRoute(input: {
     description: input.description?.trim() || null,
     vehicle_id: input.vehicleId || null,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
 }
@@ -165,7 +166,7 @@ export async function createStop(input: {
     sequence_order: input.sequenceOrder,
     approx_time: input.approxTime || null,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
 }
@@ -179,7 +180,7 @@ export async function updateStop(input: { stopId: string; name: string; approxTi
     .from("transport_stops")
     .update({ name: input.name.trim(), approx_time: input.approxTime || null })
     .eq("id", input.stopId);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
   revalidatePath("/dashboard/transport");
@@ -219,7 +220,7 @@ export async function moveStop(stopId: string, direction: "up" | "down") {
     p_stop_a: stopId,
     p_stop_b: neighbor.id,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
   revalidatePath("/dashboard/transport");
@@ -249,7 +250,7 @@ export async function reassignRouteVehicle(routeId: string, vehicleId: string | 
     .update({ unassigned_at: new Date().toISOString() })
     .eq("route_id", routeId)
     .is("unassigned_at", null);
-  if (closeError) throw new Error(closeError.message);
+  if (closeError) throwDbError(closeError);
 
   if (vehicleId) {
     const { error: insertError } = await admin.from("route_vehicle_history").insert({
@@ -257,14 +258,14 @@ export async function reassignRouteVehicle(routeId: string, vehicleId: string | 
       vehicle_id: vehicleId,
       assigned_by: actorId,
     });
-    if (insertError) throw new Error(insertError.message);
+    if (insertError) throwDbError(insertError);
   }
 
   const { error: updateError } = await admin
     .from("transport_routes")
     .update({ vehicle_id: vehicleId })
     .eq("id", routeId);
-  if (updateError) throw new Error(updateError.message);
+  if (updateError) throwDbError(updateError);
 
   revalidatePath("/dashboard/admin/transport");
   revalidatePath("/dashboard/transport");
@@ -292,7 +293,7 @@ export async function assignStudentToRoute(input: {
     p_stop_id: input.stopId,
     p_academic_year: input.academicYear,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
 }
@@ -306,7 +307,7 @@ export async function unassignStudentFromRoute(assignmentId: string) {
     .update({ unassigned_at: new Date().toISOString() })
     .eq("id", assignmentId)
     .is("unassigned_at", null);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
 }
@@ -333,7 +334,7 @@ export async function updateTripStatus(input: {
     },
     { onConflict: "route_id,trip_date,direction" }
   );
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
   revalidatePath("/dashboard/transport");
@@ -404,7 +405,7 @@ export async function markStudentPickup(input: {
           },
           { onConflict: "student_id,route_id,trip_date,direction" }
         );
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/driver");
   revalidatePath("/dashboard/admin/transport");
@@ -444,5 +445,5 @@ export async function recordTransportLocation(input: {
     lng: input.lng,
     recorded_by: actorId,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 }

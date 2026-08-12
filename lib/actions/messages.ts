@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
+import { throwDbError } from "@/lib/errors/db";
 
 export async function sendMessage(recipientId: string, content: string) {
   const profile = await getCurrentProfile();
@@ -40,7 +41,7 @@ export async function sendMessage(recipientId: string, content: string) {
     content: content.trim(),
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/messages/${recipientId}`);
   revalidatePath("/dashboard/messages");
@@ -96,7 +97,7 @@ export async function deleteConversation(partnerId: string) {
       `and(sender_id.eq.${profile.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${profile.id})`
     );
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   // Clean up any archive record too, so a future conversation with the
   // same person doesn't start out pre-archived.
@@ -140,7 +141,7 @@ export async function archiveConversation(partnerId: string) {
     .from("conversation_archives")
     .upsert({ user_id: profile.id, partner_id: partnerId });
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/messages");
 }
@@ -159,7 +160,7 @@ export async function unarchiveConversation(partnerId: string) {
     .eq("user_id", profile.id)
     .eq("partner_id", partnerId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/messages");
 }

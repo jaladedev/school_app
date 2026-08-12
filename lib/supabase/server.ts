@@ -5,6 +5,7 @@ import { isAuthRetryableFetchError, type SupabaseClient } from "@supabase/supaba
 import { cookies } from "next/headers";
 import type { Database } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
+import { logger } from "@/lib/logger";
 
 // Plain wrapper around Node's own global fetch, forced to HTTP/1.1 --
 // but *only* outside Vercel (see the `isVercel` check below).
@@ -67,12 +68,7 @@ export async function loggingFetch(
         : input instanceof URL
           ? input.href
           : (input as Request).url;
-    console.error(
-      `[loggingFetch] Request to ${url} failed. Real underlying error:`,
-      err,
-      "\ncause:",
-      (err as { cause?: unknown })?.cause
-    );
+    logger.error("loggingFetch: request failed", { url, error: err });
     throw err;
   }
 }
@@ -170,20 +166,12 @@ export const getCurrentProfile = cache(async function getCurrentProfile() {
   if (getUserError && isTransient) {
     // The thrown Error's [cause] only ever showed
     // `AuthRetryableFetchError: fetch failed` -- that's supabase-js's own
-    // wrapper, not the actual network error underneath it. Logging the
-    // full cause chain here (server-side, so it lands in the terminal,
-    // not the browser) surfaces what undici/fetch actually failed with
-    // (ECONNRESET, a TLS error, a timeout, etc.) instead of the opaque
-    // one-line message the error screen shows.
-    console.error(
-      "[getCurrentProfile] Supabase auth fetch failed. Full cause chain:",
-      getUserError,
-      "\nunderlying cause:",
-      (getUserError as { cause?: unknown }).cause,
-      "\ndeeper cause:",
-      ((getUserError as { cause?: { cause?: unknown } }).cause as { cause?: unknown } | undefined)
-        ?.cause
-    );
+    // wrapper, not the actual network error underneath it. logger.error
+    // serializes the full cause chain (server-side, so it lands in the
+    // terminal, not the browser), surfacing what undici/fetch actually
+    // failed with (ECONNRESET, a TLS error, a timeout, etc.) instead of
+    // the opaque one-line message the error screen shows.
+    logger.error("getCurrentProfile: Supabase auth fetch failed", { error: getUserError });
     throw new Error("Couldn't verify your session right now — check your connection and retry.", {
       cause: getUserError,
     });

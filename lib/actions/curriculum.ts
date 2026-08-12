@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
+import { throwDbError } from "@/lib/errors/db";
 
 /**
  * curriculum_topics has SELECT/INSERT/UPDATE RLS policies but no DELETE
@@ -54,7 +55,7 @@ export async function deleteCurriculumTopic(topicId: string) {
   }
 
   const { error } = await admin.from("curriculum_topics").delete().eq("id", topicId);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/curriculum");
   revalidatePath("/dashboard/teacher/notes");

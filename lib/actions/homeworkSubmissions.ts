@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { HOMEWORK_SUBMISSION_BUCKET } from "@/lib/storageBuckets";
+import { throwDbError } from "@/lib/errors/db";
 
 const MAX_SUBMISSION_BYTES = 20 * 1024 * 1024;
 const ALLOWED_SUBMISSION_TYPES = new Set([
@@ -48,8 +49,7 @@ export async function submitHomework(lessonId: string, formData: FormData) {
     fileSizeLimit: `${MAX_SUBMISSION_BYTES}`,
     allowedMimeTypes: [...ALLOWED_SUBMISSION_TYPES],
   });
-  if (bucketError && !/already exists/i.test(bucketError.message))
-    throw new Error(bucketError.message);
+  if (bucketError && !/already exists/i.test(bucketError.message)) throwDbError(bucketError);
 
   // If a pending (not-yet-reviewed) submission already exists, remove its
   // old file before replacing — resubmission is allowed up until review.
@@ -74,7 +74,7 @@ export async function submitHomework(lessonId: string, formData: FormData) {
   const { error: uploadError } = await admin.storage
     .from(HOMEWORK_SUBMISSION_BUCKET)
     .upload(objectPath, file, { contentType: file.type });
-  if (uploadError) throw new Error(uploadError.message);
+  if (uploadError) throwDbError(uploadError);
 
   if (existing) {
     const { error: updateError } = await admin
@@ -87,7 +87,7 @@ export async function submitHomework(lessonId: string, formData: FormData) {
       .eq("id", existing.id);
     if (updateError) {
       await admin.storage.from(HOMEWORK_SUBMISSION_BUCKET).remove([objectPath]);
-      throw new Error(updateError.message);
+      throwDbError(updateError);
     }
     // Best-effort cleanup of the previous file; not fatal if it fails.
     await admin.storage.from(HOMEWORK_SUBMISSION_BUCKET).remove([existing.file_url]);
@@ -100,7 +100,7 @@ export async function submitHomework(lessonId: string, formData: FormData) {
     });
     if (insertError) {
       await admin.storage.from(HOMEWORK_SUBMISSION_BUCKET).remove([objectPath]);
-      throw new Error(insertError.message);
+      throwDbError(insertError);
     }
   }
 
@@ -145,7 +145,7 @@ export async function reviewHomeworkSubmission(submissionId: string, remark: str
     })
     .eq("id", submissionId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/teacher/homework");
 }

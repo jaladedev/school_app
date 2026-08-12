@@ -7,6 +7,7 @@ import { assertRole, getAuthenticatedUser } from "@/lib/actions/authGuards";
 import type { EducationLevel, PaymentMethod } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
 import { computeInvoiceStatus } from "@/lib/invoiceStatus";
+import { throwDbError } from "@/lib/errors/db";
 
 /**
  * Admin or the bursar. The DB already grants staff_role: "bursar" write
@@ -55,7 +56,7 @@ export async function createFeeStructure(input: {
     created_by: id,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/fees");
 }
@@ -104,7 +105,7 @@ export async function generateInvoicesForClass(feeStructureId: string, classId: 
     }))
   );
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/fees");
   return { created: toCreate.length };
@@ -147,7 +148,7 @@ export async function recordPayment(input: {
     p_enforce_balance: true,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
   if (result?.[0]?.already_recorded) {
     throw new Error("A payment with this reference has already been recorded.");
   }
@@ -187,7 +188,7 @@ export async function applyDiscount(invoiceId: string, discountKobo: number) {
     .update({ discount_kobo: discountKobo, status: newStatus })
     .eq("id", invoiceId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/fees");
 }
@@ -235,7 +236,7 @@ export async function voidInvoice(invoiceId: string, reason: string) {
     .eq("id", invoiceId)
     .is("voided_at", null);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/fees/invoices");
   revalidatePath("/dashboard/student/fees");
@@ -338,7 +339,7 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
     p_enforce_balance: true,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/student/fees");
   revalidatePath("/dashboard/parent/fees");
@@ -360,7 +361,7 @@ export async function sendFeeReminders(minDaysBetween = 7) {
     p_min_days_between: minDaysBetween,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/fees/invoices");
 

@@ -1,7 +1,9 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { isAuthRetryableFetchError } from "@supabase/supabase-js";
+import { isAuthRetryableFetchError, type User } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { edgeEnv } from "@/lib/env.edge";
+
+type SupabaseMiddlewareClient = ReturnType<typeof createServerClient>;
 
 // Decodes a JWT payload without verifying the signature. That's fine
 // here — this claim only gates a UI redirect (whether to show the
@@ -17,6 +19,96 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+// is_active isn't included in the JWT claims, so it always needs a
+// profile lookup (unlike must_change_password, which can often be read
+// straight off the token). Deactivated staff/students must be blocked
+// immediately, not just on their next full getCurrentProfile() call, so
+// this runs on every request to a protected route. Returns a redirect
+// response if the account is deactivated, otherwise null.
+async function handleDeactivation(
+  supabase: SupabaseMiddlewareClient,
+  user: User,
+  request: NextRequest
+): Promise<NextResponse | null> {
+  const { data: activeCheck } = await supabase
+    .from("profiles")
+    .select("is_active")
+    .eq("id", user.id)
+    .single();
+
+  if (!activeCheck || activeCheck.is_active !== false) return null;
+
+  // Clear the session so the stale-but-valid cookie can't keep granting
+  // access on subsequent requests, then send them to login with a reason
+  // the login page can surface.
+  await supabase.auth.signOut();
+  const redirectUrl = new URL("/login", request.url);
+  redirectUrl.searchParams.set("reason", "deactivated");
+  return NextResponse.redirect(redirectUrl);
+}
+
+// Resolves whether the signed-in user must change their password.
+// Prefers the JWT claim (cheap, no extra query); falls back to a
+// profile lookup for sessions issued before the claim existed.
+async function handlePasswordChange(
+  supabase: SupabaseMiddlewareClient,
+  user: User
+): Promise<boolean> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const claims = session?.access_token ? decodeJwtPayload(session.access_token) : null;
+
+  if (claims && "must_change_password" in claims) {
+    return Boolean(claims.must_change_password);
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("must_change_password")
+    .eq("id", user.id)
+    .single();
+  return profile?.must_change_password ?? false;
+}
+
+// Route-level redirects once we know who the user is and whether they
+// must change their password. Returns a redirect response, or null to
+// let the request continue.
+function handleAuthRedirect(params: {
+  request: NextRequest;
+  isDashboardRoute: boolean;
+  isLoginRoute: boolean;
+  isChangePasswordRoute: boolean;
+  user: User | null;
+  mustChangePassword: boolean;
+}): NextResponse | null {
+  const {
+    request,
+    isDashboardRoute,
+    isLoginRoute,
+    isChangePasswordRoute,
+    user,
+    mustChangePassword,
+  } = params;
+
+  if (isDashboardRoute && mustChangePassword) {
+    return NextResponse.redirect(new URL("/change-password", request.url));
+  }
+
+  if (isLoginRoute && user) {
+    return NextResponse.redirect(
+      new URL(mustChangePassword ? "/change-password" : "/dashboard", request.url)
+    );
+  }
+
+  if (isChangePasswordRoute && user && !mustChangePassword) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  return null;
 }
 
 export async function proxy(request: NextRequest) {
@@ -98,58 +190,21 @@ export async function proxy(request: NextRequest) {
   let mustChangePassword = false;
 
   if (user && (isDashboardRoute || isLoginRoute || isChangePasswordRoute)) {
-    // is_active isn't included in the JWT claims, so it always needs a
-    // profile lookup (unlike must_change_password below, which can often
-    // be read straight off the token). Deactivated staff/students must be
-    // blocked immediately, not just on their next full getCurrentProfile()
-    // call, so this runs on every request to a protected route.
-    const { data: activeCheck } = await supabase
-      .from("profiles")
-      .select("is_active")
-      .eq("id", user.id)
-      .single();
+    const deactivationRedirect = await handleDeactivation(supabase, user, request);
+    if (deactivationRedirect) return deactivationRedirect;
 
-    if (activeCheck && activeCheck.is_active === false) {
-      // Clear the session so the stale-but-valid cookie can't keep
-      // granting access on subsequent requests, then send them to login
-      // with a reason the login page can surface.
-      await supabase.auth.signOut();
-      const redirectUrl = new URL("/login", request.url);
-      redirectUrl.searchParams.set("reason", "deactivated");
-      return NextResponse.redirect(redirectUrl);
-    }
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    const claims = session?.access_token ? decodeJwtPayload(session.access_token) : null;
-
-    if (claims && "must_change_password" in claims) {
-      mustChangePassword = Boolean(claims.must_change_password);
-    } else {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("must_change_password")
-        .eq("id", user.id)
-        .single();
-      mustChangePassword = profile?.must_change_password ?? false;
-    }
+    mustChangePassword = await handlePasswordChange(supabase, user);
   }
 
-  if (isDashboardRoute && mustChangePassword) {
-    return NextResponse.redirect(new URL("/change-password", request.url));
-  }
-
-  if (isLoginRoute && user) {
-    return NextResponse.redirect(
-      new URL(mustChangePassword ? "/change-password" : "/dashboard", request.url)
-    );
-  }
-
-  if (isChangePasswordRoute && user && !mustChangePassword) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
+  const authRedirect = handleAuthRedirect({
+    request,
+    isDashboardRoute,
+    isLoginRoute,
+    isChangePasswordRoute,
+    user,
+    mustChangePassword,
+  });
+  if (authRedirect) return authRedirect;
 
   return response;
 }

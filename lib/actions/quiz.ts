@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
+import { throwDbError } from "@/lib/errors/db";
 
 type QuestionInput = {
   questionText: string;
@@ -51,7 +52,7 @@ export async function createQuiz(input: {
       .select("subjects_taught")
       .eq("id", actorId)
       .single();
-    if (teacherError) throw new Error(teacherError.message);
+    if (teacherError) throwDbError(teacherError);
 
     const assignedSubjects = teacherProfile?.subjects_taught ?? [];
     if (!assignedSubjects.includes(input.subjectId)) {
@@ -115,7 +116,7 @@ export async function createQuiz(input: {
         })),
     })),
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   // Quiz creation had no audit trail at all before this -- unlike
   // gradesModeration.tsx's admin approvals, which already log every
@@ -162,7 +163,7 @@ export async function getQuizPreviewQuestions(quizId: string) {
     )
     .eq("quiz_id", quizId)
     .order("sequence_order", { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
   return data;
 }
 
@@ -207,14 +208,14 @@ export async function getQuizQuestionAnalytics(quizId: string): Promise<{
     )
     .eq("quiz_id", quizId)
     .order("sequence_order", { ascending: true });
-  if (qError) throw new Error(qError.message);
+  if (qError) throwDbError(qError);
 
   const { data: submittedAttempts, error: aError } = await supabase
     .from("quiz_attempts")
     .select("id")
     .eq("quiz_id", quizId)
     .not("submitted_at", "is", null);
-  if (aError) throw new Error(aError.message);
+  if (aError) throwDbError(aError);
 
   const attemptIds = (submittedAttempts ?? []).map((a) => a.id);
   const totalSubmitted = attemptIds.length;
@@ -236,7 +237,7 @@ export async function getQuizQuestionAnalytics(quizId: string): Promise<{
         )
         .in("attempt_id", attemptIds)
     : { data: [] as AnswerRow[], error: null };
-  if (ansError) throw new Error(ansError.message);
+  if (ansError) throwDbError(ansError);
 
   const answersByQuestion = new Map<string, AnswerRow[]>();
   for (const row of answers ?? []) {
@@ -380,7 +381,7 @@ export async function setQuizPublished(quizId: string, isPublished: boolean) {
     .from("quizzes")
     .update({ is_published: isPublished })
     .eq("id", quizId);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/teacher/quizzes");
   revalidatePath(`/dashboard/teacher/quizzes/${quizId}`);
@@ -411,7 +412,7 @@ export async function gradeQuizEssayAnswers(
     p_attempt_id: attemptId,
     p_scores: scores,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/teacher/quizzes/${quizId}`);
 }

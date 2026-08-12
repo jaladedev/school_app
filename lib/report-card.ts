@@ -6,6 +6,7 @@ import {
   ordinal,
   rankDescending,
   computeSubjectPercent,
+  indexGradesByAssessmentAndStudent,
   type SubjectResult,
   type ReportCardData,
 } from "@/lib/report-card-scoring";
@@ -143,6 +144,12 @@ export async function getReportCardData(
   const subjects: SubjectResult[] = [];
   const overallPercentByStudent = new Map<string, { sum: number; count: number }>();
 
+  // Indexed once up front (O(totalGrades)) instead of re-scanning the
+  // whole class's grades array inside computeSubjectPercent for every
+  // (subject, student) pair -- with C subjects and S students that scan
+  // was happening C*S times, i.e. O(subjects * students * totalGrades).
+  const gradesByKey = indexGradesByAssessmentAndStudent(allGrades ?? []);
+
   for (const [subjectId, info] of subjectMap.entries()) {
     const percentByStudent = new Map<string, number>();
 
@@ -152,7 +159,7 @@ export async function getReportCardData(
         info.assessmentIds,
         info.maxScores,
         info.weights,
-        allGrades ?? []
+        gradesByKey
       );
       if (percent !== null) {
         percentByStudent.set(sid, percent);

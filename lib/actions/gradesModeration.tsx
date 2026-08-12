@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
+import { throwDbError } from "@/lib/errors/db";
 
 async function assertCanModerateAssessment(assessmentId: string) {
   const { id } = await assertRole(["admin", "teacher"], "Only an admin or HOD can approve grades.");
@@ -34,7 +35,7 @@ export async function approveAssessmentGrades(assessmentId: string) {
     .eq("assessment_id", assessmentId)
     .eq("moderation_status", "pending");
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "assessment",
@@ -66,7 +67,7 @@ export async function approveSingleGrade(gradeId: string) {
     .update({ moderation_status: "approved" })
     .eq("id", gradeId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "grade",

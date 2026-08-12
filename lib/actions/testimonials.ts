@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
+import { throwDbError } from "@/lib/errors/db";
 
 export async function issueTestimonial(input: {
   studentId: string;
@@ -53,7 +54,7 @@ export async function issueTestimonial(input: {
     leaving_academic_year: leavingAcademicYear,
     issued_by: actorId,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/admin/students/${input.studentId}/testimonial`);
 }

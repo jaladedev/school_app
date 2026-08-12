@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
+import { throwDbError } from "@/lib/errors/db";
 
 export async function saveReportCardRemark(input: {
   studentId: string;
@@ -41,7 +42,7 @@ export async function saveReportCardRemark(input: {
     { onConflict: "student_id,term,academic_year" }
   );
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/admin/students/${input.studentId}/report-card`);
   revalidatePath("/dashboard/student/report-card");
@@ -68,7 +69,7 @@ export async function setReportCardApproval(input: {
     .eq("academic_year", input.academicYear)
     .maybeSingle();
 
-  if (fetchError) throw new Error(fetchError.message);
+  if (fetchError) throwDbError(fetchError);
   if (!existing) {
     throw new Error(
       "Add a class teacher's or head teacher's remark before approving this report card."
@@ -84,7 +85,7 @@ export async function setReportCardApproval(input: {
     })
     .eq("id", existing.id);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/admin/students/${input.studentId}/report-card`);
   revalidatePath("/dashboard/student/report-card");

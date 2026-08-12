@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logger } from "@/lib/logger";
 
 /**
  * Writes an audit_log row from application code, for actions that don't
@@ -29,9 +30,9 @@ export async function writeAuditLog(entry: {
       metadata: entry.metadata ?? {},
     });
     if (error) {
-      console.error("Failed to write audit_log entry", { entry, error: error.message });
+      logger.error("writeAuditLog: failed to write audit_log entry", { entry, error });
     }
   } catch (err) {
-    console.error("Failed to write audit_log entry", { entry, err });
+    logger.error("writeAuditLog: failed to write audit_log entry", { entry, error: err });
   }
 }

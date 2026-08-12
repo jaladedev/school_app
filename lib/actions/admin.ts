@@ -8,6 +8,7 @@ import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
 import { STUDENT_PHOTO_BUCKET } from "@/lib/storageBuckets";
 import type { StaffRole } from "@/types/database";
+import { throwDbError } from "@/lib/errors/db";
 
 const TEMP_PASSWORD_WORDS = [
   "acorn",
@@ -92,7 +93,7 @@ async function insertProfileContact(
   const { error } = await admin.from("profile_contacts").insert({ id: userId, email, phone });
   if (error) {
     await deleteUserAfterFailedSetup(admin, userId);
-    throw new Error(error.message);
+    throwDbError(error);
   }
 }
 
@@ -113,7 +114,7 @@ async function cleanupOrphanedAuthUsers(admin: ReturnType<typeof createAdminClie
   const { data: profileRows, error: profileListError } = await admin.from("profiles").select("id");
 
   if (profileListError) {
-    throw new Error(profileListError.message);
+    throwDbError(profileListError);
   }
 
   const profileIds = new Set((profileRows ?? []).map((row) => row.id));
@@ -127,7 +128,7 @@ async function cleanupOrphanedAuthUsers(admin: ReturnType<typeof createAdminClie
       perPage: 1000,
     });
 
-    if (listUsersError) throw new Error(listUsersError.message);
+    if (listUsersError) throwDbError(listUsersError);
 
     const batch = usersPage?.users ?? [];
     allAuthUsers.push(...batch);
@@ -198,7 +199,7 @@ async function recordEnrollments(
     { onConflict: "student_id,academic_year,term" }
   );
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 }
 
 async function mapWithConcurrency<T, R>(
@@ -251,7 +252,7 @@ export async function createTeacherAccount(input: {
 
   if (profileError) {
     await deleteUserAfterFailedSetup(admin, userId);
-    throw new Error(profileError.message);
+    throwDbError(profileError);
   }
 
   await insertProfileContact(admin, userId, input.email);
@@ -271,7 +272,7 @@ export async function createTeacherAccount(input: {
 
   if (teacherError) {
     await deleteUserAfterFailedSetup(admin, userId);
-    throw new Error(teacherError.message);
+    throwDbError(teacherError);
   }
 
   revalidatePath("/dashboard/admin/staff");
@@ -317,7 +318,7 @@ export async function createStudentAccount(input: {
 
   if (profileError) {
     await deleteUserAfterFailedSetup(admin, userId);
-    throw new Error(profileError.message);
+    throwDbError(profileError);
   }
 
   await insertProfileContact(admin, userId, input.email);
@@ -333,7 +334,7 @@ export async function createStudentAccount(input: {
 
   if (studentError) {
     await deleteUserAfterFailedSetup(admin, userId);
-    throw new Error(studentError.message);
+    throwDbError(studentError);
   }
 
   await recordEnrollment(admin, userId, input.classId);
@@ -387,23 +388,33 @@ export async function createStudentsBulk(input: {
   }
 
   const emails = input.students.map((student) => student.email.trim().toLowerCase());
-  const duplicateInputEmails = new Set(
-    emails.filter((email, index) => emails.indexOf(email) !== index)
-  );
+  const seenEmails = new Set<string>();
+  const duplicateInputEmails = new Set<string>();
+  for (const email of emails) {
+    if (seenEmails.has(email)) duplicateInputEmails.add(email);
+    else seenEmails.add(email);
+  }
 
-  // Fetch every existing profile email and compare case-insensitively in
-  // JS. A `.in("email", [...])` query does an exact-case match, so it
-  // would silently miss a DB row like "John@Example.com" against an
-  // import row of "john@example.com" — this avoids that gap. Fine at
-  // school-roster scale; if `profiles` ever got huge, this would want to
-  // become a targeted case-insensitive query instead.
-  const { data: allContacts, error: existingProfilesError } = await admin
-    .from("profile_contacts")
-    .select("email");
+  // Case-insensitive existence check, scoped to just this import's emails
+  // instead of pulling every row in profile_contacts into JS. A plain
+  // `.in("email", [...])` does an exact-case match, so it would silently
+  // miss a DB row like "John@Example.com" against an import row of
+  // "john@example.com" -- the ilike-per-email .or() filter keeps the
+  // case-insensitive comparison but lets Postgres do the filtering, so
+  // this stays cheap as the whole school's roster grows, not just as
+  // this one import grows.
+  const uniqueEmails = Array.from(seenEmails);
+  const emailFilter = uniqueEmails
+    .map((email) => `email.ilike."${email.replace(/"/g, '\\"')}"`)
+    .join(",");
 
-  if (existingProfilesError) throw new Error(existingProfilesError.message);
+  const { data: matchingContacts, error: existingProfilesError } = uniqueEmails.length
+    ? await admin.from("profile_contacts").select("email").or(emailFilter)
+    : { data: [], error: null };
 
-  const existingEmails = new Set((allContacts ?? []).map((c) => c.email.toLowerCase()));
+  if (existingProfilesError) throwDbError(existingProfilesError);
+
+  const existingEmails = new Set((matchingContacts ?? []).map((c) => c.email.toLowerCase()));
 
   const created = await mapWithConcurrency<BulkStudentRow, BulkCreationAttempt>(
     input.students,
@@ -533,7 +544,7 @@ export async function reassignStudentClass(studentId: string, classId: string) {
     .update({ class_id: classId })
     .eq("id", studentId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await recordEnrollment(admin, studentId, classId);
 
@@ -559,7 +570,7 @@ export async function updateStudentAccount(input: {
     .update({ full_name: input.fullName })
     .eq("id", input.studentId);
 
-  if (profileError) throw new Error(profileError.message);
+  if (profileError) throwDbError(profileError);
 
   const { error: studentError } = await admin
     .from("student_profiles")
@@ -578,7 +589,7 @@ export async function updateStudentAccount(input: {
     })
     .eq("id", input.studentId);
 
-  if (studentError) throw new Error(studentError.message);
+  if (studentError) throwDbError(studentError);
 
   if (input.classId) {
     await recordEnrollment(admin, input.studentId, input.classId);
@@ -633,7 +644,7 @@ export async function uploadStudentPhoto(studentId: string, formData: FormData) 
       upsert: true,
     });
 
-  if (uploadError) throw new Error(uploadError.message);
+  if (uploadError) throwDbError(uploadError);
 
   const { error: updateError } = await admin
     .from("profiles")
@@ -642,7 +653,7 @@ export async function uploadStudentPhoto(studentId: string, formData: FormData) 
 
   if (updateError) {
     await admin.storage.from(STUDENT_PHOTO_BUCKET).remove([objectPath]);
-    throw new Error(updateError.message);
+    throwDbError(updateError);
   }
 
   if (profile.avatar_url && profile.avatar_url !== objectPath) {
@@ -664,7 +675,7 @@ export async function updateTeacherAccount(input: { teacherId: string; fullName:
     .update({ full_name: input.fullName })
     .eq("id", input.teacherId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/staff");
   revalidatePath(`/dashboard/admin/staff/${input.teacherId}`);
@@ -679,7 +690,7 @@ export async function updateTeacherSubjects(teacherId: string, subjectIds: strin
     ? await admin.from("subjects").select("id").in("id", uniqueSubjectIds)
     : { data: [], error: null };
 
-  if (subjectsError) throw new Error(subjectsError.message);
+  if (subjectsError) throwDbError(subjectsError);
   if ((subjects ?? []).length !== uniqueSubjectIds.length) {
     throw new Error("One or more selected subjects no longer exist.");
   }
@@ -689,7 +700,7 @@ export async function updateTeacherSubjects(teacherId: string, subjectIds: strin
     .update({ subjects_taught: uniqueSubjectIds })
     .eq("id", teacherId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/admin/staff/${teacherId}`);
   revalidatePath("/dashboard/admin/staff");
@@ -710,7 +721,7 @@ export async function updateTeacherStaffRole(teacherId: string, staffRole: Staff
     .from("teacher_profiles")
     .update({ staff_role: staffRole })
     .eq("id", teacherId);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "teacher_profile",
@@ -754,7 +765,7 @@ async function assertValidParentChildLinks(
     .select("id")
     .in("id", studentIds);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   const existingIds = new Set((students ?? []).map((student) => student.id));
   const missingIds = studentIds.filter((studentId) => !existingIds.has(studentId));
@@ -796,7 +807,7 @@ export async function createParentAccount(input: {
 
   if (profileError) {
     await deleteUserAfterFailedSetup(admin, userId);
-    throw new Error(profileError.message);
+    throwDbError(profileError);
   }
 
   await insertProfileContact(admin, userId, input.email);
@@ -812,7 +823,7 @@ export async function createParentAccount(input: {
 
   if (linksError) {
     await deleteUserAfterFailedSetup(admin, userId);
-    throw new Error(linksError.message);
+    throwDbError(linksError);
   }
 
   revalidatePath("/dashboard/admin/parents");
@@ -829,7 +840,7 @@ export async function addChildToParent(parentId: string, studentId: string, rela
     .eq("id", studentId)
     .maybeSingle();
 
-  if (studentError) throw new Error(studentError.message);
+  if (studentError) throwDbError(studentError);
   if (!student) throw new Error("The selected student does not exist.");
 
   const { error } = await admin.from("guardian_links").insert({
@@ -839,7 +850,7 @@ export async function addChildToParent(parentId: string, studentId: string, rela
     is_primary: false,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/parents");
   revalidatePath(`/dashboard/admin/parents/${parentId}`);
@@ -851,7 +862,7 @@ export async function removeChildFromParent(guardianLinkId: string) {
 
   const { error } = await admin.from("guardian_links").delete().eq("id", guardianLinkId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/parents");
 }
@@ -870,14 +881,14 @@ export async function deactivateUser(userId: string, deactivate: boolean) {
     ban_duration: deactivate ? "87600h" : "none",
   });
 
-  if (authError) throw new Error(authError.message);
+  if (authError) throwDbError(authError);
 
   const { error: profileError } = await admin
     .from("profiles")
     .update({ is_active: !deactivate })
     .eq("id", userId);
 
-  if (profileError) throw new Error(profileError.message);
+  if (profileError) throwDbError(profileError);
 
   await writeAuditLog({
     entityType: "profile",
@@ -918,7 +929,7 @@ export async function promoteStudents(input: {
     .in("id", studentIds)
     .select("id");
 
-  if (updateError) throw new Error(updateError.message);
+  if (updateError) throwDbError(updateError);
 
   const updatedIds = (updatedStudents ?? []).map((student) => student.id);
   const missingIds = studentIds.filter((id) => !updatedIds.includes(id));
@@ -946,14 +957,14 @@ export async function resetUserPassword(userId: string): Promise<{ password: str
     password: newPassword,
   });
 
-  if (updateError) throw new Error(updateError.message);
+  if (updateError) throwDbError(updateError);
 
   const { error: profileError } = await admin
     .from("profiles")
     .update({ must_change_password: true })
     .eq("id", userId);
 
-  if (profileError) throw new Error(profileError.message);
+  if (profileError) throwDbError(profileError);
 
   revalidatePath("/dashboard/admin/staff");
   revalidatePath("/dashboard/admin/students");

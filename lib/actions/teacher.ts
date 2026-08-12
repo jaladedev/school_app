@@ -14,6 +14,7 @@ import type {
   HomeworkStatus,
   ResourceType,
 } from "@/types/database";
+import { throwDbError } from "@/lib/errors/db";
 
 // ---------- Lessons ----------
 
@@ -62,7 +63,7 @@ export async function createLesson(input: {
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/teacher");
   revalidatePath("/dashboard/teacher/attendance");
@@ -92,7 +93,7 @@ export async function updateHomeworkStatus(lessonId: string, status: HomeworkSta
     .update({ homework_status: status })
     .eq("id", lessonId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/teacher/homework");
 }
@@ -133,7 +134,7 @@ export async function markAttendance(
     .from("attendance")
     .upsert(rows, { onConflict: "lesson_id,student_id" });
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/teacher/attendance/${lessonId}`);
   revalidatePath("/dashboard/teacher/attendance");
@@ -196,7 +197,7 @@ export async function saveGrade(
     { onConflict: "assessment_id,student_id" }
   );
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   // Regular teacher grade entry had no audit trail before this --
   // gradesModeration.tsx already logs admin/HOD *approvals*, but not the
@@ -286,7 +287,7 @@ export async function importGrades(
     { onConflict: "assessment_id,student_id" }
   );
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/teacher/grades/${assessmentId}`);
   revalidatePath("/dashboard/admin/grades");
@@ -370,7 +371,7 @@ async function createStandardSetFor(
     )
     .select("id, title");
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   // One entry per assessment (not one entry for the whole batch) so each
   // shows up individually in /dashboard/admin/audit-log under its own
@@ -449,7 +450,7 @@ export async function createStandardAssessmentSetForAllMyClasses(input: {
     .select("subject_id, class_id, subjects(name), classes(name, arm)")
     .eq("teacher_id", teacherId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   // A teacher can have several periods a week for the same subject/class
   // (e.g. Mon + Wed) -- dedupe down to distinct subject/class combos
@@ -527,7 +528,7 @@ export async function createCustomAssessment(input: {
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "assessment",
@@ -615,7 +616,7 @@ export async function saveTopicNote(
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   // The autosave scratch row (if any) is now superseded by this real,
   // version-tracked save -- delete it so a stale autosave never lingers
@@ -655,7 +656,7 @@ export async function saveTopicNoteDraft(topicId: string, content: string) {
       { topic_id: topicId, author_id: teacherId, content, updated_at: new Date().toISOString() },
       { onConflict: "topic_id,author_id" }
     );
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 }
 
 /**
@@ -781,7 +782,7 @@ export async function restoreTopicNoteVersion(topicId: string, versionNoteId: st
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath("/dashboard/teacher/notes");
@@ -883,7 +884,7 @@ export async function deleteTopicNoteVersion(topicId: string, versionNoteId: str
           .from("topic_resources")
           .update({ note_id: stillReferencedIn.id })
           .eq("id", resource.id);
-        if (reassignError) throw new Error(reassignError.message);
+        if (reassignError) throwDbError(reassignError);
       } else {
         toHardDelete.push(resource);
       }
@@ -901,12 +902,12 @@ export async function deleteTopicNoteVersion(topicId: string, versionNoteId: str
           "id",
           toHardDelete.map((r) => r.id)
         );
-      if (cleanupError) throw new Error(cleanupError.message);
+      if (cleanupError) throwDbError(cleanupError);
     }
   }
 
   const { error } = await supabase.from("topic_notes").delete().eq("id", versionNoteId);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath("/dashboard/teacher/notes");
@@ -959,8 +960,7 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
     fileSizeLimit: `${MAX_TOPIC_RESOURCE_BYTES}`,
     allowedMimeTypes: [...RESOURCE_TYPES.keys()],
   });
-  if (bucketError && !/already exists/i.test(bucketError.message))
-    throw new Error(bucketError.message);
+  if (bucketError && !/already exists/i.test(bucketError.message)) throwDbError(bucketError);
 
   const extension =
     file.name
@@ -973,7 +973,7 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
     .upload(objectPath, file, {
       contentType: file.type,
     });
-  if (uploadError) throw new Error(uploadError.message);
+  if (uploadError) throwDbError(uploadError);
 
   const { data: latestResource } = await admin
     .from("topic_resources")
@@ -997,7 +997,7 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
     .single();
   if (insertError) {
     await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([objectPath]);
-    throw new Error(insertError.message);
+    throwDbError(insertError);
   }
 
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
@@ -1051,7 +1051,7 @@ export async function createVideoEmbedResource(
     })
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath(`/dashboard/student/topics/${topicId}`);
   return data;
@@ -1092,7 +1092,7 @@ export async function createLinkResource(topicId: string, noteId: string, url: s
     })
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath(`/dashboard/student/topics/${topicId}`);
   return data;
@@ -1138,7 +1138,7 @@ export async function refreshLinkPreview(resourceId: string) {
     .select("*")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
   revalidatePath(`/dashboard/teacher/notes/${existing.topic_id}`);
   revalidatePath(`/dashboard/student/topics/${existing.topic_id}`);
   return resource;
@@ -1183,7 +1183,7 @@ export async function createMermaidResource(
     .select("*")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
   revalidatePath(`/dashboard/student/topics/${topicId}`);
@@ -1234,7 +1234,7 @@ export async function updateMermaidResource(
     .select("*")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/teacher/notes/${existing.topic_id}`);
   revalidatePath(`/dashboard/student/topics/${existing.topic_id}`);
@@ -1291,7 +1291,7 @@ export async function updateTopicResource(resourceId: string, formData: FormData
     const { error: uploadError } = await admin.storage
       .from(TOPIC_RESOURCE_BUCKET)
       .upload(newObjectPath, file, { contentType: file.type });
-    if (uploadError) throw new Error(uploadError.message);
+    if (uploadError) throwDbError(uploadError);
 
     update.resource_type = resourceType;
     update.file_url = newObjectPath;
@@ -1317,7 +1317,7 @@ export async function updateTopicResource(resourceId: string, formData: FormData
     // Roll back the just-uploaded replacement file if the row update
     // failed, same cleanup-on-failure pattern uploadTopicResource uses.
     if (newObjectPath) await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([newObjectPath]);
-    throw new Error(error.message);
+    throwDbError(error);
   }
 
   // Only remove the *old* file after the row update succeeds and points
@@ -1372,7 +1372,7 @@ export async function deleteTopicResource(resourceId: string) {
 
   const { error: deleteError } = await admin.from("topic_resources").delete().eq("id", resourceId);
 
-  if (deleteError) throw new Error(deleteError.message);
+  if (deleteError) throwDbError(deleteError);
 
   revalidatePath(`/dashboard/teacher/notes/${resource.topic_id}`);
   revalidatePath(`/dashboard/student/topics/${resource.topic_id}`);

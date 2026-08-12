@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { serverEnv } from "@/lib/env.server";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
 
   if (error) {
     // Returning a 5xx tells Paystack to retry transient database failures.
-    console.error("Unable to record Paystack webhook payment", { reference, error: error.message });
+    logger.error("paystack webhook: unable to record payment", { reference, error });
     return NextResponse.json({ error: "Unable to record payment." }, { status: 500 });
   }
 

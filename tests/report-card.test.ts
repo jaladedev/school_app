@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeSubjectPercent, ordinal, rankDescending } from "@/lib/report-card-scoring";
+import {
+  computeSubjectPercent,
+  indexGradesByAssessmentAndStudent,
+  ordinal,
+  rankDescending,
+} from "@/lib/report-card-scoring";
 
 describe("report-card scoring and ranking", () => {
   it("calculates unweighted scores from earned points and available points", () => {
@@ -15,10 +20,10 @@ describe("report-card scoring and ranking", () => {
           ["ca", null],
           ["exam", null],
         ]),
-        [
+        indexGradesByAssessmentAndStudent([
           { assessment_id: "ca", student_id: "student-1", score: 16 },
           { assessment_id: "exam", student_id: "student-1", score: 56 },
-        ]
+        ])
       )
     ).toBe(72);
   });
@@ -36,10 +41,10 @@ describe("report-card scoring and ranking", () => {
           ["ca", 30],
           ["exam", 70],
         ]),
-        [
+        indexGradesByAssessmentAndStudent([
           { assessment_id: "ca", student_id: "student-1", score: 10 },
           { assessment_id: "exam", student_id: "student-1", score: 80 },
-        ]
+        ])
       )
     ).toBe(71);
   });
@@ -64,11 +69,11 @@ describe("report-card scoring and ranking", () => {
           ["2nd_ca", null],
           ["exam", null],
         ]),
-        [
+        indexGradesByAssessmentAndStudent([
           { assessment_id: "1st_ca", student_id: "student-1", score: 18 },
           { assessment_id: "2nd_ca", student_id: "student-1", score: 20 },
           // exam not yet graded
-        ]
+        ])
       )
     ).toBeNull();
   });
@@ -88,11 +93,11 @@ describe("report-card scoring and ranking", () => {
           ["2nd_ca", null],
           ["exam", null],
         ]),
-        [
+        indexGradesByAssessmentAndStudent([
           { assessment_id: "1st_ca", student_id: "student-1", score: 18 },
           { assessment_id: "2nd_ca", student_id: "student-1", score: 20 },
           { assessment_id: "exam", student_id: "student-1", score: 50 },
-        ]
+        ])
       )
     ).toBe(88);
   });
@@ -110,10 +115,10 @@ describe("report-card scoring and ranking", () => {
           ["ca", 20],
           ["exam", 80],
         ]),
-        [
+        indexGradesByAssessmentAndStudent([
           // Full marks on the CA, but never sat the exam.
           { assessment_id: "ca", student_id: "student-1", score: 20 },
-        ]
+        ])
       )
     ).toBeNull();
   });
@@ -125,7 +130,7 @@ describe("report-card scoring and ranking", () => {
         ["exam"],
         new Map([["exam", 100]]),
         new Map([["exam", null]]),
-        []
+        indexGradesByAssessmentAndStudent([])
       )
     ).toBeNull();
   });

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
+import { throwDbError } from "@/lib/errors/db";
 
 /**
  * Admin or the house parent assigned to the given room/hostel. Mirrors
@@ -102,7 +103,7 @@ export async function createHostel(input: {
     })
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "hostel",
@@ -136,7 +137,7 @@ export async function createHostelRoom(input: {
     })
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "hostel_room",
@@ -168,7 +169,7 @@ export async function assignStudentToRoom(input: {
     p_room_id: input.roomId,
     p_academic_year: input.academicYear,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/hostels");
 }
@@ -182,7 +183,7 @@ export async function unassignStudentFromRoom(assignmentId: string, roomId: stri
     .update({ unassigned_at: new Date().toISOString() })
     .eq("id", assignmentId)
     .is("unassigned_at", null);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/hostels");
 }
@@ -203,7 +204,7 @@ export async function logHostelLeave(input: {
     expected_return_at: input.expectedReturnAt || null,
     logged_by: actorId,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/hostels");
 }
@@ -217,7 +218,7 @@ export async function recordHostelReturn(leaveLogId: string, studentId: string) 
     .update({ returned_at: new Date().toISOString(), returned_logged_by: actorId })
     .eq("id", leaveLogId)
     .is("returned_at", null);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/hostels");
 }
@@ -254,7 +255,7 @@ export async function logHostelVisitorCheckIn(input: {
     purpose: input.purpose?.trim() || null,
     logged_by: actorId,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/hostels");
 }
@@ -268,7 +269,7 @@ export async function recordHostelVisitorCheckOut(visitorLogId: string, studentI
     .update({ checked_out_at: new Date().toISOString(), checked_out_logged_by: actorId })
     .eq("id", visitorLogId)
     .is("checked_out_at", null);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/hostels");
 }
@@ -289,7 +290,7 @@ export async function joinHostelWaitlist(studentId: string, hostelId: string) {
     p_student_id: studentId,
     p_hostel_id: hostelId,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/hostels");
   revalidatePath("/dashboard/hostels");
@@ -305,7 +306,7 @@ export async function cancelHostelWaitlistEntry(entryId: string, hostelId: strin
     .eq("id", entryId)
     .is("fulfilled_at", null)
     .is("cancelled_at", null);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/hostels");
   revalidatePath("/dashboard/hostels");

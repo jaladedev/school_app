@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
+import { throwDbError } from "@/lib/errors/db";
 
 function generateTempPassword(): string {
   // Not meant to be memorable — must_change_password forces a real
@@ -46,7 +47,7 @@ export async function createDriverAccount(input: {
     password: tempPassword,
     email_confirm: true,
   });
-  if (authError) throw new Error(authError.message);
+  if (authError) throwDbError(authError);
   if (!authUser.user) throw new Error("Account creation failed.");
 
   const { error: profileError } = await admin.from("profiles").insert({
@@ -70,7 +71,7 @@ export async function createDriverAccount(input: {
     // Roll back the auth user so a failed profile insert doesn't leave
     // an orphaned login with no matching profile row.
     await admin.auth.admin.deleteUser(authUser.user.id);
-    throw new Error(profileError.message);
+    throwDbError(profileError);
   }
 
   // email/phone live in profile_contacts now, not profiles — see
@@ -82,7 +83,7 @@ export async function createDriverAccount(input: {
   });
   if (contactError) {
     await admin.auth.admin.deleteUser(authUser.user.id);
-    throw new Error(contactError.message);
+    throwDbError(contactError);
   }
 
   const { error: teacherProfileError } = await admin.from("teacher_profiles").insert({
@@ -95,7 +96,7 @@ export async function createDriverAccount(input: {
     // this app (is_bursar, is_librarian, assertCanUpdateTrip, etc.)
     // requires both rows to exist together.
     await admin.auth.admin.deleteUser(authUser.user.id);
-    throw new Error(teacherProfileError.message);
+    throwDbError(teacherProfileError);
   }
 
   if (input.vehicleId) {
@@ -103,7 +104,7 @@ export async function createDriverAccount(input: {
       .from("vehicles")
       .update({ driver_profile_id: authUser.user.id })
       .eq("id", input.vehicleId);
-    if (vehicleError) throw new Error(vehicleError.message);
+    if (vehicleError) throwDbError(vehicleError);
   }
 
   revalidatePath("/dashboard/admin/transport");
@@ -118,7 +119,7 @@ export async function linkDriverToVehicle(vehicleId: string, driverProfileId: st
     .from("vehicles")
     .update({ driver_profile_id: driverProfileId })
     .eq("id", vehicleId);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
 }

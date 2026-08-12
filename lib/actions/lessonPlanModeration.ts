@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
+import { throwDbError } from "@/lib/errors/db";
 
 async function assertCanModerateTopicNote(topicId: string) {
   const { id } = await assertRole(
@@ -52,7 +53,7 @@ async function setNoteModerationStatus(
     .update({ moderation_status: decision })
     .eq("id", noteId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "topic_note",

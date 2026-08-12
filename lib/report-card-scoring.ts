@@ -12,8 +12,46 @@ export function ordinal(n: number): string {
 }
 
 export function rankDescending(values: number[]): number[] {
-  const sorted = [...values].sort((a, b) => b - a);
-  return values.map((v) => sorted.indexOf(v) + 1);
+  // Competition ranking (ties share a rank; the next distinct value skips
+  // ahead by the tie count, e.g. 90,80,80,70 -> 1,2,2,4). Previously this
+  // sorted once (O(n log n)) but then called sorted.indexOf(v) for every
+  // value (O(n) each), making the whole function O(n^2) -- fine for a
+  // class of 30-40, but the same shape is used for whole-class ranking
+  // and doesn't need to be quadratic. Sorting index/value pairs once and
+  // walking the sorted order in a single pass keeps the same tie
+  // semantics at O(n log n).
+  const indexed = values.map((v, i) => ({ v, i }));
+  indexed.sort((a, b) => b.v - a.v);
+
+  const ranks = new Array<number>(values.length);
+  let rank = 0;
+  indexed.forEach(({ v, i }, pos) => {
+    if (pos === 0 || v !== indexed[pos - 1].v) rank = pos + 1;
+    ranks[i] = rank;
+  });
+  return ranks;
+}
+
+/** Key used to look up a grade by (assessment, student) in O(1). */
+function gradeKey(assessmentId: string, studentId: string): string {
+  return `${assessmentId}::${studentId}`;
+}
+
+type Grade = { assessment_id: string; student_id: string; score: number };
+
+/**
+ * Indexes a flat grades array into an O(1)-lookup Map, keyed by
+ * assessment+student. Build this once per report-card/class-ranking run
+ * and reuse it across every computeSubjectPercent call, rather than
+ * passing the raw array in and re-scanning it per call (see
+ * computeSubjectPercent below).
+ */
+export function indexGradesByAssessmentAndStudent(grades: Grade[]): Map<string, Grade> {
+  const map = new Map<string, Grade>();
+  for (const g of grades) {
+    map.set(gradeKey(g.assessment_id, g.student_id), g);
+  }
+  return map;
 }
 
 export function computeSubjectPercent(
@@ -21,11 +59,11 @@ export function computeSubjectPercent(
   assessmentIds: string[],
   maxScores: Map<string, number>,
   weights: Map<string, number | null>,
-  grades: { assessment_id: string; student_id: string; score: number }[]
+  gradesByKey: Map<string, Grade>
 ): number | null {
   const relevantGrades = assessmentIds
-    .map((aid) => grades.find((g) => g.assessment_id === aid && g.student_id === studentId))
-    .filter((g): g is NonNullable<typeof g> => !!g);
+    .map((aid) => gradesByKey.get(gradeKey(aid, studentId)))
+    .filter((g): g is Grade => !!g);
 
   if (!relevantGrades.length) return null;
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertCanManageFees } from "@/lib/actions/fees";
 import { writeAuditLog } from "@/lib/audit";
+import { throwDbError } from "@/lib/errors/db";
 
 export type InstallmentInput = {
   dueDate: string;
@@ -69,7 +70,7 @@ export async function createOrReplaceInstallmentPlan(
       amount_kobo: inst.amountKobo,
     })),
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "invoice",
@@ -93,7 +94,7 @@ export async function deleteInstallmentPlan(invoiceId: string) {
   const admin = createAdminClient();
 
   const { error } = await admin.from("invoice_installments").delete().eq("invoice_id", invoiceId);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "invoice",

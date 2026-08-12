@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
 import type { StudentNoteType } from "@/types/database";
+import { throwDbError } from "@/lib/errors/db";
 
 const MAX_NOTE_LENGTH = 5000;
 
@@ -34,7 +35,7 @@ export async function createStudentNote(input: {
     visible_to_student: input.visibleToStudent,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/admin/students/${input.studentId}/notes`);
   revalidatePath("/dashboard/student/notes");

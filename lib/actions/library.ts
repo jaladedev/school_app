@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
 import { computeInvoiceStatus } from "@/lib/invoiceStatus";
+import { throwDbError } from "@/lib/errors/db";
 
 async function assertCanManageLibrary(): Promise<{ actorId: string }> {
   const { id } = await assertRole(
@@ -56,7 +57,7 @@ export async function createLibraryBook(input: {
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "library_book",
@@ -92,7 +93,7 @@ export async function updateLibraryBookCopies(bookId: string, totalCopies: numbe
     .from("library_books")
     .update({ total_copies: totalCopies, available_copies: totalCopies - onLoan })
     .eq("id", bookId);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "library_book",
@@ -113,7 +114,7 @@ export async function archiveLibraryBook(bookId: string, archive: boolean) {
     .from("library_books")
     .update({ is_archived: archive })
     .eq("id", bookId);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "library_book",
@@ -141,7 +142,7 @@ export async function issueLibraryLoan(input: {
     p_due_at: input.dueAt,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "library_loan",
@@ -162,7 +163,7 @@ export async function returnLibraryLoan(loanId: string) {
   const admin = createAdminClient();
 
   const { data: result, error } = await admin.rpc("return_library_book", { p_loan_id: loanId });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
   const loan = result?.[0];
   if (!loan) throw new Error("Return could not be recorded.");
 
@@ -232,7 +233,7 @@ export async function waiveLibraryFine(invoiceId: string, reason?: string) {
     })
     .eq("id", invoiceId);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   await writeAuditLog({
     entityType: "invoice",

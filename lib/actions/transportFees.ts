@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
+import { throwDbError } from "@/lib/errors/db";
 
 async function assertCanManageTransportFees(): Promise<{ actorId: string }> {
   const { id } = await assertRole(
@@ -50,7 +51,7 @@ export async function createTransportFeeStructure(input: {
     due_date: input.dueDate || null,
     created_by: actorId,
   });
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
   revalidatePath("/dashboard/transport");
@@ -65,7 +66,7 @@ export async function voidTransportFeeStructure(id: string) {
     .update({ voided_at: new Date().toISOString(), voided_by: actorId })
     .eq("id", id)
     .is("voided_at", null);
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/transport");
   revalidatePath("/dashboard/transport");
@@ -116,7 +117,7 @@ export async function generateTransportInvoices(
         total_amount_kobo: feeStructure.amount_kobo,
       }))
     );
-    if (error) throw new Error(error.message);
+    if (error) throwDbError(error);
   }
 
   revalidatePath("/dashboard/admin/transport");

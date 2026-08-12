@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
 import type { GradeScaleEntry } from "@/types/database";
+import { throwDbError } from "@/lib/errors/db";
 
 const ACADEMIC_YEAR_RE = /^\d{4}\/\d{4}$/;
 const VALID_TERMS = [1, 2, 3] as const;
@@ -80,7 +81,7 @@ export async function saveSchoolSettings(input: {
     })
     .eq("id", 1);
 
-  if (error) throw new Error(error.message);
+  if (error) throwDbError(error);
 
   revalidatePath("/dashboard/admin/settings");
 }
