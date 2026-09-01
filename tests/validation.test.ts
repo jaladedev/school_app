@@ -24,6 +24,7 @@ describe("form validation", () => {
         fullName: "Grace Hopper",
         email: "grace@example.com",
         temporaryPassword: "password1",
+        staffRole: "teacher",
         subjectIds: ["maths"],
       }).success
     ).toBe(true);
