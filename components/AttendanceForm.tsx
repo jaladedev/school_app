@@ -15,18 +15,18 @@ const STATUS_OPTIONS: { value: AttendanceStatus; label: string }[] = [
 ];
 
 export function AttendanceForm({
-  lessonId,
+  classId,
+  date,
   students,
   initialStatus,
   previousStatus,
-  lessonDate,
   className,
 }: {
-  lessonId: string;
+  classId: string;
+  date: string;
   students: { id: string; full_name: string }[];
   initialStatus: Record<string, AttendanceStatus>;
   previousStatus?: Record<string, AttendanceStatus>;
-  lessonDate: string;
   className: string;
 }) {
   const [statuses, setStatuses] = useState<Record<string, AttendanceStatus>>(() => {
@@ -61,13 +61,14 @@ export function AttendanceForm({
     startTransition(async () => {
       const records = students.map((s) => ({ studentId: s.id, status: statuses[s.id] }));
       try {
-        await markAttendance(lessonId, records);
+        await markAttendance(classId, date, records);
         emitToast("Attendance saved.");
       } catch (err: unknown) {
         if (looksLikeNetworkFailure(err)) {
           await queueAttendance({
-            lessonId,
-            lessonLabel: `${className} · ${lessonDate}`,
+            classId,
+            date,
+            classLabel: `${className} · ${date}`,
             records,
           });
           emitToast(
@@ -100,7 +101,7 @@ export function AttendanceForm({
           </button>
         )}
         <ExportAttendanceRegisterButton
-          lessonDate={lessonDate}
+          lessonDate={date}
           className={className}
           students={students}
           statuses={statuses}

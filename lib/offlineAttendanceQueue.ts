@@ -16,8 +16,9 @@ const STORE_NAME = "queued_attendance";
 
 export type QueuedAttendance = {
   id: string; // crypto.randomUUID() — local key, unrelated to any server id
-  lessonId: string;
-  lessonLabel: string; // class name + date, for display in the sync indicator
+  classId: string;
+  date: string;
+  classLabel: string; // class name + date, for display in the sync indicator
   records: { studentId: string; status: AttendanceStatus }[];
   queuedAt: string;
 };

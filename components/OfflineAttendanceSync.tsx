@@ -35,7 +35,7 @@ export function OfflineAttendanceSync() {
       const queued = await getQueuedAttendance();
       for (const item of queued) {
         try {
-          await markAttendance(item.lessonId, item.records);
+          await markAttendance(item.classId, item.date, item.records);
           await removeQueuedAttendance(item.id);
         } catch {
           // Leave it queued — next online event or manual retry will

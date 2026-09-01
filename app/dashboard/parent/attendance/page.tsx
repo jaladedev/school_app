@@ -21,9 +21,9 @@ export default async function ParentAttendancePage({
 
   const { data: rows } = await supabase
     .from("attendance")
-    .select("status, marked_at, lessons(lesson_date, timetable_entries(subjects(name)))")
+    .select("status, date")
     .eq("student_id", selected.id)
-    .order("marked_at", { ascending: false })
+    .order("date", { ascending: false })
     .limit(100);
 
   const summary: Record<AttendanceStatus, number> = {
@@ -66,7 +66,7 @@ export default async function ParentAttendancePage({
       {percent !== null && (
         <p className="mb-6 text-sm text-ink-soft">
           Overall attendance rate: <span className="font-medium text-ink">{percent}%</span> across{" "}
-          {total} recorded lessons.
+          {total} recorded days.
         </p>
       )}
 
@@ -77,8 +77,7 @@ export default async function ParentAttendancePage({
             className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 text-sm"
           >
             <div>
-              <p className="text-ink">{r.lessons?.timetable_entries?.subjects?.name ?? "Lesson"}</p>
-              <p className="text-xs text-ink-soft">{r.lessons?.lesson_date}</p>
+              <p className="text-xs text-ink-soft">{r.date}</p>
             </div>
             <span className="capitalize text-ink-soft">{r.status}</span>
           </div>

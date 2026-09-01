@@ -30,8 +30,7 @@ type AssessmentWithSubject = {
 };
 
 type LessonWithTimetableEntry = {
-  id: string;
-  timetable_entry_id: string;
+  lesson_date: string;
   timetable_entries: { term: number; academic_year: string } | null;
 };
 
@@ -222,25 +221,35 @@ export async function getReportCardData(
   const overallAverage = overallIndex >= 0 ? overallAverages[overallIndex] : null;
   const overallRank = overallIndex >= 0 ? overallRanks[overallIndex] : null;
 
+  // Attendance is now one record per class per day (not per lesson), so
+  // there's no lesson_id to filter by. Term boundaries aren't tracked as an
+  // explicit date range anywhere, so derive them from this class's lesson
+  // dates for the term/academic year, then filter attendance by that range.
   const { data: lessons } = await admin
     .from("lessons")
-    .select("id, timetable_entry_id, timetable_entries(term, academic_year)")
+    .select("lesson_date, timetable_entries(term, academic_year)")
     .eq("class_id", classId)
     .returns<LessonWithTimetableEntry[]>();
 
-  const relevantLessonIds = (lessons ?? [])
+  const termLessonDates = (lessons ?? [])
     .filter(
       (l: LessonWithTimetableEntry) =>
         l.timetable_entries?.term === term && l.timetable_entries?.academic_year === academicYear
     )
-    .map((l: LessonWithTimetableEntry) => l.id);
+    .map((l: LessonWithTimetableEntry) => l.lesson_date)
+    .sort();
 
-  const { data: attendanceRows } = relevantLessonIds.length
+  const termStart = termLessonDates[0];
+  const termEnd = termLessonDates[termLessonDates.length - 1];
+
+  const { data: attendanceRows } = termStart
     ? await admin
         .from("attendance")
         .select("status")
         .eq("student_id", studentId)
-        .in("lesson_id", relevantLessonIds)
+        .eq("class_id", classId)
+        .gte("date", termStart)
+        .lte("date", termEnd)
     : { data: [] };
 
   const attendance: Record<AttendanceStatus, number> & { total: number } = {

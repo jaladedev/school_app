@@ -10,7 +10,6 @@ import {
   getTeacherWorkload,
   getLibraryOverdueTrend,
   getDefaulterTrend,
-  getTeacherPunctuality,
 } from "@/lib/analytics";
 
 function Card({
@@ -52,7 +51,6 @@ export default async function AdminAnalyticsPage() {
     teacherWorkload,
     libraryOverdueTrend,
     defaulterTrend,
-    teacherPunctuality,
   ] = await Promise.all([
     getEnrollmentTrend(supabase),
     getFeeCollectionTrend(supabase),
@@ -61,7 +59,6 @@ export default async function AdminAnalyticsPage() {
     getTeacherWorkload(supabase, academicYear, term),
     getLibraryOverdueTrend(supabase),
     getDefaulterTrend(supabase),
-    getTeacherPunctuality(supabase, academicYear, term),
   ]);
 
   const currentFeePoint = feeCollectionTrend.find(
@@ -205,24 +202,6 @@ export default async function AdminAnalyticsPage() {
             />
           ) : (
             <EmptyState message="No invoices recorded yet." />
-          )}
-        </Card>
-
-        <Card
-          title="Teacher punctuality"
-          subtitle={`Attendance-marking delay vs. scheduled period start, ${academicYear} · Term ${term}`}
-        >
-          {teacherPunctuality.length ? (
-            <BarList
-              colorClassName="bg-clay"
-              items={teacherPunctuality.map((t) => ({
-                label: t.teacherName,
-                value: t.latePercent,
-                displayValue: `${t.lateCount}/${t.lessonCount} late (${t.latePercent}%, avg ${t.avgMinutesLate}m)`,
-              }))}
-            />
-          ) : (
-            <EmptyState message="No attendance data for the current term yet." />
           )}
         </Card>
       </div>

@@ -101,42 +101,43 @@ export async function updateHomeworkStatus(lessonId: string, status: HomeworkSta
 // ---------- Attendance ----------
 
 export async function markAttendance(
-  lessonId: string,
+  classId: string,
+  date: string,
   records: { studentId: string; status: AttendanceStatus }[]
 ) {
   const { id: teacherId } = await assertRole(["teacher"], "Only teachers can mark attendance.");
 
   const supabase = createClient();
 
-  const { data: lesson } = await supabase
-    .from("lessons")
-    .select("teacher_id, classes(name, arm)")
-    .eq("id", lessonId)
+  const { data: klass } = await supabase
+    .from("classes")
+    .select("name, arm, class_teacher_id")
+    .eq("id", classId)
     .single();
 
-  if (!lesson) {
-    throw new Error("Lesson not found.");
+  if (!klass) {
+    throw new Error("Class not found.");
   }
 
-  if (lesson.teacher_id !== teacherId) {
-    const className = lesson.classes?.name ?? "this class";
-    throw new Error(`You aren't the teacher assigned to this lesson for ${className}.`);
+  if (klass.class_teacher_id !== teacherId) {
+    throw new Error(`You aren't the class teacher for ${klass.name} ${klass.arm ?? ""}.`.trim());
   }
 
   const rows = records.map((r) => ({
-    lesson_id: lessonId,
+    class_id: classId,
     student_id: r.studentId,
+    date,
     status: r.status,
     marked_by: teacherId,
   }));
 
   const { error } = await supabase
     .from("attendance")
-    .upsert(rows, { onConflict: "lesson_id,student_id" });
+    .upsert(rows, { onConflict: "class_id,student_id,date" });
 
   if (error) throwDbError(error);
 
-  revalidatePath(`/dashboard/teacher/attendance/${lessonId}`);
+  revalidatePath(`/dashboard/teacher/attendance/${classId}/${date}`);
   revalidatePath("/dashboard/teacher/attendance");
   for (const studentId of new Set(records.map((r) => r.studentId))) {
     revalidatePath(`/dashboard/admin/students/${studentId}/attendance`);

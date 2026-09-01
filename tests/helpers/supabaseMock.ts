@@ -42,6 +42,7 @@ export function createQueueSupabaseMock(queue: MockResult[]) {
       is: vi.fn(() => builder),
       update: vi.fn(() => builder),
       insert: vi.fn(() => builder),
+      upsert: vi.fn(() => builder),
       single: vi.fn(() => Promise.resolve(nextResult("single", table))),
       maybeSingle: vi.fn(() => Promise.resolve(nextResult("maybeSingle", table))),
       // Lets a chain be awaited directly with no terminal .single()/

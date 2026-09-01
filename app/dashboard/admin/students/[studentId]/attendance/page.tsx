@@ -13,9 +13,9 @@ export default async function StudentAttendancePage({
 
   const { data: rows } = await supabase
     .from("attendance")
-    .select("status, marked_at, lessons(lesson_date, classes(name, arm), curriculum_topics(title))")
+    .select("status, date, classes(name, arm)")
     .eq("student_id", resolvedParams.studentId)
-    .order("marked_at", { ascending: false })
+    .order("date", { ascending: false })
     .limit(100);
 
   const summary: Record<AttendanceStatus, number> = { present: 0, absent: 0, late: 0, excused: 0 };
@@ -52,7 +52,7 @@ export default async function StudentAttendancePage({
       {percent !== null && (
         <p className="mb-6 text-sm text-ink-soft">
           Overall attendance rate: <span className="font-medium text-ink">{percent}%</span> across{" "}
-          {total} recorded lessons.
+          {total} recorded days.
         </p>
       )}
 
@@ -64,12 +64,9 @@ export default async function StudentAttendancePage({
           >
             <div>
               <p className="text-ink">
-                {r.lessons?.classes?.name} {r.lessons?.classes?.arm}
-                {r.lessons?.curriculum_topics?.title
-                  ? ` — ${r.lessons.curriculum_topics.title}`
-                  : ""}
+                {r.classes?.name} {r.classes?.arm}
               </p>
-              <p className="text-xs text-ink-soft">{r.lessons?.lesson_date}</p>
+              <p className="text-xs text-ink-soft">{r.date}</p>
             </div>
             <span className="capitalize text-ink-soft">{r.status}</span>
           </div>

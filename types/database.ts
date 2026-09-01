@@ -204,8 +204,9 @@ export type Lesson = {
 
 export type Attendance = {
   id: string;
-  lesson_id: string;
+  class_id: string;
   student_id: string;
+  date: string;
   status: AttendanceStatus;
   marked_by: string | null;
   marked_at: string;
@@ -988,10 +989,10 @@ export type Database = {
         Update: Partial<Attendance>;
         Relationships: [
           {
-            foreignKeyName: "attendance_lesson_id_fkey";
-            columns: ["lesson_id"];
+            foreignKeyName: "attendance_class_id_fkey";
+            columns: ["class_id"];
             isOneToOne: false;
-            referencedRelation: "lessons";
+            referencedRelation: "classes";
             referencedColumns: ["id"];
           },
           {
