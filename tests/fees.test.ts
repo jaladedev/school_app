@@ -80,7 +80,15 @@ describe("recordPayment", () => {
       { data: { role: "admin", is_active: true }, error: null },
       // recordPayment's own invoice lookup: total 10,000 - discount 0 - paid
       // 8,000 = 2,000 kobo still owed
-      { data: { voided_at: null, total_amount_kobo: 10000, discount_kobo: 0, amount_paid_kobo: 8000 }, error: null },
+      {
+        data: {
+          voided_at: null,
+          total_amount_kobo: 10000,
+          discount_kobo: 0,
+          amount_paid_kobo: 8000,
+        },
+        error: null,
+      },
     ];
 
     await expect(
@@ -92,7 +100,15 @@ describe("recordPayment", () => {
     mockAuthenticatedAs("admin-1");
     adminState.queue = [
       { data: { role: "admin", is_active: true }, error: null },
-      { data: { voided_at: null, total_amount_kobo: 10000, discount_kobo: 0, amount_paid_kobo: 8000 }, error: null },
+      {
+        data: {
+          voided_at: null,
+          total_amount_kobo: 10000,
+          discount_kobo: 0,
+          amount_paid_kobo: 8000,
+        },
+        error: null,
+      },
       { data: [{ already_recorded: false }], error: null }, // record_invoice_payment RPC
     ];
 
@@ -154,11 +170,13 @@ describe("verifyPaystackPayment", () => {
 
   it("blocks verification on a voided invoice", async () => {
     mockAuthenticatedAs("student-1");
-    adminState.queue = [{ data: { voided_at: "2026-01-01T00:00:00Z", student_id: "student-1" }, error: null }];
+    adminState.queue = [
+      { data: { voided_at: "2026-01-01T00:00:00Z", student_id: "student-1" }, error: null },
+    ];
 
-    await expect(verifyPaystackPayment({ reference: "ref-456", invoiceId: "inv-1" })).rejects.toThrow(
-      "This invoice has been voided and can't accept payments."
-    );
+    await expect(
+      verifyPaystackPayment({ reference: "ref-456", invoiceId: "inv-1" })
+    ).rejects.toThrow("This invoice has been voided and can't accept payments.");
   });
 
   it("rejects verification from someone who is neither the student, a linked guardian, nor an admin", async () => {
@@ -169,8 +187,8 @@ describe("verifyPaystackPayment", () => {
       { data: { role: "parent", is_active: true }, error: null }, // assertRole(["admin"]) profile lookup
     ];
 
-    await expect(verifyPaystackPayment({ reference: "ref-789", invoiceId: "inv-1" })).rejects.toThrow(
-      "You can't pay an invoice that isn't yours."
-    );
+    await expect(
+      verifyPaystackPayment({ reference: "ref-789", invoiceId: "inv-1" })
+    ).rejects.toThrow("You can't pay an invoice that isn't yours.");
   });
 });

@@ -118,9 +118,8 @@ export default async function TeacherHome() {
       suggestedTopicByKey.set(
         key,
         currentWeek != null
-          ? (topics.find(
-              (t) => currentWeek >= t.week_number && currentWeek <= t.week_end_number
-            )?.id ?? null)
+          ? (topics.find((t) => currentWeek >= t.week_number && currentWeek <= t.week_end_number)
+              ?.id ?? null)
           : null
       );
     }

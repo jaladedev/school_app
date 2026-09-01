@@ -65,7 +65,7 @@ export function ToastProvider() {
             toast.tone === "error"
               ? "border-clay bg-clay/10 text-clay"
               : toast.tone === "info"
-                ? "bg-marigold-soft border-marigold text-ink"
+                ? "border-marigold bg-marigold-soft text-ink"
                 : "border-leaf bg-leaf-soft text-leaf"
           }`}
         >

@@ -97,7 +97,9 @@ describe("assertRole", () => {
     // rejection, since the caller-supplied errorMessage would otherwise
     // wrongly tell a legitimately-active admin they're not allowed to do
     // something, when the real problem was Supabase being unreachable.
-    await expect(assertRole(["admin"], "Not allowed.")).rejects.toThrow(TRANSIENT_AUTH_ERROR_MESSAGE);
+    await expect(assertRole(["admin"], "Not allowed.")).rejects.toThrow(
+      TRANSIENT_AUTH_ERROR_MESSAGE
+    );
   });
 
   it("propagates getAuthenticatedUser's transient-auth error without ever reaching the profile lookup", async () => {
@@ -108,7 +110,9 @@ describe("assertRole", () => {
     });
     adminState.queue = []; // any admin call here is a bug -- the queue is empty on purpose
 
-    await expect(assertRole(["admin"], "Not allowed.")).rejects.toThrow(TRANSIENT_AUTH_ERROR_MESSAGE);
+    await expect(assertRole(["admin"], "Not allowed.")).rejects.toThrow(
+      TRANSIENT_AUTH_ERROR_MESSAGE
+    );
   });
 
   it("rejects with 'You must be signed in.' when there is genuinely no user", async () => {

@@ -205,9 +205,9 @@ describe("report-card scoring and ranking", () => {
         ["ca", null],
         ["exam", null],
       ]);
-      expect(
-        computeSubjectPercent("student-1", ["ca", "exam"], maxScores, weights, index)
-      ).toBe(85);
+      expect(computeSubjectPercent("student-1", ["ca", "exam"], maxScores, weights, index)).toBe(
+        85
+      );
       expect(
         computeSubjectPercent("student-2", ["ca", "exam"], maxScores, weights, index)
       ).toBeNull();

@@ -424,7 +424,7 @@ export function QuizAttemptRunner({
   return (
     <div className="max-w-2xl">
       {mode === "preview" && (
-        <div className="bg-marigold-soft mb-4 rounded-xl border border-marigold px-3 py-2 text-sm text-ink">
+        <div className="mb-4 rounded-xl border border-marigold bg-marigold-soft px-3 py-2 text-sm text-ink">
           <span className="font-medium">Preview mode</span> — you&apos;re dry-running this quiz as a
           teacher. Nothing you do here is saved or scored for any student.
         </div>

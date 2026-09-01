@@ -82,9 +82,7 @@ describe("markAttendance", () => {
     clientState.queue = [{ data: null, error: null }];
 
     await expect(
-      markAttendance("missing-class", "2026-09-01", [
-        { studentId: "student-1", status: "present" },
-      ])
+      markAttendance("missing-class", "2026-09-01", [{ studentId: "student-1", status: "present" }])
     ).rejects.toThrow(/Class not found/);
   });
 
@@ -145,16 +143,10 @@ describe("markAttendance", () => {
       { onConflict: "class_id,student_id,date" }
     );
 
-    expect(revalidatePath).toHaveBeenCalledWith(
-      "/dashboard/teacher/attendance/class-1/2026-09-01"
-    );
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard/teacher/attendance/class-1/2026-09-01");
     expect(revalidatePath).toHaveBeenCalledWith("/dashboard/teacher/attendance");
-    expect(revalidatePath).toHaveBeenCalledWith(
-      "/dashboard/admin/students/student-1/attendance"
-    );
-    expect(revalidatePath).toHaveBeenCalledWith(
-      "/dashboard/admin/students/student-2/attendance"
-    );
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard/admin/students/student-1/attendance");
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard/admin/students/student-2/attendance");
   });
 
   it("surfaces a database error from the upsert via throwDbError instead of swallowing it", async () => {

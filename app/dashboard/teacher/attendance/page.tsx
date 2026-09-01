@@ -62,7 +62,9 @@ export default async function AttendanceLandingPage() {
     .slice(-8)
     .map(([date, counts]) => ({ id: date, lessonDate: date, ...counts }));
 
-  const pastDates = [...byDate.keys()].filter((d) => d !== today).sort((a, b) => b.localeCompare(a));
+  const pastDates = [...byDate.keys()]
+    .filter((d) => d !== today)
+    .sort((a, b) => b.localeCompare(a));
 
   return (
     <div className="max-w-xl">

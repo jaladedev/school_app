@@ -57,7 +57,7 @@ export function IdCardBatch({
                 <p className="truncate text-xs font-semibold text-ink">{schoolName}</p>
                 {schoolMotto && <p className="truncate text-[10px] text-ink-soft">{schoolMotto}</p>}
               </div>
-              <span className="bg-marigold-soft rounded-full px-2 py-0.5 text-[10px] font-medium text-ink">
+              <span className="rounded-full bg-marigold-soft px-2 py-0.5 text-[10px] font-medium text-ink">
                 {academicYear}
               </span>
             </div>

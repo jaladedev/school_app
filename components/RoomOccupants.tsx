@@ -139,7 +139,7 @@ export function RoomOccupants({
               <div className="flex items-center gap-2">
                 {openLeave ? (
                   <>
-                    <span className="bg-marigold-soft rounded-full px-2 py-0.5 text-xs font-medium text-ink">
+                    <span className="rounded-full bg-marigold-soft px-2 py-0.5 text-xs font-medium text-ink">
                       Out{openLeave.expectedReturnAt ? " — back by scheduled time" : ""}
                     </span>
                     <button

@@ -91,8 +91,14 @@ function handleAuthRedirect(params: {
   user: User | null;
   mustChangePassword: boolean;
 }): NextResponse | null {
-  const { request, isDashboardRoute, isLoginRoute, isChangePasswordRoute, user, mustChangePassword } =
-    params;
+  const {
+    request,
+    isDashboardRoute,
+    isLoginRoute,
+    isChangePasswordRoute,
+    user,
+    mustChangePassword,
+  } = params;
 
   if (isDashboardRoute && mustChangePassword) {
     return NextResponse.redirect(new URL("/change-password", request.url));

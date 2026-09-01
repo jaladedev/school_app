@@ -73,7 +73,7 @@ export function DriverAccountSection({
 
   if (tempPassword) {
     return (
-      <div className="bg-marigold-soft rounded-lg border border-marigold p-3 text-xs">
+      <div className="rounded-lg border border-marigold bg-marigold-soft p-3 text-xs">
         <p className="mb-1 font-medium text-ink">
           Driver account created — share these sign-in details now, they won&apos;t be shown again:
         </p>
