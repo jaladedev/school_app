@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import type { Database } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
 import { logger } from "@/lib/logger";
+import { TRANSIENT_AUTH_ERROR_MESSAGE } from "@/lib/authErrors";
 
 // Plain wrapper around Node's own global fetch, forced to HTTP/1.1 --
 // but *only* outside Vercel (see the `isVercel` check below).
@@ -172,7 +173,7 @@ export const getCurrentProfile = cache(async function getCurrentProfile() {
     // failed with (ECONNRESET, a TLS error, a timeout, etc.) instead of
     // the opaque one-line message the error screen shows.
     logger.error("getCurrentProfile: Supabase auth fetch failed", { error: getUserError });
-    throw new Error("Couldn't verify your session right now — check your connection and retry.", {
+    throw new Error(TRANSIENT_AUTH_ERROR_MESSAGE, {
       cause: getUserError,
     });
   }

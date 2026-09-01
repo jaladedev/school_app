@@ -5,6 +5,7 @@ import { createClient, getUserWithRetry } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserRole } from "@/types/database";
 import { throwDbError } from "@/lib/errors/db";
+import { TRANSIENT_AUTH_ERROR_MESSAGE } from "@/lib/authErrors";
 
 /**
  * Resolves the JWT-validated current user, distinguishing a transient
@@ -22,7 +23,7 @@ export async function getAuthenticatedUser(): Promise<User> {
   const { user, error: getUserError, isTransient } = await getUserWithRetry(supabase);
 
   if (getUserError && isTransient) {
-    throw new Error("Couldn't verify your session right now — check your connection and retry.", {
+    throw new Error(TRANSIENT_AUTH_ERROR_MESSAGE, {
       cause: getUserError,
     });
   }
@@ -60,7 +61,7 @@ export async function assertRole(
     .single();
 
   if (profileError && !profile && profileError.message.includes("fetch failed")) {
-    throw new Error("Couldn't verify your session right now — check your connection and retry.", {
+    throw new Error(TRANSIENT_AUTH_ERROR_MESSAGE, {
       cause: profileError,
     });
   }
