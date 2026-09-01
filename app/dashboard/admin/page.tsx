@@ -2,20 +2,16 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/EmptyState";
 
-async function count(supabase: ReturnType<typeof createClient>, table: string) {
-  const { count } = await supabase.from(table).select("*", { count: "exact", head: true });
-  return count ?? 0;
-}
-
 export default async function AdminOverview() {
   const supabase = createClient();
 
-  const [studentCount, teacherCount, classCount, subjectCount] = await Promise.all([
-    count(supabase, "student_profiles"),
-    count(supabase, "teacher_profiles"),
-    count(supabase, "classes"),
-    count(supabase, "subjects"),
-  ]);
+  // Single round trip for all 4 stats (admin_overview_counts RPC) instead
+  // of 4 separate count() requests.
+  const { data: overviewCounts } = await supabase.rpc("admin_overview_counts").single();
+  const studentCount = overviewCounts?.student_count ?? 0;
+  const teacherCount = overviewCounts?.teacher_count ?? 0;
+  const classCount = overviewCounts?.class_count ?? 0;
+  const subjectCount = overviewCounts?.subject_count ?? 0;
 
   const { data: recentAnnouncements } = await supabase
     .from("announcements")

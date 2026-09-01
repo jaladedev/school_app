@@ -1815,6 +1815,15 @@ export type Database = {
         Args: Record<string, never>;
         Returns: number | null;
       };
+      admin_overview_counts: {
+        Args: Record<string, never>;
+        Returns: {
+          student_count: number;
+          teacher_count: number;
+          class_count: number;
+          subject_count: number;
+        }[];
+      };
       invoice_dashboard_totals: {
         Args: { p_academic_year?: string | null; p_term?: number | null };
         Returns: {

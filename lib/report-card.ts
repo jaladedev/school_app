@@ -40,14 +40,32 @@ export async function getReportCardData(
   term: number,
   academicYear: string
 ): Promise<ReportCardData | null> {
+  // "Not signed in at all" still throws -- that's a real auth failure the
+  // caller can't do anything about, and every current call site is inside
+  // a role-gated layout anyway, so it's effectively unreachable in
+  // practice.
   const requester = await assertRole(
     ["admin", "teacher", "parent", "student"],
     "You must be signed in to view a report card."
   );
 
+  // "Signed in, but not entitled to THIS student's report card" is a
+  // different kind of failure: every current caller happens to only ever
+  // pass a studentId the requester is already entitled to (parent/report-
+  // card's studentId comes from resolveSelectedChild, which is pre-
+  // filtered to the parent's own linked children; student/report-card
+  // always passes the requester's own id), so this branch is dead code
+  // today. It's still worth having, though, as a guard for any future
+  // caller that doesn't pre-filter -- and it returns null (this
+  // function's existing "nothing to show" signal, same as "no class
+  // assigned") rather than throwing, so an unauthorized studentId renders
+  // the same friendly empty state every page here already has for the
+  // null case, instead of surfacing a generic uncaught-error page. It
+  // also avoids confirming/denying whether a report card exists for that
+  // id, which a distinct "forbidden" message would leak.
   if (requester.id !== studentId && requester.role !== "admin" && requester.role !== "teacher") {
     if (requester.role !== "parent") {
-      throw new Error("You don't have permission to view this report card.");
+      return null;
     }
 
     const { data: link } = await createAdminClient()
@@ -58,7 +76,7 @@ export async function getReportCardData(
       .maybeSingle();
 
     if (!link) {
-      throw new Error("You don't have permission to view this report card.");
+      return null;
     }
   }
 

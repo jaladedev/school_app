@@ -29,6 +29,16 @@ export default function LoginPage() {
 
     await supabase.auth.getSession();
 
+    // A full navigation, not router.push(). The Supabase browser client
+    // writes the new session to cookies asynchronously after sign-in;
+    // router.push() reuses Next's client-side router cache for any route
+    // segments it's already fetched/rendered, which can serve a
+    // pre-login (unauthenticated) shell instead of picking up the fresh
+    // session. Setting window.location.href forces a real browser
+    // request, which guarantees proxy.ts (the auth middleware) and every
+    // server component in the dashboard tree -- including
+    // getCurrentProfile() in the dashboard layout -- re-run with the new
+    // cookies rather than serving anything cached from before sign-in.
     window.location.href = "/dashboard";
   }
 

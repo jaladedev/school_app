@@ -66,37 +66,64 @@ export default async function TeacherHome() {
   // combination appearing in today's schedule, so each row's "Log lesson"
   // form can offer the right topic list without a query per row. Also work
   // out which topic matches the current scheme-of-work week, to suggest it.
+  //
+  // Single batched query: pull every topic for the distinct subject_ids in
+  // today's schedule (scoped to the current term/year), then group in memory
+  // by subject_id:education_level:level_number. Avoids one round-trip per
+  // unique (subject, class) combo.
   const topicsByKey = new Map<string, { id: string; title: string }[]>();
   const suggestedTopicByKey = new Map<string, string | null>();
-  for (const entry of todaysEntries ?? []) {
-    const subj = entry.subjects;
-    const cls = entry.classes;
-    if (!subj || !cls) continue;
-    const key = `${subj.id}:${cls.education_level}:${cls.level_number}`;
-    if (topicsByKey.has(key)) continue;
 
-    const { data: topics } = await supabase
+  const distinctSubjectIds = [
+    ...new Set(
+      (todaysEntries ?? [])
+        .map((entry) => entry.subjects?.id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  if (distinctSubjectIds.length > 0) {
+    const { data: allTopics } = await supabase
       .from("curriculum_topics")
-      .select("id, title, week_number, week_end_number")
-      .eq("subject_id", subj.id)
-      .eq("education_level", cls.education_level)
-      .eq("level_number", cls.level_number)
+      .select("id, title, subject_id, education_level, level_number, week_number, week_end_number")
+      .in("subject_id", distinctSubjectIds)
       .eq("term", settings?.current_term ?? 1)
       .eq("academic_year", settings?.current_academic_year ?? "")
       .order("week_number", { ascending: true });
 
-    topicsByKey.set(
-      key,
-      (topics ?? []).map((t) => ({ id: t.id, title: t.title }))
-    );
-    suggestedTopicByKey.set(
-      key,
-      currentWeek != null
-        ? ((topics ?? []).find(
-            (t) => currentWeek >= t.week_number && currentWeek <= t.week_end_number
-          )?.id ?? null)
-        : null
-    );
+    const topicsRawByKey = new Map<
+      string,
+      { id: string; title: string; week_number: number; week_end_number: number }[]
+    >();
+    for (const t of allTopics ?? []) {
+      const key = `${t.subject_id}:${t.education_level}:${t.level_number}`;
+      if (!topicsRawByKey.has(key)) topicsRawByKey.set(key, []);
+      topicsRawByKey.get(key)!.push(t);
+    }
+
+    const seenKeys = new Set<string>();
+    for (const entry of todaysEntries ?? []) {
+      const subj = entry.subjects;
+      const cls = entry.classes;
+      if (!subj || !cls) continue;
+      const key = `${subj.id}:${cls.education_level}:${cls.level_number}`;
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+
+      const topics = topicsRawByKey.get(key) ?? [];
+      topicsByKey.set(
+        key,
+        topics.map((t) => ({ id: t.id, title: t.title }))
+      );
+      suggestedTopicByKey.set(
+        key,
+        currentWeek != null
+          ? (topics.find(
+              (t) => currentWeek >= t.week_number && currentWeek <= t.week_end_number
+            )?.id ?? null)
+          : null
+      );
+    }
   }
 
   // Distinct classes taught, from timetable

@@ -6,6 +6,7 @@ import { ChildSwitcher } from "@/components/ChildSwitcher";
 import { EmptyState } from "@/components/EmptyState";
 import { InstallmentScheduleView } from "@/components/InstallmentScheduleView";
 import { formatKobo, type InvoiceStatus, type PaymentMethod } from "@/types/database";
+import { getInvoiceStatusLabel } from "@/lib/invoiceStatus";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-leaf-soft text-leaf",
@@ -101,9 +102,9 @@ export default async function ParentFeesPage({
                   </p>
                 </div>
                 <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[status]}`}
                 >
-                  {status}
+                  {getInvoiceStatusLabel(status, inv.amount_paid_kobo, owed)}
                 </span>
               </div>
               <div className="mt-2 flex items-center justify-between text-sm">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatKobo, type InvoiceStatus } from "@/types/database";
+import { getInvoiceStatusLabel } from "@/lib/invoiceStatus";
 import { RecordPaymentForm } from "@/components/RecordPaymentForm";
 import { VoidInvoiceForm } from "@/components/VoidInvoiceForm";
 import { ApplyDiscountForm } from "@/components/ApplyDiscountForm";
@@ -190,9 +191,9 @@ export default async function AdminInvoicesPage({
                     </span>
                   ) : (
                     <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[status]}`}
                     >
-                      {status}
+                      {getInvoiceStatusLabel(status, inv.amount_paid_kobo, owed)}
                     </span>
                   )}
                   <p className="mt-1 text-sm text-ink">

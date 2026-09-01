@@ -1,5 +1,7 @@
 "use client";
 
+import { ErrorState } from "@/components/ErrorState";
+
 export default function RootError({
   error,
   reset,
@@ -7,18 +9,5 @@ export default function RootError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-paper px-4 text-center">
-      <p className="mb-2 font-display text-xl font-semibold text-ink">Something went wrong</p>
-      <p className="mb-6 max-w-sm text-sm text-ink-soft">
-        {error.message || "An unexpected error occurred."}
-      </p>
-      <button
-        onClick={reset}
-        className="rounded-lg bg-marigold px-4 py-2 text-sm font-medium text-ink hover:bg-marigold-dark"
-      >
-        Try again
-      </button>
-    </div>
-  );
+  return <ErrorState message={error.message} onRetryAction={reset} fullScreen />;
 }

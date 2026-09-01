@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { formatKobo, type InvoiceStatus, type PaymentMethod } from "@/types/database";
+import { getInvoiceStatusLabel } from "@/lib/invoiceStatus";
 import { PaystackPayButton } from "@/components/PaystackPayButton";
 import { InstallmentScheduleView } from "@/components/InstallmentScheduleView";
 import { redirect } from "next/navigation";
@@ -96,9 +97,9 @@ export default async function StudentFeesPage() {
                   </p>
                 </div>
                 <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLES[status]}`}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[status]}`}
                 >
-                  {status}
+                  {getInvoiceStatusLabel(status, inv.amount_paid_kobo, owed)}
                 </span>
               </div>
               <div className="mt-2 flex items-center justify-between text-sm">
