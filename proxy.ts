@@ -11,6 +11,7 @@ type SupabaseMiddlewareClient = ReturnType<typeof createServerClient>;
 // change-password screen), it isn't used to authorize any data access.
 // Actual data access is still governed by RLS using the verified,
 // signature-checked session on the server/client that runs the query.
+// NEVER use this for authorization decisions — UI redirects only.
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const payload = token.split(".")[1];

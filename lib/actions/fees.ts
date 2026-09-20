@@ -299,9 +299,13 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
     }
   }
 
-  // Idempotency: if this reference was already recorded, don't credit
-  // the invoice twice (e.g. the browser tab retrying after a network
-  // blip, or the user re-triggering the same callback).
+  // Idempotency pre-check: advisory only, purely to skip an unnecessary
+  // Paystack verify call + network round-trip for a reference we already
+  // hold. This is NOT what makes duplicate submission safe -- it has a
+  // TOCTOU race with a concurrent request. record_invoice_payment() is the
+  // actual source of truth: it returns already_recorded=true (not an
+  // error) for a duplicate reference, so nothing here is ever allowed to
+  // credit the invoice a second time even if this check misses the race.
   const { data: existingPayment } = await admin
     .from("payments")
     .select("id")

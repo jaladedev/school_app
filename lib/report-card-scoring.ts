@@ -54,6 +54,12 @@ export function indexGradesByAssessmentAndStudent(grades: Grade[]): Map<string, 
   return map;
 }
 
+// When every assessment in the group carries a weight_percent, scores are
+// combined by that weighting (allWeighted branch below). If even one is
+// unweighted, this intentionally falls back to a plain score-sum /
+// max-sum percentage across ALL assessments in the group, ignoring any
+// weights that do happen to be set on the others — a deliberate, simpler
+// fallback rather than a partial-weighting blend.
 export function computeSubjectPercent(
   studentId: string,
   assessmentIds: string[],

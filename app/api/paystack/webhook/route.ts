@@ -77,15 +77,29 @@ export async function POST(request: Request) {
     p_enforce_balance: true,
   });
 
-  if (error) {
-    // Returning a 5xx tells Paystack to retry transient database failures.
-    logger.error("paystack webhook: unable to record payment", { reference, error });
-    return NextResponse.json({ error: "Unable to record payment." }, { status: 500 });
+  if (!error) {
+    revalidatePath("/dashboard/student/fees");
+    revalidatePath("/dashboard/parent/fees");
+    revalidatePath("/dashboard/admin/fees/invoices");
+    return NextResponse.json({ received: true });
   }
 
-  revalidatePath("/dashboard/student/fees");
-  revalidatePath("/dashboard/parent/fees");
-  revalidatePath("/dashboard/admin/fees/invoices");
+  // A duplicate reference for this invoice is NOT an error path today --
+  // record_invoice_payment() returns normally with already_recorded=true
+  // in that case, so `error` here only ever reflects a genuine raise
+  // exception from the RPC. The one business-rule outcome that can never
+  // succeed on retry is the balance-mismatch guard (p_enforce_balance);
+  // acknowledge that so Paystack stops re-delivering. Everything else is
+  // treated as transient and gets a 5xx so Paystack retries.
+  const msg: string = (error as { message?: string }).message ?? "";
+  if (msg.includes("does not match what is owed on this invoice")) {
+    logger.warn("paystack webhook: acknowledged non-retryable outcome", {
+      reference,
+      message: msg,
+    });
+    return NextResponse.json({ received: true, note: msg });
+  }
 
-  return NextResponse.json({ received: true });
+  logger.error("paystack webhook: unable to record payment", { reference, error });
+  return NextResponse.json({ error: "Unable to record payment." }, { status: 500 });
 }
