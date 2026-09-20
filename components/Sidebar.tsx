@@ -165,7 +165,7 @@ export function Sidebar({
     role === "teacher" && staffRole === "librarian"
       ? [...NAV_BY_ROLE.teacher, { label: "Library", href: "/dashboard/library" }]
       : role === "teacher" && staffRole === "house_parent"
-        ? [...NAV_BY_ROLE.teacher, { label: "Hostel", href: "/dashboard/hostel" }]
+        ? [...NAV_BY_ROLE.teacher, { label: "Hostel", href: "/dashboard/hostels" }]
         : role === "teacher" && staffRole === "transport_officer"
           ? [...NAV_BY_ROLE.teacher, { label: "Transport", href: "/dashboard/transport" }]
           : role === "teacher" && staffRole === "driver"
