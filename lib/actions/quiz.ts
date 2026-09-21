@@ -119,7 +119,7 @@ export async function createQuiz(input: {
   if (error) throwDbError(error);
 
   // Quiz creation had no audit trail at all before this -- unlike
-  // gradesModeration.tsx's admin approvals, which already log every
+  // gradesModeration.ts's admin approvals, which already log every
   // moderation action. A quiz is a form of assessment (it creates its
   // own `assessments` row), so it deserves the same accountability:
   // who created it, for which subject/class, how many questions/points.

@@ -15,16 +15,13 @@ async function assertCanModerateTopicNote(topicId: string) {
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
   if (profile?.role === "admin") return { actorId: id };
 
-  const [{ data: teacher }, { data: topic }] = await Promise.all([
-    admin.from("teacher_profiles").select("staff_role, subjects_taught").eq("id", id).single(),
-    admin.from("curriculum_topics").select("subject_id").eq("id", topicId).single(),
-  ]);
-  if (
-    teacher?.staff_role !== "hod" ||
-    !topic ||
-    !teacher.subjects_taught?.includes(topic.subject_id)
-  ) {
-    throw new Error("Only the HOD assigned to this subject can review this lesson plan.");
+  const { data: teacher } = await admin
+    .from("teacher_profiles")
+    .select("staff_role")
+    .eq("id", id)
+    .single();
+    if (teacher?.staff_role !== "hod") {
+    throw new Error("Only an admin or HOD can review lesson plans.");
   }
   return { actorId: id };
 }

@@ -60,22 +60,16 @@ export default async function TeacherNotesPage({
 
   const statusByTopic = new Map((notes ?? []).map((n) => [n.topic_id, n.status]));
 
-  // Lesson-plan review: a HOD sees the latest version of every published
-  // note across their subjects that's still awaiting a decision. RLS
-  // (topic_note_visible via is_hod_of_topic) already scopes this to only
-  // their own subjects even if the query below were broader, but
-  // filtering by subjectIds up front keeps the query itself tight.
+  // Lesson-plan review: a HOD sees the latest version of every published note for every topic in the school, not just their own subjects_taught.
   const isHod = teacherProfile?.staff_role === "hod";
-  const { data: reviewCandidates } =
-    isHod && subjectIds.length
-      ? await supabase
-          .from("topic_notes")
-          .select(
-            "id, topic_id, status, moderation_status, version, updated_at, curriculum_topics!inner(title, subject_id, subjects(name))"
-          )
-          .in("curriculum_topics.subject_id", subjectIds)
-          .order("version", { ascending: false })
-      : { data: [] };
+  const { data: reviewCandidates } = isHod
+    ? await supabase
+        .from("topic_notes")
+        .select(
+          "id, topic_id, status, moderation_status, version, updated_at, curriculum_topics!inner(title, subject_id, subjects(name))"
+        )
+        .order("version", { ascending: false })
+    : { data: [] };
 
   type ReviewCandidate = NonNullable<typeof reviewCandidates>[number];
 

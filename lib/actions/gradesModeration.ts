@@ -11,16 +11,13 @@ async function assertCanModerateAssessment(assessmentId: string) {
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
   if (profile?.role === "admin") return { actorId: id };
-  const [{ data: teacher }, { data: assessment }] = await Promise.all([
-    admin.from("teacher_profiles").select("staff_role, subjects_taught").eq("id", id).single(),
-    admin.from("assessments").select("subject_id").eq("id", assessmentId).single(),
-  ]);
-  if (
-    teacher?.staff_role !== "hod" ||
-    !assessment ||
-    !teacher.subjects_taught?.includes(assessment.subject_id)
-  ) {
-    throw new Error("Only the HOD assigned to this subject can approve these grades.");
+  const { data: teacher } = await admin
+    .from("teacher_profiles")
+    .select("staff_role")
+    .eq("id", id)
+    .single();
+    if (teacher?.staff_role !== "hod") {
+    throw new Error("Only an admin or HOD can approve grades.");
   }
   return { actorId: id };
 }

@@ -201,7 +201,7 @@ export async function saveGrade(
   if (error) throwDbError(error);
 
   // Regular teacher grade entry had no audit trail before this --
-  // gradesModeration.tsx already logs admin/HOD *approvals*, but not the
+  // gradesModeration.ts already logs admin/HOD *approvals*, but not the
   // actual score being typed in that gets approved. `entity_type: "grade"`
   // matches what that file uses so both show up together under the same
   // filter in /dashboard/admin/audit-log, rather than needing a second

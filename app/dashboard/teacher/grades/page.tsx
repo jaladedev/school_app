@@ -45,12 +45,12 @@ export default async function TeacherGradesPage() {
     classesBySubject.set(entry.subject_id, list);
   }
 
+  // HOD moderation: a HOD reviews pending grades school-wide now (see
+  // 20260921183938_hod_principal_wide_approval.sql), not just their own
+  // subjects_taught -- so this is no longer filtered by subjectIds.
   const { data: moderationAssessments } =
-    teacherProfile?.staff_role === "hod" && subjectIds.length
-      ? await supabase
-          .from("assessments")
-          .select("id, title, classes(name, arm), subjects(name)")
-          .in("subject_id", subjectIds)
+    teacherProfile?.staff_role === "hod"
+      ? await supabase.from("assessments").select("id, title, classes(name, arm), subjects(name)")
       : { data: [] };
   const moderationIds = (moderationAssessments ?? []).map((assessment) => assessment.id);
   const { data: moderationGrades } = moderationIds.length
