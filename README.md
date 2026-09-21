@@ -202,4 +202,4 @@ proxy.ts             — Next.js middleware: session refresh, role/auth gating, 
 
 ## License
 
-This project is currently intended for internal or local development use within the workspace and is not yet packaged for public distribution.
+This project is currently intended for internal or local development use within the workspace and is not yet packaged for public distribution. See [LICENSE](./LICENSE) for the full terms.
