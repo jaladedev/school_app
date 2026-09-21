@@ -1,3 +1,10 @@
+// These types are maintained by hand and must be kept aligned with the
+// actual SQL schema in supabase/migrations/. There is no automated check
+// (CI drift check) enforcing this yet -- see "Notes for contributors" in
+// README.md. After any migration that adds/changes a table or column,
+// regenerate and diff against this file: run
+// `supabase gen types typescript --linked` and compare its output here
+// by hand before committing.
 export type UserRole = "student" | "teacher" | "admin" | "parent";
 export type NoteStatus = "draft" | "published" | "archived";
 export type NoteModerationStatus = "pending" | "approved" | "rejected";
