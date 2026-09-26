@@ -3,15 +3,25 @@ import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/component
 import { EmptyState } from "@/components/EmptyState";
 
 const ENTITY_TYPES = [
-  "profile",
-  "teacher_profile",
-  "assessment",
-  "quiz",
-  "grade",
+  "asset",
+  "curriculum_topic",
   "enrollment",
   "fee_structure",
+  "homework_submission",
+  "hostel_assignment",
+  "hostel_fee_structure",
+  "hostel_leave_log",
+  "hostel_visitor_log",
   "invoice",
   "payment",
+  "quiz",
+  "quiz_attempt",
+  "route_vehicle_history",
+  "testimonial",
+  "transport_assignment",
+  "transport_fee_structure",
+  "transport_trip_status",
+  "vehicle",
 ] as const;
 
 function actionLabel(action: string): string {
