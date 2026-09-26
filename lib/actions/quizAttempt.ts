@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { QuizAttempt, QuizAttemptQuestionRow } from "@/types/database";
+import type { QuizAttempt, QuizAttemptQuestionRow, QuizAttemptReviewRow } from "@/types/database";
 import { throwDbError } from "@/lib/errors/db";
 
 // These call the RPCs as the student's own authenticated session (not
@@ -54,4 +54,13 @@ export async function submitQuizAttempt(
 
   revalidatePath("/dashboard/student/quizzes");
   return (data as { score: number; total_points: number }[])[0];
+}
+
+export async function getQuizAttemptReview(attemptId: string): Promise<QuizAttemptReviewRow[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("get_quiz_attempt_review", {
+    p_attempt_id: attemptId,
+  });
+  if (error) throwDbError(error);
+  return (data ?? []) as QuizAttemptReviewRow[];
 }

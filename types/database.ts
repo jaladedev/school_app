@@ -704,6 +704,20 @@ export type QuizAttemptQuestionRow = {
   matched_pairs: Record<string, string> | null;
 };
 
+export type QuizAttemptReviewRow = QuizAttemptQuestionRow & {
+  is_correct: boolean | null;
+  points_awarded: number | null;
+};
+
+export type TopicNoteSearchResult = {
+  note_id: string;
+  topic_id: string;
+  topic_title: string | null;
+  subject_name: string | null;
+  snippet: string;
+  rank: number;
+};
+
 export type TransportFeeStructure = {
   id: string;
   route_id: string;
@@ -1929,6 +1943,14 @@ export type Database = {
       get_quiz_attempt_questions: {
         Args: { p_attempt_id: string };
         Returns: QuizAttemptQuestionRow[];
+      };
+      get_quiz_attempt_review: {
+        Args: { p_attempt_id: string };
+        Returns: QuizAttemptReviewRow[];
+      };
+      search_topic_notes: {
+        Args: { p_query: string; p_limit?: number };
+        Returns: TopicNoteSearchResult[];
       };
       answer_quiz_question: {
         Args: {

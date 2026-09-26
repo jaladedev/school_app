@@ -77,25 +77,33 @@ export default async function StudentQuizzesPage() {
                 </p>
               </div>
               {submitted ? (
-                pendingGrading ? (
-                  <span
-                    title="This quiz includes essay questions your teacher hasn't scored yet — your final score will update once grading is complete."
-                    className="rounded-full bg-marigold/20 px-2.5 py-1 text-xs font-medium text-ink"
+                <div className="flex items-center gap-2">
+                  {pendingGrading ? (
+                    <span
+                      title="This quiz includes essay questions your teacher hasn't scored yet — your final score will update once grading is complete."
+                      className="rounded-full bg-marigold/20 px-2.5 py-1 text-xs font-medium text-ink"
+                    >
+                      Submitted — grading in progress
+                    </span>
+                  ) : pendingApproval ? (
+                    <span
+                      title="Your score is computed but hasn't been approved yet — it'll appear here and on your grades page once that's done."
+                      className="rounded-full bg-marigold/20 px-2.5 py-1 text-xs font-medium text-ink"
+                    >
+                      Submitted — pending approval
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-xs font-medium text-leaf">
+                      Submitted — {attempt!.score}/{attempt!.total_points}
+                    </span>
+                  )}
+                  <Link
+                    href={`/dashboard/student/quizzes/${q.id}/attempt/review`}
+                    className="text-xs font-medium text-leaf hover:underline"
                   >
-                    Submitted — grading in progress
-                  </span>
-                ) : pendingApproval ? (
-                  <span
-                    title="Your score is computed but hasn't been approved yet — it'll appear here and on your grades page once that's done."
-                    className="rounded-full bg-marigold/20 px-2.5 py-1 text-xs font-medium text-ink"
-                  >
-                    Submitted — pending approval
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-xs font-medium text-leaf">
-                    Submitted — {attempt!.score}/{attempt!.total_points}
-                  </span>
-                )
+                    Review answers
+                  </Link>
+                </div>
               ) : closed ? (
                 <span className="rounded-full bg-clay/10 px-2.5 py-1 text-xs font-medium text-clay">
                   Closed
