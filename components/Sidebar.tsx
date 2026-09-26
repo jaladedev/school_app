@@ -140,6 +140,33 @@ const BURSAR_NAV: { label: string; href: string }[] = [
  * light up a shorter sibling/parent item (e.g. /dashboard/admin/classes)
  * whose href happens to be a string prefix of it.
  */
+type NotificationCounts = {
+  messages: number;
+  announcements: number;
+  homework: number;
+};
+
+// Which notification bucket lights up a given nav label. "Homework" only
+// carries a count for students (unseen graded feedback) -- for
+// teachers/parents/admin get_notification_counts() always returns 0 there,
+// since it's their own homework's grade that's new, not something they're
+// tracking on someone else's submission.
+function countFor(label: string, counts: NotificationCounts): number {
+  if (label === "Messages") return counts.messages;
+  if (label === "Announcements") return counts.announcements;
+  if (label === "Homework") return counts.homework;
+  return 0;
+}
+
+function NotificationBadge({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-marigold px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
 function findActiveHref(pathname: string, items: { href: string }[]): string | null {
   let best: string | null = null;
   for (const item of items) {
@@ -156,11 +183,18 @@ export function Sidebar({
   role,
   fullName,
   staffRole,
+  notificationCounts,
 }: {
   role: UserRole;
   fullName: string;
   staffRole?: StaffRole | null;
+  notificationCounts?: NotificationCounts;
 }) {
+  const counts: NotificationCounts = notificationCounts ?? {
+    messages: 0,
+    announcements: 0,
+    homework: 0,
+  };
   const items =
     role === "teacher" && staffRole === "librarian"
       ? [...NAV_BY_ROLE.teacher, { label: "Library", href: "/dashboard/library" }]
@@ -342,6 +376,7 @@ export function Sidebar({
                               }`}
                             >
                               {item.label}
+                              <NotificationBadge count={countFor(item.label, counts)} />
                             </Link>
                           );
                         })}
@@ -367,6 +402,7 @@ export function Sidebar({
                       }`}
                     >
                       {item.label}
+                      <NotificationBadge count={countFor(item.label, counts)} />
                     </Link>
                   );
                 })}

@@ -206,8 +206,34 @@ export type Lesson = {
   objectives: string | null;
   homework: string | null;
   homework_status: HomeworkStatus;
+  homework_due_at: string | null;
   created_at: string;
 };
+
+// Mirrors isLoanOverdue's local-midnight comparison below, applied to
+// homework instead of library loans: "overdue" only means something once
+// there's a due date and it isn't graded/reviewed yet.
+export type HomeworkDueStatus = "none" | "overdue" | "due_today" | "due_soon" | "upcoming";
+
+export function homeworkDueStatus(
+  lesson: Pick<Lesson, "homework_due_at" | "homework_status">
+): HomeworkDueStatus {
+  if (!lesson.homework_due_at) return "none";
+  if (lesson.homework_status === "reviewed" || lesson.homework_status === "graded") return "none";
+
+  const [year, month, day] = lesson.homework_due_at.split("-").map(Number);
+  const dueAtLocalMidnight = new Date(year, month - 1, day);
+  const now = new Date();
+  const todayLocalMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round(
+    (dueAtLocalMidnight.getTime() - todayLocalMidnight.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays < 0) return "overdue";
+  if (diffDays === 0) return "due_today";
+  if (diffDays <= 2) return "due_soon";
+  return "upcoming";
+}
 
 export type Attendance = {
   id: string;
@@ -230,6 +256,7 @@ export type HomeworkSubmission = {
   reviewed_by: string | null;
   reviewed_at: string | null;
   status: HomeworkSubmissionStatus;
+  grade_seen_at: string | null;
 };
 
 export type Assessment = {
@@ -1831,6 +1858,22 @@ export type Database = {
           class_count: number;
           subject_count: number;
         }[];
+      };
+      get_notification_counts: {
+        Args: Record<string, never>;
+        Returns: {
+          unread_messages: number;
+          unread_announcements: number;
+          unread_graded_homework: number;
+        }[];
+      };
+      mark_all_announcements_read: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
+      mark_all_homework_seen: {
+        Args: Record<string, never>;
+        Returns: undefined;
       };
       invoice_dashboard_totals: {
         Args: { p_academic_year?: string | null; p_term?: number | null };

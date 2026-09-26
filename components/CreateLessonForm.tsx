@@ -21,6 +21,7 @@ export function CreateLessonForm({
   const [topicId, setTopicId] = useState(suggestedTopicId ?? "");
   const [objectives, setObjectives] = useState("");
   const [homework, setHomework] = useState("");
+  const [homeworkDueAt, setHomeworkDueAt] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -37,6 +38,7 @@ export function CreateLessonForm({
           topicId: topicId || undefined,
           objectives: objectives || undefined,
           homework: homework || undefined,
+          homeworkDueAt: homework ? homeworkDueAt || undefined : undefined,
         });
         onClose();
         router.refresh();
@@ -86,6 +88,19 @@ export function CreateLessonForm({
         rows={2}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
       />
+
+      {homework && (
+        <label className="block text-xs text-ink-soft">
+          Due date (optional)
+          <input
+            type="date"
+            value={homeworkDueAt}
+            min={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setHomeworkDueAt(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-rule px-3 py-2 text-sm outline-none focus-visible:border-marigold"
+          />
+        </label>
+      )}
 
       <div className="flex gap-2">
         <button

@@ -75,6 +75,13 @@ export default async function AnnouncementsPage({
     ? await supabase.from("classes").select("id, name, arm").order("name")
     : { data: [] };
 
+  // Viewing this page is what "read" means for the nav badge -- clear
+  // every announcement visible to this user in one call. Awaited (not
+  // fire-and-forget): some serverless/edge runtimes tear the request down
+  // as soon as the response starts streaming, which would silently drop
+  // an unawaited call before it ever reached the database.
+  await supabase.rpc("mark_all_announcements_read");
+
   return (
     <div className="max-w-2xl">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

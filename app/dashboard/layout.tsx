@@ -23,9 +23,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login");
   }
 
+  const supabase = createClient();
+
   let staffRole = null;
   if (profile.role === "teacher") {
-    const supabase = createClient();
     const { data: teacher } = await supabase
       .from("teacher_profiles")
       .select("staff_role")
@@ -34,9 +35,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
     staffRole = teacher?.staff_role ?? null;
   }
 
+  const { data: counts } = await supabase.rpc("get_notification_counts").single();
+
   return (
     <div className="flex flex-col lg:flex-row">
-      <Sidebar role={profile.role} fullName={profile.full_name} staffRole={staffRole} />
+      <Sidebar
+        role={profile.role}
+        fullName={profile.full_name}
+        staffRole={staffRole}
+        notificationCounts={{
+          messages: counts?.unread_messages ?? 0,
+          announcements: counts?.unread_announcements ?? 0,
+          homework: counts?.unread_graded_homework ?? 0,
+        }}
+      />
       <main className="flex-1 px-4 py-6 sm:px-8 sm:py-8">
         <DashboardBreadcrumbs />
         {children}

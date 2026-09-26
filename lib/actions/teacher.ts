@@ -25,6 +25,7 @@ export async function createLesson(input: {
   topicId?: string;
   objectives?: string;
   homework?: string;
+  homeworkDueAt?: string;
 }) {
   const { id: teacherId } = await assertRole(["teacher"], "Only teachers can log lessons.");
 
@@ -49,6 +50,14 @@ export async function createLesson(input: {
     throw new Error("Class doesn't match this timetable entry.");
   }
 
+  if (input.homeworkDueAt && !input.homework) {
+    throw new Error("Set the homework text before giving it a due date.");
+  }
+
+  if (input.homeworkDueAt && input.homeworkDueAt < input.lessonDate) {
+    throw new Error("Homework due date can't be before the lesson date.");
+  }
+
   const { data: lesson, error } = await supabase
     .from("lessons")
     .insert({
@@ -59,6 +68,7 @@ export async function createLesson(input: {
       topic_id: input.topicId || null,
       objectives: input.objectives || null,
       homework: input.homework || null,
+      homework_due_at: input.homeworkDueAt || null,
     })
     .select("id")
     .single();
