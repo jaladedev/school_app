@@ -737,6 +737,246 @@ export async function updateTeacherStaffRole(teacherId: string, staffRole: Staff
 
 // ---------- Parent accounts ----------
 
+export type BulkParentRow = {
+  fullName: string;
+  email: string;
+  admissionNos: string[];
+  relationship?: string;
+  isPrimary?: boolean;
+};
+
+export type BulkParentResult = {
+  email: string;
+  fullName: string;
+  success: boolean;
+  password?: string;
+  error?: string;
+  childrenLinked?: number;
+};
+
+type BulkParentAttempt =
+  | BulkParentResult
+  | {
+      result: BulkParentResult;
+      userId: string;
+    };
+
+// Bulk counterpart to createParentAccount: one row per parent, each
+// naming their child(ren) by admission number rather than by clicking
+// through the single-parent form's student search once per child. Mirrors
+// createStudentsBulk's shape (concurrency-limited, per-row pass/fail,
+// generated or shared passwords) so admins already familiar with that
+// flow don't need to learn a second one.
+export async function createParentsBulk(input: {
+  parents: BulkParentRow[];
+  passwordStrategy: "auto" | "shared";
+  sharedPassword?: string;
+}): Promise<BulkParentResult[]> {
+  await assertRole(["admin"], "Only an admin can perform this action.");
+
+  const admin = createAdminClient();
+
+  if (
+    input.passwordStrategy === "shared" &&
+    (!input.sharedPassword || input.sharedPassword.length < 8)
+  ) {
+    throw new Error("Shared password must be at least 8 characters.");
+  }
+
+  const emails = input.parents.map((p) => p.email.trim().toLowerCase());
+  const seenEmails = new Set<string>();
+  const duplicateInputEmails = new Set<string>();
+  for (const email of emails) {
+    if (seenEmails.has(email)) duplicateInputEmails.add(email);
+    else seenEmails.add(email);
+  }
+
+  const uniqueEmails = Array.from(seenEmails);
+  const emailFilter = uniqueEmails
+    .map((email) => `email.ilike."${email.replace(/"/g, '\\"')}"`)
+    .join(",");
+
+  const { data: matchingContacts, error: existingProfilesError } = uniqueEmails.length
+    ? await admin.from("profile_contacts").select("email").or(emailFilter)
+    : { data: [], error: null };
+
+  if (existingProfilesError) throwDbError(existingProfilesError);
+
+  const existingEmails = new Set((matchingContacts ?? []).map((c) => c.email.toLowerCase()));
+
+  // Resolve every admission number across every row in one query rather
+  // than one lookup per row, same reasoning as the email-existence check
+  // above: cheap regardless of how large this import gets.
+  const allAdmissionNos = Array.from(
+    new Set(input.parents.flatMap((p) => p.admissionNos).filter(Boolean))
+  );
+
+  const { data: matchingStudents, error: studentsError } = allAdmissionNos.length
+    ? await admin.from("student_profiles").select("id, admission_no").in("admission_no", allAdmissionNos)
+    : { data: [], error: null };
+
+  if (studentsError) throwDbError(studentsError);
+
+  // admission_no has no uniqueness constraint at the DB level, so group
+  // rather than overwrite -- a collision must be surfaced as an error for
+  // that row, never silently resolved to whichever match happened to
+  // come back first (that could link a parent to the wrong child).
+  const studentIdsByAdmissionNo = new Map<string, string[]>();
+  for (const s of matchingStudents ?? []) {
+    const key = s.admission_no as string;
+    const list = studentIdsByAdmissionNo.get(key) ?? [];
+    list.push(s.id as string);
+    studentIdsByAdmissionNo.set(key, list);
+  }
+
+  const created = await mapWithConcurrency<BulkParentRow, BulkParentAttempt>(
+    input.parents,
+    5,
+    async (row) => {
+      const password =
+        input.passwordStrategy === "shared" ? input.sharedPassword! : generateTempPassword();
+      const email = row.email.trim().toLowerCase();
+
+      try {
+        if (existingEmails.has(email) || duplicateInputEmails.has(email)) {
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: `An account with the email "${row.email}" already exists.`,
+          } satisfies BulkParentResult;
+        }
+
+        if (!row.admissionNos.length) {
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: "No admission number given for this parent.",
+          } satisfies BulkParentResult;
+        }
+
+        const studentIds: string[] = [];
+        const missing: string[] = [];
+        const ambiguous: string[] = [];
+        for (const admissionNo of row.admissionNos) {
+          const ids = studentIdsByAdmissionNo.get(admissionNo);
+          if (!ids || ids.length === 0) missing.push(admissionNo);
+          else if (ids.length > 1) ambiguous.push(admissionNo);
+          else studentIds.push(ids[0]);
+        }
+
+        if (missing.length) {
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: `No student found with admission no. ${missing.join(", ")}.`,
+          } satisfies BulkParentResult;
+        }
+
+        if (ambiguous.length) {
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: `Admission no. ${ambiguous.join(", ")} matches more than one student — fix the duplicate before importing.`,
+          } satisfies BulkParentResult;
+        }
+
+        const { data: createdUser, error: createError } = await admin.auth.admin.createUser({
+          email: row.email,
+          password,
+          email_confirm: true,
+        });
+
+        if (createError || !createdUser.user) {
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: createError?.message ?? "Account creation failed.",
+          } satisfies BulkParentResult;
+        }
+
+        const userId = createdUser.user.id;
+
+        const { error: profileError } = await admin.from("profiles").insert({
+          id: userId,
+          role: "parent",
+          full_name: row.fullName,
+        });
+
+        if (profileError) {
+          await deleteUserAfterFailedSetup(admin, userId);
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: profileError.message,
+          } satisfies BulkParentResult;
+        }
+
+        const { error: contactError } = await admin
+          .from("profile_contacts")
+          .insert({ id: userId, email: row.email });
+
+        if (contactError) {
+          await deleteUserAfterFailedSetup(admin, userId);
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: contactError.message,
+          } satisfies BulkParentResult;
+        }
+
+        const { error: linksError } = await admin.from("guardian_links").insert(
+          studentIds.map((studentId, i) => ({
+            parent_id: userId,
+            student_id: studentId,
+            relationship: row.relationship || null,
+            is_primary: i === 0 ? (row.isPrimary ?? true) : false,
+          }))
+        );
+
+        if (linksError) {
+          await deleteUserAfterFailedSetup(admin, userId);
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: linksError.message,
+          } satisfies BulkParentResult;
+        }
+
+        return {
+          result: {
+            email: row.email,
+            fullName: row.fullName,
+            success: true,
+            password,
+            childrenLinked: studentIds.length,
+          },
+          userId,
+        };
+      } catch (err: any) {
+        return {
+          email: row.email,
+          fullName: row.fullName,
+          success: false,
+          error: err.message ?? "Unexpected error.",
+        } satisfies BulkParentResult;
+      }
+    }
+  );
+
+  const results = created.map((row) => ("result" in row ? row.result : row));
+
+  revalidatePath("/dashboard/admin/parents");
+  return results;
+}
+
 export type ParentChildLink = {
   studentId: string;
   relationship: string;

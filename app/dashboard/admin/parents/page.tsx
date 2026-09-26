@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { CreateParentForm } from "@/components/CreateParentForm";
+import { BulkCreateParentsForm } from "@/components/BulkCreateParentsForm";
 import { ResetPasswordButton } from "@/components/ResetPasswordButton";
 import { DeactivateUserButton } from "@/components/DeactivateUserButton";
 
@@ -37,12 +38,15 @@ export default async function AdminParentsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Parents</h1>
           <p className="text-sm text-ink-soft">{parents?.length ?? 0} parent accounts.</p>
         </div>
-        <CreateParentForm />
+        <div className="flex flex-wrap gap-2">
+          <CreateParentForm />
+          <BulkCreateParentsForm />
+        </div>
       </div>
 
       <div className="space-y-2">

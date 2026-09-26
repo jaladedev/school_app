@@ -40,3 +40,63 @@ export function downloadCsv(filename: string, headers: string[], rows: (string |
   link.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Parses raw CSV text into rows of fields, per RFC 4180: handles quoted
+ * fields (so a field can contain commas or newlines), escaped quotes
+ * ("" inside a quoted field), and both \n and \r\n line endings.
+ *
+ * Splitting each line on a raw "," silently corrupts any field that
+ * itself contains a comma — including data this app's own buildCsv above
+ * can produce (guardian names like "Okafor, Jr.", addresses, etc.), so
+ * exporting and re-importing the same data could break. Shared here
+ * rather than duplicated per bulk-import form so the two can't drift.
+ */
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (normalized[i + 1] === '"') {
+          field += '"';
+          i++; // skip the escaped quote's second character
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = true;
+    } else if (char === ",") {
+      row.push(field);
+      field = "";
+    } else if (char === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+
+  // Final field/row, if the text doesn't end with a newline.
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  return rows.filter((r) => r.some((f) => f.trim().length > 0));
+}
