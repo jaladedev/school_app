@@ -9,13 +9,13 @@ export function CreateLessonForm({
   classId,
   topics,
   suggestedTopicId,
-  onClose,
+  onCloseAction,
 }: {
   timetableEntryId: string;
   classId: string;
   topics: { id: string; title: string }[];
   suggestedTopicId?: string | null;
-  onClose: () => void;
+  onCloseAction: () => void;
 }) {
   const router = useRouter();
   const [topicId, setTopicId] = useState(suggestedTopicId ?? "");
@@ -40,7 +40,7 @@ export function CreateLessonForm({
           homework: homework || undefined,
           homeworkDueAt: homework ? homeworkDueAt || undefined : undefined,
         });
-        onClose();
+        onCloseAction();
         router.refresh();
       } catch (err: any) {
         setError(err.message ?? "Something went wrong.");
@@ -112,7 +112,7 @@ export function CreateLessonForm({
         </button>
         <button
           type="button"
-          onClick={onClose}
+          onClick={onCloseAction}
           className="rounded-lg border border-rule px-3 py-1.5 text-sm text-ink-soft"
         >
           Cancel
