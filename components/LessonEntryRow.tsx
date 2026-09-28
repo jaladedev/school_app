@@ -92,7 +92,7 @@ export function LessonEntryRow({
           classId={classId}
           topics={topics}
           suggestedTopicId={suggestedTopicId ?? null}
-          onClose={() => setLogging(false)}
+          onCloseAction={() => setLogging(false)}
         />
       )}
     </div>
