@@ -6,12 +6,30 @@ export default async function StudentQuizzesPage() {
   const profile = await getCurrentProfile();
   const supabase = createClient();
 
+  const { data: settings } = await supabase
+    .from("school_settings")
+    .select("current_academic_year, current_term")
+    .eq("id", 1)
+    .single();
+
   // RLS already restricts this to published quizzes for the student's own
-  // class — no extra filtering needed here.
-  const { data: quizzes } = await supabase
+  // class; the academic_year/term filter narrows that further to the
+  // current term only, since quizzes RLS has no notion of "current" — a
+  // quiz stays queryable (and would otherwise stay listed) after its
+  // term ends.
+  const quizzesQuery = supabase
     .from("quizzes")
-    .select("id, duration_minutes, closes_at, assessments(title, max_score)")
+    .select(
+      "id, duration_minutes, closes_at, assessments!inner(title, max_score, term, academic_year)"
+    )
     .order("created_at", { ascending: false });
+  if (settings?.current_academic_year) {
+    quizzesQuery.eq("assessments.academic_year", settings.current_academic_year);
+  }
+  if (settings?.current_term) {
+    quizzesQuery.eq("assessments.term", settings.current_term);
+  }
+  const { data: quizzes } = await quizzesQuery;
 
   const { data: attempts } = profile
     ? await supabase

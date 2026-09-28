@@ -89,6 +89,7 @@ function handleAuthRedirect(params: {
   isDashboardRoute: boolean;
   isLoginRoute: boolean;
   isChangePasswordRoute: boolean;
+  isHomeRoute: boolean;
   user: User | null;
   mustChangePassword: boolean;
 }): NextResponse | null {
@@ -97,6 +98,7 @@ function handleAuthRedirect(params: {
     isDashboardRoute,
     isLoginRoute,
     isChangePasswordRoute,
+    isHomeRoute,
     user,
     mustChangePassword,
   } = params;
@@ -105,7 +107,10 @@ function handleAuthRedirect(params: {
     return NextResponse.redirect(new URL("/change-password", request.url));
   }
 
-  if (isLoginRoute && user) {
+  // A signed-in user should never land on the marketing page or the
+  // login form — send them straight to their dashboard (or, if their
+  // password is still flagged, to the change-password gate first).
+  if ((isLoginRoute || isHomeRoute) && user) {
     return NextResponse.redirect(
       new URL(mustChangePassword ? "/change-password" : "/dashboard", request.url)
     );
@@ -185,6 +190,7 @@ export async function proxy(request: NextRequest) {
   const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard");
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
   const isChangePasswordRoute = request.nextUrl.pathname.startsWith("/change-password");
+  const isHomeRoute = request.nextUrl.pathname === "/";
 
   if ((isDashboardRoute || isChangePasswordRoute) && !user && !authCheckFailedTransiently) {
     return NextResponse.redirect(new URL("/login", request.url));
@@ -205,7 +211,7 @@ export async function proxy(request: NextRequest) {
 
   let mustChangePassword = false;
 
-  if (user && (isDashboardRoute || isLoginRoute || isChangePasswordRoute)) {
+  if (user && (isDashboardRoute || isLoginRoute || isChangePasswordRoute || isHomeRoute)) {
     const deactivationRedirect = await handleDeactivation(supabase, user, request);
     if (deactivationRedirect) return deactivationRedirect;
 
@@ -217,6 +223,7 @@ export async function proxy(request: NextRequest) {
     isDashboardRoute,
     isLoginRoute,
     isChangePasswordRoute,
+    isHomeRoute,
     user,
     mustChangePassword,
   });
@@ -226,5 +233,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/change-password"],
+  matcher: ["/", "/dashboard/:path*", "/login", "/change-password"],
 };
