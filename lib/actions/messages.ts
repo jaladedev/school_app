@@ -2,8 +2,32 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/audit";
 import { throwDbError } from "@/lib/errors/db";
+
+/**
+ * Returns just the display name/role for a message-thread partner.
+ * profiles' own RLS only lets a caller read their own row (or, for
+ * admins/teachers, everyone) -- so a student or parent opening a thread
+ * with a teacher they found via search_messageable_users has no
+ * row-level access to that teacher's profile via the plain session
+ * client. Needs the admin client to bypass that, same reasoning as the
+ * search RPC: only full_name/role ever come back, nothing more
+ * sensitive, so this isn't widening access beyond what starting the
+ * conversation already exposed.
+ */
+export async function getMessagePartner(
+  userId: string
+): Promise<{ full_name: string; role: string } | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("profiles")
+    .select("full_name, role")
+    .eq("id", userId)
+    .maybeSingle();
+  return data;
+}
 
 export async function sendMessage(recipientId: string, content: string) {
   const profile = await getCurrentProfile();
