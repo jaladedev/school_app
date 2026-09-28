@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { getMessagePartner } from "@/lib/actions/messages";
 import { ArchiveConversationButton } from "@/components/ArchiveConversationButton";
 
 type Conversation = {
@@ -82,15 +83,14 @@ export function RealtimeInbox({
 
           // Brand new conversation partner we haven't seen before — fetch
           // their profile so we can show a real name instead of skipping
-          // the notification entirely.
+          // the notification entirely. profiles RLS blocks a direct
+          // client-side read here for a student/parent hearing from a
+          // teacher for the first time, so this goes through the same
+          // admin-backed server action the inbox's initial load uses.
           if (!knownPartnerIds.current.has(row.sender_id)) {
             knownPartnerIds.current.add(row.sender_id);
 
-            const { data: partner } = await supabase
-              .from("profiles")
-              .select("full_name, role")
-              .eq("id", row.sender_id)
-              .single();
+            const partner = await getMessagePartner(row.sender_id);
 
             setConversations((prev) => {
               if (prev.some((c) => c.partnerId === row.sender_id)) return prev;

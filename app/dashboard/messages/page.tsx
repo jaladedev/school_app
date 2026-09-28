@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { getMessagePartners } from "@/lib/actions/messages";
 import { NewConversationSearch } from "@/components/NewConversationSearch";
 import { RealtimeInbox } from "@/components/RealtimeInbox";
 import { redirect } from "next/navigation";
@@ -50,9 +51,10 @@ export default async function MessagesInboxPage({
   }
 
   const partnerIds = [...conversations.keys()];
-  const { data: partners } = partnerIds.length
-    ? await supabase.from("profiles").select("id, full_name, role").in("id", partnerIds)
-    : { data: [] };
+  // profiles RLS only lets a student/parent read their own row, so a
+  // direct session-client query here would come back empty for any
+  // teacher/admin conversation partner -- see getMessagePartners.
+  const partners = await getMessagePartners(partnerIds);
 
   const partnerById = new Map((partners ?? []).map((p) => [p.id, p]));
 

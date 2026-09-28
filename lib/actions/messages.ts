@@ -29,6 +29,26 @@ export async function getMessagePartner(
   return data;
 }
 
+/**
+ * Bulk version of getMessagePartner, for the inbox list where a student
+ * or parent may have several conversations with teachers/admins whose
+ * profiles rows their own session can't read (same RLS gap noted
+ * above). Returns a plain array rather than a Map since server actions
+ * can only return plain serializable data across the client/server
+ * boundary.
+ */
+export async function getMessagePartners(
+  userIds: string[]
+): Promise<{ id: string; full_name: string; role: string }[]> {
+  if (!userIds.length) return [];
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("profiles")
+    .select("id, full_name, role")
+    .in("id", userIds);
+  return data ?? [];
+}
+
 export async function sendMessage(recipientId: string, content: string) {
   const profile = await getCurrentProfile();
   if (!profile) {
@@ -41,11 +61,19 @@ export async function sendMessage(recipientId: string, content: string) {
 
   const supabase = createClient();
 
-  const { data: recipient, error: recipientError } = await supabase
+  // Same RLS gap as getMessagePartner above: a student/parent sending to
+  // a teacher has no row-level access to that teacher's profiles row via
+  // the session client, so this existence/active check needs the admin
+  // client too -- it only ever reads id/is_active, never anything more
+  // sensitive, so it's exposing nothing beyond "does this id exist and
+  // is it active", which messages_insert_sender already implies anyone
+  // may need to know before sending.
+  const admin = createAdminClient();
+  const { data: recipient, error: recipientError } = await admin
     .from("profiles")
     .select("id, is_active")
     .eq("id", recipientId)
-    .single();
+    .maybeSingle();
 
   if (recipientError || !recipient) {
     throw new Error("Recipient not found.");
