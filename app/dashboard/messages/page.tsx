@@ -77,7 +77,7 @@ export default async function MessagesInboxPage({
     <div className="max-w-xl">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-display text-2xl font-semibold text-ink">Messages</h1>
-        <NewConversationSearch currentUserId={profile.id} />
+        <NewConversationSearch />
       </div>
 
       <div className="mb-4 flex gap-2">

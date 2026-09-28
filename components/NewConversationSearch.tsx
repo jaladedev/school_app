@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export function NewConversationSearch({ currentUserId }: { currentUserId: string }) {
+export function NewConversationSearch() {
   const router = useRouter();
   const supabase = createClient();
 
@@ -20,12 +20,15 @@ export function NewConversationSearch({ currentUserId }: { currentUserId: string
       return;
     }
     startTransition(async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, role")
-        .neq("id", currentUserId)
-        .ilike("full_name", `%${value}%`)
-        .limit(10);
+      // profiles' own RLS only lets a student/parent read their own row
+      // (admins and teachers can read everyone directly) -- this RPC is
+      // security definer specifically so every role can find someone to
+      // message, matching messages_insert_sender's own lack of a
+      // recipient restriction. See its migration for the reasoning.
+      const { data } = await supabase.rpc("search_messageable_users", {
+        p_query: value,
+        p_limit: 10,
+      });
       setResults(data ?? []);
     });
   }

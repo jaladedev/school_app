@@ -1952,6 +1952,10 @@ export type Database = {
         Args: { p_query: string; p_limit?: number };
         Returns: TopicNoteSearchResult[];
       };
+      search_messageable_users: {
+        Args: { p_query: string; p_limit?: number };
+        Returns: { id: string; full_name: string; role: string }[];
+      };
       answer_quiz_question: {
         Args: {
           p_attempt_id: string;
