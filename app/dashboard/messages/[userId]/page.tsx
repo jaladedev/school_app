@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { markThreadRead } from "@/lib/actions/messages";
 import { MessageComposer } from "@/components/MessageComposer";
 import { RealtimeMessageThread } from "@/components/RealtimeMessageThread";
@@ -21,11 +22,22 @@ export default async function MessageThreadPage({
   }
   const supabase = createClient();
 
-  const { data: partner } = await supabase
+  // profiles' own RLS only lets a caller read their own row (or, for
+  // admins/teachers, everyone). A student or parent messaging a teacher
+  // they found via search_messageable_users has no row-level access to
+  // that teacher's profile, so .single() here returned zero rows and
+  // threw (PGRST116), crashing this whole Server Component -- same root
+  // cause as the search itself, just hit a step later. The admin client
+  // bypasses that, and only ever surfaces full_name/role -- the same two
+  // fields the search RPC already exposes to anyone starting a
+  // conversation, so this isn't widening access, just fixing where the
+  // narrow read happens.
+  const admin = createAdminClient();
+  const { data: partner } = await admin
     .from("profiles")
     .select("full_name, role")
     .eq("id", resolvedParams.userId)
-    .single();
+    .maybeSingle();
 
   const { data: messages } = await supabase
     .from("messages")
