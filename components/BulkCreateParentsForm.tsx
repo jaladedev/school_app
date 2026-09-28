@@ -60,9 +60,7 @@ export function BulkCreateParentsForm() {
       return;
     }
     if (invalidRows.length) {
-      setError(
-        "Every row needs a full name, an email, and at least one student admission number."
-      );
+      setError("Every row needs a full name, an email, and at least one student admission number.");
       return;
     }
     if (strategy === "shared" && sharedPassword.length < 8) {
@@ -130,8 +128,8 @@ export function BulkCreateParentsForm() {
             className="w-full rounded-lg border border-rule px-3 py-2 font-mono text-sm outline-none focus-visible:border-marigold"
           />
           <p className="mt-1 text-xs text-ink-soft">
-            Each admission number must already belong to an existing student — import students
-            first if you haven&apos;t yet.
+            Each admission number must already belong to an existing student — import students first
+            if you haven&apos;t yet.
           </p>
           {parsed.length > 0 && (
             <p className="mt-1 text-xs text-ink-soft">
@@ -238,8 +236,7 @@ export function BulkCreateParentsForm() {
             </table>
           </div>
           <p className="mt-2 text-xs text-ink-soft">
-            Copy these passwords out now — they won&apos;t be shown again after you leave this
-            page.
+            Copy these passwords out now — they won&apos;t be shown again after you leave this page.
           </p>
         </div>
       )}

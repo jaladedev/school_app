@@ -70,9 +70,7 @@ export default async function TeacherHomeworkPage() {
 
   const givenCount = (lessons ?? []).filter((l) => l.homework_status === "given").length;
   const reviewedCount = (lessons ?? []).filter((l) => l.homework_status === "reviewed").length;
-  const overdueCount = (lessons ?? []).filter(
-    (l) => homeworkDueStatus(l) === "overdue"
-  ).length;
+  const overdueCount = (lessons ?? []).filter((l) => homeworkDueStatus(l) === "overdue").length;
 
   const admin = createAdminClient();
   const signedUrlByPath = new Map<string, string>();
@@ -91,60 +89,62 @@ export default async function TeacherHomeworkPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Homework given</h1>
-      <p className="mb-6 text-sm text-ink-soft">{summaryLine(givenCount, reviewedCount, overdueCount)}</p>
+      <p className="mb-6 text-sm text-ink-soft">
+        {summaryLine(givenCount, reviewedCount, overdueCount)}
+      </p>
 
       <div className="space-y-2">
         {lessons?.map((l) => {
           const dueStatus = homeworkDueStatus(l);
           return (
-          <div
-            key={l.id}
-            className={`rounded-lg border bg-white p-4 ${
-              dueStatus === "overdue" ? "border-clay/50" : "border-rule"
-            }`}
-          >
-            <div className="mb-1 flex items-center justify-between gap-3">
-              <p className="font-medium text-ink">
-                {l.timetable_entries?.subjects?.name ?? "Lesson"} — {l.classes?.name}{" "}
-                {l.classes?.arm}
-              </p>
-              <div className="flex shrink-0 items-center gap-2">
-                <span className="text-xs text-ink-soft">{l.lesson_date}</span>
-                <HomeworkStatusToggle lessonId={l.id} status={l.homework_status} />
+            <div
+              key={l.id}
+              className={`rounded-lg border bg-white p-4 ${
+                dueStatus === "overdue" ? "border-clay/50" : "border-rule"
+              }`}
+            >
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <p className="font-medium text-ink">
+                  {l.timetable_entries?.subjects?.name ?? "Lesson"} — {l.classes?.name}{" "}
+                  {l.classes?.arm}
+                </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-xs text-ink-soft">{l.lesson_date}</span>
+                  <HomeworkStatusToggle lessonId={l.id} status={l.homework_status} />
+                </div>
               </div>
-            </div>
-            {l.homework_due_at && dueStatus !== "none" && (
-              <p
-                className={`mb-1 text-xs font-medium ${
-                  dueStatus === "overdue" ? "text-clay" : "text-ink-soft"
-                }`}
-              >
-                {dueLabel(l.homework_due_at, dueStatus)}
-              </p>
-            )}
-            {l.curriculum_topics?.title && (
-              <p className="mb-1 text-xs text-ink-soft">{l.curriculum_topics.title}</p>
-            )}
-            <p className="text-sm text-ink">{l.homework}</p>
+              {l.homework_due_at && dueStatus !== "none" && (
+                <p
+                  className={`mb-1 text-xs font-medium ${
+                    dueStatus === "overdue" ? "text-clay" : "text-ink-soft"
+                  }`}
+                >
+                  {dueLabel(l.homework_due_at, dueStatus)}
+                </p>
+              )}
+              {l.curriculum_topics?.title && (
+                <p className="mb-1 text-xs text-ink-soft">{l.curriculum_topics.title}</p>
+              )}
+              <p className="text-sm text-ink">{l.homework}</p>
 
-            {l.homework_submissions?.length ? (
-              <div className="mt-3 rounded-lg border border-rule bg-paper p-2">
-                {l.homework_submissions.map((s) => (
-                  <HomeworkSubmissionReview
-                    key={s.id}
-                    submissionId={s.id}
-                    studentName={s.student_profiles?.profiles?.full_name ?? "Student"}
-                    fileName={s.file_name}
-                    signedUrl={signedUrlByPath.get(s.file_url) ?? null}
-                    status={s.status}
-                    remark={s.teacher_remark}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="mt-2 text-xs text-ink-soft">No submissions yet.</p>
-            )}
-          </div>
+              {l.homework_submissions?.length ? (
+                <div className="mt-3 rounded-lg border border-rule bg-paper p-2">
+                  {l.homework_submissions.map((s) => (
+                    <HomeworkSubmissionReview
+                      key={s.id}
+                      submissionId={s.id}
+                      studentName={s.student_profiles?.profiles?.full_name ?? "Student"}
+                      fileName={s.file_name}
+                      signedUrl={signedUrlByPath.get(s.file_url) ?? null}
+                      status={s.status}
+                      remark={s.teacher_remark}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-ink-soft">No submissions yet.</p>
+              )}
+            </div>
           );
         })}
 

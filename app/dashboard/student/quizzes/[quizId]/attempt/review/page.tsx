@@ -76,8 +76,7 @@ function questionOutcome(
   if (q.type === "matching") {
     if (!q.matchedPairs) return "unanswered";
     const allMatched = q.options.every(
-      (o) =>
-        (q.matchedPairs?.[o.id] ?? "").trim().toLowerCase() === o.text.trim().toLowerCase()
+      (o) => (q.matchedPairs?.[o.id] ?? "").trim().toLowerCase() === o.text.trim().toLowerCase()
     );
     return allMatched ? "correct" : "incorrect";
   }
@@ -254,9 +253,7 @@ export default async function QuizAttemptReviewPage({
                         <span className={rowCorrect ? "text-leaf" : "text-clay"}>
                           {chosen || "—"}
                         </span>
-                        {!rowCorrect && (
-                          <span className="text-leaf"> (correct: {o.text})</span>
-                        )}
+                        {!rowCorrect && <span className="text-leaf"> (correct: {o.text})</span>}
                       </div>
                     );
                   })}
@@ -273,7 +270,6 @@ export default async function QuizAttemptReviewPage({
                   )}
                 </div>
               )}
-
             </div>
           );
         })}

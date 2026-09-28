@@ -32,6 +32,15 @@ export function RealtimeMessageThread({
     seenIds.current = new Set(initialMessages.map((m) => m.id));
   }, [initialMessages]);
 
+  // Mark any messages from this partner already unread as of page load
+  // now that the thread is open — this has to happen here (client-
+  // invoked) rather than during the server component's render, since
+  // markThreadRead() calls revalidatePath and Next.js doesn't allow
+  // that during render.
+  useEffect(() => {
+    markThreadRead(partnerId);
+  }, [partnerId]);
+
   useEffect(() => {
     const supabase = createClient();
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
-import { getMessagePartner, markThreadRead } from "@/lib/actions/messages";
+import { getMessagePartner } from "@/lib/actions/messages";
 import { MessageComposer } from "@/components/MessageComposer";
 import { RealtimeMessageThread } from "@/components/RealtimeMessageThread";
 import { ArchiveConversationButton } from "@/components/ArchiveConversationButton";
@@ -37,10 +37,6 @@ export default async function MessageThreadPage({
     .eq("user_id", profile.id)
     .eq("partner_id", resolvedParams.userId)
     .maybeSingle();
-
-  // Mark any unread messages from this partner as read now that the
-  // thread is being viewed.
-  await markThreadRead(resolvedParams.userId);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] max-w-xl flex-col">

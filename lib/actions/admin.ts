@@ -812,7 +812,10 @@ export async function createParentsBulk(input: {
   );
 
   const { data: matchingStudents, error: studentsError } = allAdmissionNos.length
-    ? await admin.from("student_profiles").select("id, admission_no").in("admission_no", allAdmissionNos)
+    ? await admin
+        .from("student_profiles")
+        .select("id, admission_no")
+        .in("admission_no", allAdmissionNos)
     : { data: [], error: null };
 
   if (studentsError) throwDbError(studentsError);

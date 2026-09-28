@@ -16,7 +16,7 @@ async function assertCanModerateAssessment(assessmentId: string) {
     .select("staff_role")
     .eq("id", id)
     .single();
-    if (teacher?.staff_role !== "hod") {
+  if (teacher?.staff_role !== "hod") {
     throw new Error("Only an admin or HOD can approve grades.");
   }
   return { actorId: id };

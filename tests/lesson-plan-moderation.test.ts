@@ -44,7 +44,14 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
   it("lets a HOD approve a lesson plan outside their subjects_taught", async () => {
     mockAuthenticatedAs("hod-1");
     adminState.queue = [
-      { data: { topic_id: "topic-outside-hod-department", status: "published", curriculum_topics: { title: "Photosynthesis" } }, error: null }, // topic_notes lookup
+      {
+        data: {
+          topic_id: "topic-outside-hod-department",
+          status: "published",
+          curriculum_topics: { title: "Photosynthesis" },
+        },
+        error: null,
+      }, // topic_notes lookup
       { data: { role: "teacher", is_active: true }, error: null }, // assertRole
       { data: { role: "teacher" }, error: null }, // not admin
       { data: { staff_role: "hod" }, error: null }, // hod -- no department check
@@ -58,7 +65,14 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
   it("lets an admin approve a lesson plan regardless of any HOD department logic", async () => {
     mockAuthenticatedAs("admin-1");
     adminState.queue = [
-      { data: { topic_id: "topic-1", status: "published", curriculum_topics: { title: "Photosynthesis" } }, error: null },
+      {
+        data: {
+          topic_id: "topic-1",
+          status: "published",
+          curriculum_topics: { title: "Photosynthesis" },
+        },
+        error: null,
+      },
       { data: { role: "admin", is_active: true }, error: null }, // assertRole
       { data: { role: "admin" }, error: null }, // short-circuits before teacher_profiles lookup
       { data: null, error: null }, // topic_notes.update
@@ -71,7 +85,14 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
   it("rejects a non-HOD teacher even for a topic in a subject they teach", async () => {
     mockAuthenticatedAs("teacher-1");
     adminState.queue = [
-      { data: { topic_id: "topic-1", status: "published", curriculum_topics: { title: "Photosynthesis" } }, error: null },
+      {
+        data: {
+          topic_id: "topic-1",
+          status: "published",
+          curriculum_topics: { title: "Photosynthesis" },
+        },
+        error: null,
+      },
       { data: { role: "teacher", is_active: true }, error: null }, // assertRole
       { data: { role: "teacher" }, error: null }, // not admin
       { data: { staff_role: "class_teacher" }, error: null }, // not hod
@@ -85,7 +106,14 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
   it("rejects a student before any DB write", async () => {
     mockAuthenticatedAs("student-1");
     adminState.queue = [
-      { data: { topic_id: "topic-1", status: "published", curriculum_topics: { title: "Photosynthesis" } }, error: null },
+      {
+        data: {
+          topic_id: "topic-1",
+          status: "published",
+          curriculum_topics: { title: "Photosynthesis" },
+        },
+        error: null,
+      },
       { data: { role: "student", is_active: true }, error: null }, // assertRole
     ];
 
@@ -97,7 +125,14 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
   it("rejects reviewing a note that hasn't been published yet, before checking role", async () => {
     mockAuthenticatedAs("hod-1");
     adminState.queue = [
-      { data: { topic_id: "topic-1", status: "draft", curriculum_topics: { title: "Photosynthesis" } }, error: null },
+      {
+        data: {
+          topic_id: "topic-1",
+          status: "draft",
+          curriculum_topics: { title: "Photosynthesis" },
+        },
+        error: null,
+      },
     ];
 
     await expect(approveLessonPlan("note-1")).rejects.toThrow(

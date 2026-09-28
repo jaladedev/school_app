@@ -107,7 +107,10 @@ describe("grade moderation: HOD is school-wide, not scoped to subjects_taught", 
   it("approveSingleGrade: lets a HOD approve a single grade outside their subjects_taught", async () => {
     mockAuthenticatedAs("hod-1");
     adminState.queue = [
-      { data: { assessment_id: "assessment-outside-hod-department", student_id: "student-1" }, error: null }, // grade lookup
+      {
+        data: { assessment_id: "assessment-outside-hod-department", student_id: "student-1" },
+        error: null,
+      }, // grade lookup
       { data: { role: "teacher", is_active: true }, error: null }, // assertRole
       { data: { role: "teacher" }, error: null }, // not admin
       { data: { staff_role: "hod" }, error: null }, // hod -- no department check
