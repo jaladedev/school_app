@@ -18,7 +18,7 @@ type PaystackChargeEvent = {
 };
 
 function invoiceIdFromReference(reference: string): string | null {
-  const match = /^inv_([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})_\d+$/i.exec(reference);
+  const match = /^inv[_-]([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})[_-]\d+$/i.exec(reference);
   return match?.[1] ?? null;
 }
 

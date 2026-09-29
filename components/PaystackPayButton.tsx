@@ -68,7 +68,9 @@ export function PaystackPayButton({
       email,
       amount: amountKobo, // Paystack expects kobo directly for NGN
       currency: "NGN",
-      ref: `inv_${invoiceId}_${Date.now()}`,
+      // Paystack only allows letters, digits, "-", "." and "=" in a
+      // reference -- underscores make request_inline fail with a 400.
+      ref: `inv-${invoiceId}-${Date.now()}`,
       metadata: { invoiceId },
       callback: (response: { reference: string }) => {
         // This callback firing is a UI cue only — verifyPaystackPayment
