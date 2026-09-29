@@ -5,6 +5,7 @@ import { getLinkedChildren, resolveSelectedChild } from "@/lib/parent";
 import { ChildSwitcher } from "@/components/ChildSwitcher";
 import { EmptyState } from "@/components/EmptyState";
 import { InstallmentScheduleView } from "@/components/InstallmentScheduleView";
+import { PaystackPayButton } from "@/components/PaystackPayButton";
 import { formatKobo, type InvoiceStatus, type PaymentMethod } from "@/types/database";
 import { getInvoiceStatusLabel } from "@/lib/invoiceStatus";
 
@@ -41,6 +42,13 @@ export default async function ParentFeesPage({
   }
 
   const supabase = createClient();
+
+  // The payer is the parent, so Paystack's receipt email goes to their own
+  // Auth email (same source the student fees page uses for its own email).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const email = user?.email ?? "";
 
   const { data: invoices } = await supabase
     .from("invoices")
@@ -120,6 +128,11 @@ export default async function ParentFeesPage({
                   installments={inv.invoice_installments}
                   amountPaidKobo={inv.amount_paid_kobo}
                 />
+              )}
+              {balance > 0 && (
+                <div className="mt-3">
+                  <PaystackPayButton invoiceId={inv.id} email={email} amountKobo={balance} />
+                </div>
               )}
             </div>
           );
