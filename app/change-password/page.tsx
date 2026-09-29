@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { PasswordInput } from "@/components/PasswordInput";
 import { clearMustChangePassword } from "@/lib/actions/authGuards";
 
 export default function ChangePasswordPage() {
@@ -78,14 +79,12 @@ export default function ChangePasswordPage() {
             <label htmlFor="newPassword" className="mb-1 block text-sm font-medium text-ink">
               New password
             </label>
-            <input
+            <PasswordInput
               id="newPassword"
-              type="password"
               required
               minLength={8}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded-lg border border-rule bg-white px-3 py-2 text-ink outline-none focus-visible:border-marigold"
               placeholder="At least 8 characters"
             />
           </div>
@@ -94,13 +93,11 @@ export default function ChangePasswordPage() {
             <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium text-ink">
               Confirm new password
             </label>
-            <input
+            <PasswordInput
               id="confirmPassword"
-              type="password"
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-lg border border-rule bg-white px-3 py-2 text-ink outline-none focus-visible:border-marigold"
               placeholder="Re-enter your new password"
             />
           </div>
