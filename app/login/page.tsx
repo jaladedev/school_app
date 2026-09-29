@@ -35,7 +35,7 @@ export default function LoginPage() {
     // segments it's already fetched/rendered, which can serve a
     // pre-login (unauthenticated) shell instead of picking up the fresh
     // session. Setting window.location.href forces a real browser
-    // request, which guarantees proxy.ts (the auth middleware) and every
+    // request, which guarantees middleware.ts (the auth middleware) and every
     // server component in the dashboard tree -- including
     // getCurrentProfile() in the dashboard layout -- re-run with the new
     // cookies rather than serving anything cached from before sign-in.

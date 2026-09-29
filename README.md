@@ -53,7 +53,7 @@ This README describes the current app state rather than the original starter-era
 - [Supabase](https://supabase.com/) — Postgres, Auth, Storage, and Row Level Security
 - `@supabase/ssr` + `@supabase/supabase-js` for server/browser Supabase clients
 - [Zod](https://zod.dev/) for server-side env and input validation
-- Custom Next.js middleware (`proxy.ts`) for auth/role gating and forced-password-change redirects
+- Custom Next.js middleware (`middleware.ts`) for auth/role gating and forced-password-change redirects
 
 **Rich content & editing**
 
@@ -177,7 +177,7 @@ app/                  — App Router pages and role-driven dashboard routes
 components/          — reusable UI components and forms
 lib/                 — server actions, helpers, validators, and Supabase integration
 types/               — shared database typing
-proxy.ts             — Next.js middleware: session refresh, role/auth gating, and
+middleware.ts        — Next.js middleware: session refresh, role/auth gating, and
                        forced-password-change redirects on /dashboard, /login, and
                        /change-password (runs in every environment, not just locally)
 ```

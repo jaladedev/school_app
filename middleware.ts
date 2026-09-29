@@ -131,7 +131,7 @@ function handleAuthRedirect(params: {
   return null;
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(
@@ -223,8 +223,7 @@ export async function proxy(request: NextRequest) {
     const gate = await handleDeactivation(supabase, user, request);
     if (gate.redirect) return gate.redirect;
 
-    mustChangePassword =
-      gate.mustChangePassword ?? (await handlePasswordChange(supabase, user));
+    mustChangePassword = gate.mustChangePassword ?? (await handlePasswordChange(supabase, user));
   }
 
   const authRedirect = handleAuthRedirect({
