@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { UserRole, StaffRole } from "@/types/database";
 import { SignOutButton } from "@/components/SignOutButton";
+import { LiveMessagesBadge } from "@/components/LiveMessagesBadge";
 
 const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
   student: [
@@ -185,11 +186,13 @@ export function Sidebar({
   role,
   fullName,
   staffRole,
+  userId,
   notificationCounts,
 }: {
   role: UserRole;
   fullName: string;
   staffRole?: StaffRole | null;
+  userId: string;
   notificationCounts?: NotificationCounts;
 }) {
   const counts: NotificationCounts = notificationCounts ?? {
@@ -378,7 +381,11 @@ export function Sidebar({
                               }`}
                             >
                               {item.label}
-                              <NotificationBadge count={countFor(item.label, counts)} />
+                              {item.label === "Messages" ? (
+                                <LiveMessagesBadge userId={userId} initialCount={counts.messages} />
+                              ) : (
+                                <NotificationBadge count={countFor(item.label, counts)} />
+                              )}
                             </Link>
                           );
                         })}
@@ -404,7 +411,11 @@ export function Sidebar({
                       }`}
                     >
                       {item.label}
-                      <NotificationBadge count={countFor(item.label, counts)} />
+                      {item.label === "Messages" ? (
+                        <LiveMessagesBadge userId={userId} initialCount={counts.messages} />
+                      ) : (
+                        <NotificationBadge count={countFor(item.label, counts)} />
+                      )}
                     </Link>
                   );
                 })}

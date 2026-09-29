@@ -43,6 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         role={profile.role}
         fullName={profile.full_name}
         staffRole={staffRole}
+        userId={profile.id}
         notificationCounts={{
           messages: counts?.unread_messages ?? 0,
           announcements: counts?.unread_announcements ?? 0,

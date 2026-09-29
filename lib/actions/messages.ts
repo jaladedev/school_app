@@ -42,10 +42,7 @@ export async function getMessagePartners(
 ): Promise<{ id: string; full_name: string; role: string }[]> {
   if (!userIds.length) return [];
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("profiles")
-    .select("id, full_name, role")
-    .in("id", userIds);
+  const { data } = await admin.from("profiles").select("id, full_name, role").in("id", userIds);
   return data ?? [];
 }
 
@@ -113,6 +110,31 @@ export async function markThreadRead(partnerId: string) {
     .eq("read", false);
 
   revalidatePath("/dashboard/messages");
+}
+
+/**
+ * Backs the live sidebar badge (LiveMessagesBadge) rather than
+ * get_notification_counts(): that RPC only runs once per dashboard
+ * *layout* mount, and Next.js doesn't re-run a layout's server data on
+ * a soft client-side navigation between routes under it -- so the
+ * badge would otherwise go stale the moment a new message arrives
+ * while the user is already inside /dashboard. Scoped to the caller's
+ * own recipient_id, so the plain session client (and its RLS) is fine
+ * here -- no admin client needed, unlike the partner-lookup actions
+ * above.
+ */
+export async function getUnreadMessagesCount(): Promise<number> {
+  const profile = await getCurrentProfile();
+  if (!profile) return 0;
+
+  const supabase = createClient();
+  const { count } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("recipient_id", profile.id)
+    .eq("read", false);
+
+  return count ?? 0;
 }
 
 /**
