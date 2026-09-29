@@ -33,14 +33,22 @@ async function handleDeactivation(
   supabase: SupabaseMiddlewareClient,
   user: User,
   request: NextRequest
-): Promise<NextResponse | null> {
+): Promise<{ redirect: NextResponse | null; mustChangePassword: boolean | null }> {
+  // must_change_password is read from the same row on purpose: the JWT
+  // claim is only refreshed at token issuance, so after an admin reset a
+  // still-valid older token says `false` and would skip the change-password
+  // gate. The database is the source of truth; null means "couldn't read it".
   const { data: activeCheck } = await supabase
     .from("profiles")
-    .select("is_active")
+    .select("is_active, must_change_password")
     .eq("id", user.id)
     .single();
 
-  if (!activeCheck || activeCheck.is_active !== false) return null;
+  const mustChangePassword = activeCheck ? Boolean(activeCheck.must_change_password) : null;
+
+  if (!activeCheck || activeCheck.is_active !== false) {
+    return { redirect: null, mustChangePassword };
+  }
 
   // Deactivation is a security-relevant, infrequent event -- worth a
   // record of who got signed out and when, separate from the ordinary
@@ -53,12 +61,12 @@ async function handleDeactivation(
   await supabase.auth.signOut();
   const redirectUrl = new URL("/login", request.url);
   redirectUrl.searchParams.set("reason", "deactivated");
-  return NextResponse.redirect(redirectUrl);
+  return { redirect: NextResponse.redirect(redirectUrl), mustChangePassword };
 }
 
-// Resolves whether the signed-in user must change their password.
-// Prefers the JWT claim (cheap, no extra query); falls back to a
-// profile lookup for sessions issued before the claim existed.
+// Fallback only: used when the profile row couldn't be read above.
+// Reads the JWT claim, which can be stale after an admin reset, so the
+// profile value from handleDeactivation always wins when available.
 async function handlePasswordChange(
   supabase: SupabaseMiddlewareClient,
   user: User
@@ -212,10 +220,11 @@ export async function proxy(request: NextRequest) {
   let mustChangePassword = false;
 
   if (user && (isDashboardRoute || isLoginRoute || isChangePasswordRoute || isHomeRoute)) {
-    const deactivationRedirect = await handleDeactivation(supabase, user, request);
-    if (deactivationRedirect) return deactivationRedirect;
+    const gate = await handleDeactivation(supabase, user, request);
+    if (gate.redirect) return gate.redirect;
 
-    mustChangePassword = await handlePasswordChange(supabase, user);
+    mustChangePassword =
+      gate.mustChangePassword ?? (await handlePasswordChange(supabase, user));
   }
 
   const authRedirect = handleAuthRedirect({
