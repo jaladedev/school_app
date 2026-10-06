@@ -14,13 +14,16 @@ export default async function AttendanceLandingPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: myClass } = await supabase
+  // A teacher can be class teacher of more than one class, so this is a list,
+  // not a single row.
+  const { data: myClasses } = await supabase
     .from("classes")
     .select("id, name, arm")
     .eq("class_teacher_id", profile.id)
-    .maybeSingle();
+    .eq("is_archived", false)
+    .order("name", { ascending: true });
 
-  if (!myClass) {
+  if (!myClasses?.length) {
     return (
       <div className="max-w-xl">
         <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Attendance</h1>
@@ -32,80 +35,92 @@ export default async function AttendanceLandingPage() {
     );
   }
 
-  const className = `${myClass.name} ${myClass.arm ?? ""}`.trim();
+  const sections = await Promise.all(
+    myClasses.map(async (myClass) => {
+      const className = `${myClass.name} ${myClass.arm ?? ""}`.trim();
 
-  const { data: todayRows } = await supabase
-    .from("attendance")
-    .select("student_id")
-    .eq("class_id", myClass.id)
-    .eq("date", today);
+      const { data: recentRows } = await supabase
+        .from("attendance")
+        .select("date, status")
+        .eq("class_id", myClass.id)
+        .order("date", { ascending: false })
+        .limit(80);
 
-  const markedToday = (todayRows?.length ?? 0) > 0;
+      const byDate = new Map<string, { present: number; total: number }>();
+      for (const row of recentRows ?? []) {
+        const current = byDate.get(row.date) ?? { present: 0, total: 0 };
+        current.total += 1;
+        if (row.status === "present" || row.status === "late") current.present += 1;
+        byDate.set(row.date, current);
+      }
 
-  const { data: recentRows } = await supabase
-    .from("attendance")
-    .select("date, status")
-    .eq("class_id", myClass.id)
-    .order("date", { ascending: false })
-    .limit(80);
+      const history = [...byDate.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .slice(-8)
+        .map(([date, counts]) => ({ id: date, lessonDate: date, ...counts }));
 
-  const byDate = new Map<string, { present: number; total: number }>();
-  for (const row of recentRows ?? []) {
-    const current = byDate.get(row.date) ?? { present: 0, total: 0 };
-    current.total += 1;
-    if (row.status === "present" || row.status === "late") current.present += 1;
-    byDate.set(row.date, current);
-  }
+      const pastDates = [...byDate.keys()]
+        .filter((d) => d !== today)
+        .sort((a, b) => b.localeCompare(a));
 
-  const history = [...byDate.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-8)
-    .map(([date, counts]) => ({ id: date, lessonDate: date, ...counts }));
-
-  const pastDates = [...byDate.keys()]
-    .filter((d) => d !== today)
-    .sort((a, b) => b.localeCompare(a));
+      return {
+        id: myClass.id,
+        className,
+        markedToday: byDate.has(today),
+        history,
+        pastDates,
+      };
+    })
+  );
 
   return (
     <div className="max-w-xl">
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Attendance</h1>
-      <p className="mb-6 text-sm text-ink-soft">{className} — one record per student per day.</p>
+      <p className="mb-6 text-sm text-ink-soft">One record per student per day.</p>
 
-      <AttendanceHistoryChart lessons={history} />
+      {sections.map((section) => (
+        <section key={section.id} className="mb-12">
+          <h2 className="mb-3 font-display text-xl font-semibold text-ink">{section.className}</h2>
 
-      <h2 className="mb-3 font-display text-lg font-semibold text-ink">Today</h2>
-      <div className="mb-8">
-        <Link
-          href={`/dashboard/teacher/attendance/${myClass.id}/${today}`}
-          className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 transition hover:border-leaf"
-        >
-          <div>
-            <p className="text-ink">{className}</p>
-            <p className="text-xs text-ink-soft">{today}</p>
+          <AttendanceHistoryChart lessons={section.history} />
+
+          <h3 className="mb-3 font-display text-lg font-semibold text-ink">Today</h3>
+          <div className="mb-8">
+            <Link
+              href={`/dashboard/teacher/attendance/${section.id}/${today}`}
+              className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 transition hover:border-leaf"
+            >
+              <div>
+                <p className="text-ink">{section.className}</p>
+                <p className="text-xs text-ink-soft">{today}</p>
+              </div>
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                  section.markedToday
+                    ? "bg-leaf-soft text-leaf"
+                    : "bg-marigold/20 text-marigold-text"
+                }`}
+              >
+                {section.markedToday ? "Marked" : "Pending"}
+              </span>
+            </Link>
           </div>
-          <span
-            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-              markedToday ? "bg-leaf-soft text-leaf" : "bg-marigold/20 text-marigold-text"
-            }`}
-          >
-            {markedToday ? "Marked" : "Pending"}
-          </span>
-        </Link>
-      </div>
 
-      <h2 className="mb-3 font-display text-lg font-semibold text-ink">Recent</h2>
-      <div className="space-y-2">
-        {pastDates.map((date) => (
-          <Link
-            key={date}
-            href={`/dashboard/teacher/attendance/${myClass.id}/${date}`}
-            className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 transition hover:border-leaf"
-          >
-            <span className="text-ink">{date}</span>
-          </Link>
-        ))}
-        {!pastDates.length && <EmptyState message="No earlier attendance found." />}
-      </div>
+          <h3 className="mb-3 font-display text-lg font-semibold text-ink">Recent</h3>
+          <div className="space-y-2">
+            {section.pastDates.map((date) => (
+              <Link
+                key={date}
+                href={`/dashboard/teacher/attendance/${section.id}/${date}`}
+                className="flex items-center justify-between rounded-lg border border-rule bg-white px-4 py-3 transition hover:border-leaf"
+              >
+                <span className="text-ink">{date}</span>
+              </Link>
+            ))}
+            {!section.pastDates.length && <EmptyState message="No earlier attendance found." />}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

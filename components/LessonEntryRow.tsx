@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { CreateLessonForm } from "@/components/CreateLessonForm";
 
 export function LessonEntryRow({
@@ -64,18 +63,15 @@ export function LessonEntryRow({
             )}
           </p>
           <p className="text-sm text-ink-soft">
-            Period {periodNumber} · {startTime}–{endTime}
+            Period {periodNumber} · {startTime.slice(0, 5)}–{endTime.slice(0, 5)}
             {room ? ` · Room ${room}` : ""}
           </p>
         </div>
 
         {lessonId ? (
-          <Link
-            href={`/dashboard/teacher/attendance/${lessonId}`}
-            className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark"
-          >
-            Mark attendance
-          </Link>
+          <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-xs font-medium text-leaf">
+            Lesson logged
+          </span>
         ) : (
           <button
             onClick={() => setLogging((prev) => !prev)}
