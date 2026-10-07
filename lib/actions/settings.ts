@@ -18,7 +18,6 @@ export async function saveSchoolSettings(input: {
   currentTerm: number;
   currentTermStartDate?: string | null;
   libraryFineKoboPerDay?: number;
-  studentOnlinePaymentEnabled?: boolean;
   gradeScale: GradeScaleEntry[];
 }) {
   await assertRole(["admin"], "Only an admin can update school settings.");
@@ -77,11 +76,30 @@ export async function saveSchoolSettings(input: {
       current_term: input.currentTerm,
       current_term_start_date: input.currentTermStartDate || null,
       library_fine_kobo_per_day: input.libraryFineKoboPerDay ?? 0,
-      // Omitted = leave the stored value alone (never flips it by accident).
-      ...(input.studentOnlinePaymentEnabled !== undefined && {
-        student_online_payment_enabled: input.studentOnlinePaymentEnabled,
-      }),
       grade_scale: input.gradeScale,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", 1);
+
+  if (error) throwDbError(error);
+
+  revalidatePath("/dashboard/admin/settings");
+  revalidatePath("/dashboard/student/fees");
+}
+
+/**
+ * Flips only the student-payment toggle, so it can save instantly from its
+ * own switch without resubmitting (and risking overwriting) the rest of
+ * the settings form.
+ */
+export async function setStudentOnlinePayment(enabled: boolean) {
+  await assertRole(["admin"], "Only an admin can update school settings.");
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("school_settings")
+    .update({
+      student_online_payment_enabled: enabled,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1);

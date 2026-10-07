@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { saveSchoolSettings } from "@/lib/actions/settings";
 import { emitToast } from "@/lib/toast";
+import { StudentPaymentToggle } from "@/components/StudentPaymentToggle";
 import type { GradeScaleEntry, SchoolSettings } from "@/types/database";
 
 export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
@@ -15,9 +16,6 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
   const [termStartDate, setTermStartDate] = useState(settings.current_term_start_date ?? "");
   const [fineNaira, setFineNaira] = useState(
     settings.library_fine_kobo_per_day ? String(settings.library_fine_kobo_per_day / 100) : ""
-  );
-  const [studentPayEnabled, setStudentPayEnabled] = useState(
-    settings.student_online_payment_enabled ?? true
   );
   const [gradeScale, setGradeScale] = useState<GradeScaleEntry[]>(settings.grade_scale);
   const [isPending, startTransition] = useTransition();
@@ -51,7 +49,6 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
           currentTerm: term,
           currentTermStartDate: termStartDate || null,
           libraryFineKoboPerDay: fineNaira ? Math.round(fine * 100) : 0,
-          studentOnlinePaymentEnabled: studentPayEnabled,
           gradeScale,
         });
         emitToast("School settings saved.");
@@ -196,27 +193,7 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-rule bg-white p-4">
-        <h2 className="mb-3 font-display text-lg font-semibold text-ink">Online fee payment</h2>
-        <label className="flex items-start gap-3">
-          <input
-            type="checkbox"
-            checked={studentPayEnabled}
-            onChange={(e) => setStudentPayEnabled(e.target.checked)}
-            className="mt-1"
-          />
-          <span>
-            <span className="block text-sm font-medium text-ink">
-              Let students pay their own fees online
-            </span>
-            <span className="block text-xs text-ink-soft">
-              Parents and guardians can always pay. Students can always see their invoices; when
-              this is off they just won&apos;t get the &quot;Pay with card&quot; button. When a
-              student does pay, their linked guardians are emailed a copy of the payment.
-            </span>
-          </span>
-        </label>
-      </div>
+      <StudentPaymentToggle initialEnabled={settings.student_online_payment_enabled ?? true} />
 
       <div className="rounded-xl border border-rule bg-white p-4">
         <h2 className="mb-3 font-display text-lg font-semibold text-ink">Grade scale</h2>
