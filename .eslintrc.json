@@ -45,7 +45,10 @@
       // lib/audit.ts writes audit log rows regardless of the calling
       // user's RLS permissions; lib/report-card.ts guards access
       // internally (see getReportCardData) before using the admin
-      // client; the dashboard pages below are protected by role-gated
+      // client; lib/feeReceiptEmail.ts only uses a type-only import of
+      // createAdminClient (ReturnType<...>) -- the client itself is
+      // passed in by lib/actions/fees.ts, so no service_role client is
+      // created here; the dashboard pages below are protected by role-gated
       // layouts and need cross-user reads the signed-in user's own RLS
       // policies wouldn't allow (e.g. an admin looking up any student).
       // New page-level usages should be added here deliberately rather
@@ -54,6 +57,7 @@
       "files": [
         "lib/audit.ts",
         "lib/report-card.ts",
+        "lib/feeReceiptEmail.ts",
         "app/dashboard/admin/id-cards/print/page.tsx",
         "app/dashboard/admin/students/\\[studentId\\]/page.tsx",
         "app/dashboard/teacher/homework/page.tsx",
