@@ -29,7 +29,8 @@ vi.mock("@/lib/env.server", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/email", () => ({ sendBulkEmail }));
 
-import { checkOnlinePaymentAllowed, STUDENT_PAYMENT_DISABLED_MESSAGE } from "@/lib/actions/fees";
+import { checkOnlinePaymentAllowed } from "@/lib/actions/fees";
+import { STUDENT_PAYMENT_DISABLED_MESSAGE } from "@/lib/feeMessages";
 import { sendGuardianReceiptCopy } from "@/lib/feeReceiptEmail";
 import { createAdminClient } from "@/lib/supabase/admin";
 

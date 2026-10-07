@@ -10,6 +10,7 @@ import { computeInvoiceStatus } from "@/lib/invoiceStatus";
 import { throwDbError } from "@/lib/errors/db";
 import { sendGuardianReceiptCopy } from "@/lib/feeReceiptEmail";
 import { logger } from "@/lib/logger";
+import { STUDENT_PAYMENT_DISABLED_MESSAGE } from "@/lib/feeMessages";
 
 /**
  * Admin or the bursar. The DB already grants staff_role: "bursar" write
@@ -283,9 +284,6 @@ async function resolveInvoicePayer(
   await assertRole(["admin"], "You can't pay an invoice that isn't yours.");
   return "admin";
 }
-
-export const STUDENT_PAYMENT_DISABLED_MESSAGE =
-  "Online payment by students is turned off at your school. Ask a parent or guardian to pay, or pay at the school office.";
 
 /**
  * Called by the pay button BEFORE the Paystack popup opens. Checking only
