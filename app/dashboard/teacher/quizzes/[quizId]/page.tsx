@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { PublishToggle } from "@/components/PublishToggle";
+import { QuizScheduleEditor } from "@/components/QuizScheduleEditor";
 import { QuestionText } from "@/components/QuestionText";
 import { EssayGradingForm } from "@/components/EssayGradingForm";
 
@@ -90,6 +91,13 @@ export default async function TeacherQuizDetailPage({
         </div>
         <PublishToggle quizId={quiz.id} isPublished={quiz.is_published} />
       </div>
+
+      <QuizScheduleEditor
+        quizId={quiz.id}
+        opensAt={quiz.opens_at}
+        closesAt={quiz.closes_at}
+        isPublished={quiz.is_published}
+      />
 
       <div className="mb-6 flex flex-wrap gap-2">
         <Link

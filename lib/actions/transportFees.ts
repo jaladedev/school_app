@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
+import { runAction, type ActionResult } from "@/lib/actionResult";
 
 async function assertCanManageTransportFees(): Promise<{ actorId: string }> {
   const { id } = await assertRole(
@@ -28,7 +29,7 @@ async function assertCanManageTransportFees(): Promise<{ actorId: string }> {
   return { actorId: id };
 }
 
-export async function createTransportFeeStructure(input: {
+async function insertTransportFeeStructure(input: {
   routeId: string;
   term: number;
   academicYear: string;
@@ -46,7 +47,7 @@ export async function createTransportFeeStructure(input: {
     route_id: input.routeId,
     term: input.term,
     academic_year: input.academicYear,
-    title: input.title?.trim() || "Transport Fee",
+    title: input.title?.trim().slice(0, 120) || "Transport Fee",
     amount_kobo: input.amountKobo,
     due_date: input.dueDate || null,
     created_by: actorId,
@@ -55,6 +56,13 @@ export async function createTransportFeeStructure(input: {
 
   revalidatePath("/dashboard/admin/transport");
   revalidatePath("/dashboard/transport");
+}
+
+/** Returns failures as values -- thrown messages are redacted in production (see lib/actionResult.ts). */
+export async function createTransportFeeStructure(
+  input: Parameters<typeof insertTransportFeeStructure>[0]
+): Promise<ActionResult> {
+  return runAction(() => insertTransportFeeStructure(input));
 }
 
 export async function voidTransportFeeStructure(id: string) {

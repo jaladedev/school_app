@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
 import type { TripDirection, TripStatusValue } from "@/types/database";
 import { throwDbError } from "@/lib/errors/db";
@@ -280,14 +281,13 @@ export async function assignStudentToRoute(input: {
   academicYear: string;
 }) {
   await assertCanManageTransport();
-  const admin = createAdminClient();
 
   // The route lock, capacity check, stop-belongs-to-route check,
   // close-old-assignment, and insert-new-assignment all happen inside
   // assign_student_to_route in one transaction — closes the race window
   // the old sequential app-side calls had (mirrors
   // assign_student_to_hostel_room for hostels).
-  const { error } = await admin.rpc("assign_student_to_route", {
+  const { error } = await createClient().rpc("assign_student_to_route", {
     p_student_id: input.studentId,
     p_route_id: input.routeId,
     p_stop_id: input.stopId,

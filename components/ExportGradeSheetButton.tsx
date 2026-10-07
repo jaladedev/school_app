@@ -63,7 +63,11 @@ export function ExportGradeSheetButton({
         grade.score,
         percent.toFixed(1),
         gradeScale.length ? scoreToLetterGrade(percent, gradeScale) : "",
-        grade.moderation_status === "approved" ? "Approved" : "Pending",
+        grade.moderation_status === "approved"
+          ? "Approved"
+          : grade.moderation_status === "rejected"
+            ? "Rejected"
+            : "Pending",
       ];
     });
 

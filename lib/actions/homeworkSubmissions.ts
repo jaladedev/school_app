@@ -148,4 +148,6 @@ export async function reviewHomeworkSubmission(submissionId: string, remark: str
   if (error) throwDbError(error);
 
   revalidatePath("/dashboard/teacher/homework");
+  revalidatePath("/dashboard/student/homework");
+  revalidatePath("/dashboard/parent/homework");
 }

@@ -2,7 +2,8 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/EmptyState";
 import { HomeworkSubmissionUpload } from "@/components/HomeworkSubmissionUpload";
-import { homeworkDueStatus } from "@/types/database";
+import { homeworkDisplayStatus, homeworkDueStatus } from "@/types/database";
+import { HomeworkStatusBadge } from "@/components/HomeworkStatusBadge";
 import type { HomeworkStatus, HomeworkSubmissionStatus } from "@/types/database";
 
 type HomeworkLessonRow = {
@@ -78,25 +79,16 @@ export default async function StudentHomeworkPage() {
               </p>
               <div className="flex shrink-0 items-center gap-2">
                 <span className="text-xs text-ink-soft">{l.lesson_date}</span>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                    l.homework_status === "graded"
-                      ? "bg-sky-100 text-sky-800"
-                      : l.homework_status === "reviewed"
-                        ? "bg-leaf-soft text-leaf"
-                        : "bg-marigold/20 text-marigold-text"
-                  }`}
-                >
-                  {l.homework_status === "graded"
-                    ? "Graded"
-                    : l.homework_status === "reviewed"
-                      ? "Reviewed"
-                      : "Given"}
-                </span>
+                <HomeworkStatusBadge
+                  status={homeworkDisplayStatus(l.homework_status, l.homework_submissions?.[0]?.status)}
+                />
               </div>
             </div>
             {l.homework_due_at &&
               (() => {
+                // A submitted/reviewed/graded card isn't "overdue" any more.
+                if (homeworkDisplayStatus(l.homework_status, l.homework_submissions?.[0]?.status) !== "given")
+                  return null;
                 const status = homeworkDueStatus(l);
                 if (status === "none") return null;
                 return (

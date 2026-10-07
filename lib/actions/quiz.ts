@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
 import { throwDbError } from "@/lib/errors/db";
+import { quizWindowError } from "@/lib/quizWindow";
+import { runAction, type ActionResult } from "@/lib/actionResult";
 
 type QuestionInput = {
   questionText: string;
@@ -20,7 +22,7 @@ type QuestionInput = {
   options: { text: string; isCorrect: boolean; matchPrompt?: string }[];
 };
 
-export async function createQuiz(input: {
+async function insertQuiz(input: {
   title: string;
   subjectId: string;
   classId: string;
@@ -41,6 +43,9 @@ export async function createQuiz(input: {
     ["admin", "teacher"],
     "Only an admin or a teacher can create a quiz."
   );
+
+  const windowError = quizWindowError(input.opensAt, input.closesAt);
+  if (windowError) throw new Error(windowError);
 
   // Teachers may only create quizzes for subjects they're assigned to.
   // RLS (assessments_write_teacher_admin) only checks created_by, not
@@ -142,6 +147,68 @@ export async function createQuiz(input: {
 
   revalidatePath("/dashboard/teacher/quizzes");
   return quizId as string;
+}
+
+/** Returns failures as values -- thrown messages are redacted in production (see lib/actionResult.ts). */
+export async function createQuiz(
+  input: Parameters<typeof insertQuiz>[0]
+): Promise<ActionResult<string>> {
+  return runAction(() => insertQuiz(input));
+}
+
+/**
+ * Change when a quiz opens/closes. Only allowed while it's unpublished --
+ * once students can see it, the window is what they planned around.
+ * Passing undefined/empty clears that bound.
+ */
+export async function updateQuizSchedule(
+  quizId: string,
+  schedule: { opensAt?: string; closesAt?: string }
+): Promise<ActionResult> {
+  return runAction(async () => {
+    const { id: actorId, role: actorRole } = await assertRole(
+      ["admin", "teacher"],
+      "Only an admin or teacher can do this."
+    );
+    const admin = createAdminClient();
+
+    const { data: quiz } = await admin
+      .from("quizzes")
+      .select("assessment_id, is_published")
+      .eq("id", quizId)
+      .single();
+    if (!quiz) throw new Error("Quiz not found.");
+
+    if (actorRole === "teacher") {
+      const { data: assessment } = await admin
+        .from("assessments")
+        .select("created_by")
+        .eq("id", quiz.assessment_id)
+        .single();
+      if (assessment?.created_by !== actorId) {
+        throw new Error("You can only change the schedule of your own quizzes.");
+      }
+    }
+
+    if (quiz.is_published) {
+      throw new Error("Unpublish this quiz before changing its schedule.");
+    }
+
+    const windowError = quizWindowError(schedule.opensAt, schedule.closesAt);
+    if (windowError) throw new Error(windowError);
+
+    const { error } = await admin
+      .from("quizzes")
+      .update({
+        opens_at: schedule.opensAt || null,
+        closes_at: schedule.closesAt || null,
+      })
+      .eq("id", quizId);
+    if (error) throwDbError(error);
+
+    revalidatePath("/dashboard/teacher/quizzes");
+    revalidatePath(`/dashboard/teacher/quizzes/${quizId}`);
+  });
 }
 
 // Fetches a quiz's questions/options (including is_correct and accepted
@@ -345,7 +412,7 @@ export async function getQuizQuestionAnalytics(quizId: string): Promise<{
   return { totalSubmitted, questions: result };
 }
 
-export async function setQuizPublished(quizId: string, isPublished: boolean) {
+async function updatePublished(quizId: string, isPublished: boolean) {
   const { id: actorId, role: actorRole } = await assertRole(
     ["admin", "teacher"],
     "Only an admin or teacher can do this."
@@ -377,6 +444,22 @@ export async function setQuizPublished(quizId: string, isPublished: boolean) {
     }
   }
 
+  if (isPublished) {
+    // Publishing a quiz that has already closed would put something on
+    // students' lists that nobody can take. This is where "edit the schedule
+    // before publishing" matters.
+    const { data: window } = await admin
+      .from("quizzes")
+      .select("closes_at")
+      .eq("id", quizId)
+      .single();
+    if (window?.closes_at && new Date(window.closes_at).getTime() < Date.now()) {
+      throw new Error(
+        "This quiz's closing time has already passed. Edit its schedule before publishing."
+      );
+    }
+  }
+
   const { error } = await admin
     .from("quizzes")
     .update({ is_published: isPublished })
@@ -385,6 +468,11 @@ export async function setQuizPublished(quizId: string, isPublished: boolean) {
 
   revalidatePath("/dashboard/teacher/quizzes");
   revalidatePath(`/dashboard/teacher/quizzes/${quizId}`);
+}
+
+/** Returns failures as values -- thrown messages are redacted in production (see lib/actionResult.ts). */
+export async function setQuizPublished(quizId: string, isPublished: boolean): Promise<ActionResult> {
+  return runAction(() => updatePublished(quizId, isPublished));
 }
 
 // Awards points for one or more essay answers on an already-submitted

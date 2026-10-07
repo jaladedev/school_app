@@ -180,26 +180,20 @@ export default async function TeacherNoteEditPage({
         .order("period_number", { ascending: true })
     : { data: [] };
 
-  // Same eligibility check as the notes list page's "awaiting your
-  // review" panel (see lessonPlanModeration.ts's assertCanModerateTopicNote):
-  // admins can review anything, an HOD can only review notes in a
-  // subject they're the HOD for. Without this, a teacher who isn't the
-  // reviewing HOD would see Approve/Reject buttons here that
-  // lessonPlanModeration's own server-side check would just reject
-  // anyway -- worse, showing them at all implies to a non-HOD teacher
-  // that they has this authority, when they don't.
+  // Same eligibility as the notes list page's "awaiting your review" panel
+  // and lessonPlanModeration.ts: any HOD can review every subject's notes
+  // (principal-level model, see 20260921184114_hod_principal_wide_approval),
+  // admins too. This used to also require the topic's subject to be in the
+  // HOD's subjects_taught, which hid the Approve/Reject buttons from an HOD
+  // here even though the list page and the server action both allow them.
   let canReview = false;
   if (profile) {
     const { data: viewerTeacherProfile } = await supabase
       .from("teacher_profiles")
-      .select("staff_role, subjects_taught")
+      .select("staff_role")
       .eq("id", profile.id)
       .maybeSingle();
-    canReview =
-      profile.role === "admin" ||
-      (viewerTeacherProfile?.staff_role === "hod" &&
-        !!topic &&
-        !!viewerTeacherProfile.subjects_taught?.includes(topic.subject_id));
+    canReview = profile.role === "admin" || viewerTeacherProfile?.staff_role === "hod";
   }
 
   return (

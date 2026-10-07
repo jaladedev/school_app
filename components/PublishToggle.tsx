@@ -11,13 +11,13 @@ export function PublishToggle({ quizId, isPublished }: { quizId: string; isPubli
 
   function toggle() {
     startTransition(async () => {
-      try {
-        await setQuizPublished(quizId, !isPublished);
-        emitToast(isPublished ? "Quiz unpublished." : "Quiz published — students can now take it.");
-        router.refresh();
-      } catch (err) {
-        emitToast(err instanceof Error ? err.message : "Something went wrong.", "error");
+      const result = await setQuizPublished(quizId, !isPublished);
+      if (!result.ok) {
+        emitToast(result.error, "error");
+        return;
       }
+      emitToast(isPublished ? "Quiz unpublished." : "Quiz published — students can now take it.");
+      router.refresh();
     });
   }
 

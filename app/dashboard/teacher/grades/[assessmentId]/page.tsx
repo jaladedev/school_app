@@ -32,8 +32,17 @@ export default async function GradeEntryPage({
 
   const { data: existingGrades } = await supabase
     .from("grades")
-    .select("student_id, score, remark")
+    .select("student_id, score, remark, moderation_status, review_note")
     .eq("assessment_id", resolvedParams.assessmentId);
+
+  const nameById = new Map(students.map((st) => [st.id, st.full_name]));
+  const sentBack = (existingGrades ?? [])
+    .filter((g) => g.moderation_status === "rejected")
+    .map((g) => ({
+      name: nameById.get(g.student_id) ?? "Unknown student",
+      score: g.score,
+      note: g.review_note,
+    }));
 
   const initialGrades: Record<string, { score: number; remark: string | null }> = {};
   for (const g of existingGrades ?? []) {
@@ -55,6 +64,22 @@ export default async function GradeEntryPage({
         {assessment?.title}{" "}
         <span className="text-base font-normal text-ink-soft">/ {assessment?.max_score}</span>
       </h1>
+
+      {sentBack.length > 0 && (
+        <div className="mb-6 rounded-lg border border-clay/40 bg-clay/5 p-4">
+          <p className="mb-2 text-sm font-medium text-clay">
+            An HOD sent {sentBack.length} grade{sentBack.length === 1 ? "" : "s"} back. Edit and
+            save to resubmit.
+          </p>
+          <ul className="space-y-1 text-sm text-ink">
+            {sentBack.map((g) => (
+              <li key={g.name}>
+                {g.name} ({g.score}){g.note ? ` — ${g.note}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {students.length ? (
         <>

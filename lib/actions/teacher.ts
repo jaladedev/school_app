@@ -15,10 +15,11 @@ import type {
   ResourceType,
 } from "@/types/database";
 import { throwDbError } from "@/lib/errors/db";
+import { runAction, type ActionResult } from "@/lib/actionResult";
 
 // ---------- Lessons ----------
 
-export async function createLesson(input: {
+async function insertLesson(input: {
   timetableEntryId: string;
   classId: string;
   lessonDate: string;
@@ -80,6 +81,13 @@ export async function createLesson(input: {
   return { lessonId: lesson.id };
 }
 
+/** Returns failures as values -- thrown messages are redacted in production (see lib/actionResult.ts). */
+export async function createLesson(
+  input: Parameters<typeof insertLesson>[0]
+): Promise<ActionResult<{ lessonId: string }>> {
+  return runAction(() => insertLesson(input));
+}
+
 export async function updateHomeworkStatus(lessonId: string, status: HomeworkStatus) {
   const { id: teacherId } = await assertRole(
     ["teacher"],
@@ -106,6 +114,8 @@ export async function updateHomeworkStatus(lessonId: string, status: HomeworkSta
   if (error) throwDbError(error);
 
   revalidatePath("/dashboard/teacher/homework");
+  revalidatePath("/dashboard/student/homework");
+  revalidatePath("/dashboard/parent/homework");
 }
 
 // ---------- Attendance ----------
@@ -204,6 +214,12 @@ export async function saveGrade(
       score,
       remark: remark ?? null,
       graded_by: teacherId,
+      // Saving always (re)submits for review -- a grade an HOD rejected
+      // goes back to pending here, and the old rejection note is cleared.
+      moderation_status: "pending",
+      review_note: null,
+      reviewed_by: null,
+      reviewed_at: null,
     },
     { onConflict: "assessment_id,student_id" }
   );
@@ -294,6 +310,10 @@ export async function importGrades(
       score: entry.score,
       remark: entry.remark?.trim() || null,
       graded_by: teacherId,
+      moderation_status: "pending" as const,
+      review_note: null,
+      reviewed_by: null,
+      reviewed_at: null,
     })),
     { onConflict: "assessment_id,student_id" }
   );

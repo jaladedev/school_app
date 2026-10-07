@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
 import { throwDbError } from "@/lib/errors/db";
@@ -162,9 +163,8 @@ export async function assignStudentToRoom(input: {
   // happen inside assign_student_to_hostel_room in one transaction —
   // closes the race window the old sequential app-side calls had.
   await assertCanManageRoom(input.roomId);
-  const admin = createAdminClient();
 
-  const { error } = await admin.rpc("assign_student_to_hostel_room", {
+  const { error } = await createClient().rpc("assign_student_to_hostel_room", {
     p_student_id: input.studentId,
     p_room_id: input.roomId,
     p_academic_year: input.academicYear,
@@ -284,9 +284,8 @@ export async function recordHostelVisitorCheckOut(visitorLogId: string, studentI
  */
 export async function joinHostelWaitlist(studentId: string, hostelId: string) {
   await assertCanManageHostel(hostelId);
-  const admin = createAdminClient();
 
-  const { error } = await admin.rpc("join_hostel_waitlist", {
+  const { error } = await createClient().rpc("join_hostel_waitlist", {
     p_student_id: studentId,
     p_hostel_id: hostelId,
   });

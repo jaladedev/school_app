@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getLinkedChildren, resolveSelectedChild } from "@/lib/parent";
 import { ChildSwitcher } from "@/components/ChildSwitcher";
-import { homeworkDueStatus } from "@/types/database";
+import { homeworkDisplayStatus, homeworkDueStatus } from "@/types/database";
+import { HomeworkStatusBadge } from "@/components/HomeworkStatusBadge";
 
 function dueLabel(dueAt: string, status: ReturnType<typeof homeworkDueStatus>): string {
   const formatted = new Date(`${dueAt}T00:00:00`).toLocaleDateString("en-GB", {
@@ -38,9 +39,12 @@ export default async function ParentHomeworkPage({
   const { data: lessons } = await supabase
     .from("lessons")
     .select(
-      "id, lesson_date, homework, homework_status, homework_due_at, timetable_entries(subjects(name))"
+      "id, lesson_date, homework, homework_status, homework_due_at, timetable_entries(subjects(name)), homework_submissions(status, student_id)"
     )
     .eq("class_id", studentProfile?.class_id ?? "")
+    // A parent can read every linked child's submissions, so narrow the
+    // embedded rows to the child being viewed (siblings share lessons).
+    .eq("homework_submissions.student_id", selected.id)
     .not("homework", "is", null)
     .order("lesson_date", { ascending: false })
     .limit(30);
@@ -59,25 +63,15 @@ export default async function ParentHomeworkPage({
               </p>
               <div className="flex shrink-0 items-center gap-2">
                 <span className="text-xs text-ink-soft">{l.lesson_date}</span>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                    l.homework_status === "graded"
-                      ? "bg-sky-100 text-sky-800"
-                      : l.homework_status === "reviewed"
-                        ? "bg-leaf-soft text-leaf"
-                        : "bg-marigold/20 text-marigold-text"
-                  }`}
-                >
-                  {l.homework_status === "graded"
-                    ? "Graded"
-                    : l.homework_status === "reviewed"
-                      ? "Reviewed"
-                      : "Given"}
-                </span>
+                <HomeworkStatusBadge
+                  status={homeworkDisplayStatus(l.homework_status, l.homework_submissions?.[0]?.status)}
+                />
               </div>
             </div>
             {l.homework_due_at &&
               (() => {
+                if (homeworkDisplayStatus(l.homework_status, l.homework_submissions?.[0]?.status) !== "given")
+                  return null;
                 const status = homeworkDueStatus(l);
                 if (status === "none") return null;
                 return (

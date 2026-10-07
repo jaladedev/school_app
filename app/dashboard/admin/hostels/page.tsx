@@ -89,7 +89,7 @@ export default async function HostelsPage() {
                   return (
                     <Link
                       key={r.id}
-                      href={`/dashboard/admin/hostels/${h.id}/rooms/${r.id}`}
+                      href={`/dashboard/hostels/${h.id}/rooms/${r.id}`}
                       className={`rounded-lg border px-3 py-2 text-center text-sm ${
                         full
                           ? "border-clay/30 bg-clay/5 text-clay"

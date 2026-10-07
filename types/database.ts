@@ -27,7 +27,7 @@ export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
 export type StaffRole =
   "teacher" | "hod" | "bursar" | "librarian" | "house_parent" | "transport_officer" | "driver";
-export type GradeModerationStatus = "pending" | "approved";
+export type GradeModerationStatus = "pending" | "approved" | "rejected";
 export type ResourceType = "image" | "diagram_mermaid" | "video" | "pdf" | "link" | "audio";
 export type AssetCondition = "new" | "good" | "fair" | "poor" | "damaged";
 
@@ -235,6 +235,25 @@ export function homeworkDueStatus(
   return "upcoming";
 }
 
+/**
+ * What a student (or their parent) should see on a homework card.
+ * `lesson.homework_status` is a class-wide status the teacher sets by hand;
+ * a single student's submission has its own status (submitted -> reviewed).
+ * Without folding the submission in, a student whose work had been reviewed
+ * kept seeing "Given" until the teacher also flipped the whole lesson.
+ */
+export type HomeworkDisplayStatus = "given" | "submitted" | "reviewed" | "graded";
+
+export function homeworkDisplayStatus(
+  lessonStatus: HomeworkStatus,
+  submissionStatus?: HomeworkSubmissionStatus | null
+): HomeworkDisplayStatus {
+  if (lessonStatus === "graded") return "graded";
+  if (submissionStatus === "reviewed" || lessonStatus === "reviewed") return "reviewed";
+  if (submissionStatus === "submitted") return "submitted";
+  return "given";
+}
+
 export type Attendance = {
   id: string;
   class_id: string;
@@ -281,6 +300,9 @@ export type Grade = {
   graded_by: string | null;
   graded_at: string;
   moderation_status: GradeModerationStatus;
+  review_note: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
 };
 
 export type StudentNote = {

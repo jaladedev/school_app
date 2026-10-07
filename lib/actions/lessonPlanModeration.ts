@@ -23,7 +23,25 @@ async function assertCanModerateTopicNote(topicId: string) {
   if (teacher?.staff_role !== "hod") {
     throw new Error("Only an admin or HOD can review lesson plans.");
   }
+
   return { actorId: id };
+}
+
+/**
+ * In a production build Next.js replaces the message of any error thrown
+ * from a server action with a generic "An error occurred in the Server
+ * Components render" string, so a thrown "You can only review..." never
+ * reaches the person. Return the failure as a value instead.
+ */
+export type ModerationResult = { ok: true } | { ok: false; error: string };
+
+async function runModeration(fn: () => Promise<void>): Promise<ModerationResult> {
+  try {
+    await fn();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Something went wrong." };
+  }
 }
 
 async function setNoteModerationStatus(
@@ -69,10 +87,13 @@ async function setNoteModerationStatus(
   revalidatePath(`/dashboard/student/topics/${note.topic_id}`);
 }
 
-export async function approveLessonPlan(noteId: string) {
-  await setNoteModerationStatus(noteId, "approved");
+export async function approveLessonPlan(noteId: string): Promise<ModerationResult> {
+  return runModeration(() => setNoteModerationStatus(noteId, "approved"));
 }
 
-export async function rejectLessonPlan(noteId: string, reviewNote?: string) {
-  await setNoteModerationStatus(noteId, "rejected", reviewNote);
+export async function rejectLessonPlan(
+  noteId: string,
+  reviewNote?: string
+): Promise<ModerationResult> {
+  return runModeration(() => setNoteModerationStatus(noteId, "rejected", reviewNote));
 }

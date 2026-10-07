@@ -59,7 +59,7 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
       { data: null, error: null }, // writeAuditLog insert
     ];
 
-    await expect(approveLessonPlan("note-1")).resolves.toBeUndefined();
+    expect(await approveLessonPlan("note-1")).toEqual({ ok: true });
   });
 
   it("lets an admin approve a lesson plan regardless of any HOD department logic", async () => {
@@ -79,7 +79,7 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
       { data: null, error: null }, // writeAuditLog insert
     ];
 
-    await expect(approveLessonPlan("note-1")).resolves.toBeUndefined();
+    expect(await approveLessonPlan("note-1")).toEqual({ ok: true });
   });
 
   it("rejects a non-HOD teacher even for a topic in a subject they teach", async () => {
@@ -98,9 +98,7 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
       { data: { staff_role: "class_teacher" }, error: null }, // not hod
     ];
 
-    await expect(rejectLessonPlan("note-1", "needs revision")).rejects.toThrow(
-      "Only an admin or HOD can review lesson plans."
-    );
+    expect(await rejectLessonPlan("note-1", "needs revision")).toEqual({ ok: false, error: "Only an admin or HOD can review lesson plans." });
   });
 
   it("rejects a student before any DB write", async () => {
@@ -117,9 +115,7 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
       { data: { role: "student", is_active: true }, error: null }, // assertRole
     ];
 
-    await expect(approveLessonPlan("note-1")).rejects.toThrow(
-      "Only an admin or HOD can review lesson plans."
-    );
+    expect(await approveLessonPlan("note-1")).toEqual({ ok: false, error: "Only an admin or HOD can review lesson plans." });
   });
 
   it("rejects reviewing a note that hasn't been published yet, before checking role", async () => {
@@ -135,8 +131,9 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
       },
     ];
 
-    await expect(approveLessonPlan("note-1")).rejects.toThrow(
-      "Only a published note can be reviewed"
-    );
+    expect(await approveLessonPlan("note-1")).toEqual({
+      ok: false,
+      error: expect.stringContaining("Only a published note can be reviewed"),
+    });
   });
 });

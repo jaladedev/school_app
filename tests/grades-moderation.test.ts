@@ -23,7 +23,12 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath }));
 
-import { approveAssessmentGrades, approveSingleGrade } from "@/lib/actions/gradesModeration";
+import {
+  approveAssessmentGrades,
+  approveSingleGrade,
+  rejectAssessmentGrades,
+  rejectSingleGrade,
+} from "@/lib/actions/gradesModeration";
 
 function mockAuthenticatedAs(userId: string) {
   getUserWithRetry.mockResolvedValue({
@@ -55,7 +60,7 @@ describe("grade moderation: HOD is school-wide, not scoped to subjects_taught", 
     ];
 
     const result = await approveAssessmentGrades("assessment-outside-hod-department");
-    expect(result.count).toBe(3);
+    expect(result).toEqual({ ok: true, data: { count: 3 } });
   });
 
   it("lets an admin approve grades regardless of any HOD department logic", async () => {
@@ -68,7 +73,7 @@ describe("grade moderation: HOD is school-wide, not scoped to subjects_taught", 
     ];
 
     const result = await approveAssessmentGrades("assessment-1");
-    expect(result.count).toBe(1);
+    expect(result).toEqual({ ok: true, data: { count: 1 } });
   });
 
   it("rejects a non-HOD teacher even for an assessment in a subject they teach", async () => {
@@ -79,18 +84,20 @@ describe("grade moderation: HOD is school-wide, not scoped to subjects_taught", 
       { data: { staff_role: "class_teacher" }, error: null }, // not hod
     ];
 
-    await expect(approveAssessmentGrades("assessment-1")).rejects.toThrow(
-      "Only an admin or HOD can approve grades."
-    );
+    expect(await approveAssessmentGrades("assessment-1")).toEqual({
+      ok: false,
+      error: "Only an admin or HOD can review grades.",
+    });
   });
 
   it("rejects a student before any DB write", async () => {
     mockAuthenticatedAs("student-1");
     adminState.queue = [{ data: { role: "student", is_active: true }, error: null }];
 
-    await expect(approveAssessmentGrades("assessment-1")).rejects.toThrow(
-      "Only an admin or HOD can approve grades."
-    );
+    expect(await approveAssessmentGrades("assessment-1")).toEqual({
+      ok: false,
+      error: "Only an admin or HOD can review grades.",
+    });
   });
 
   it("rejects a deactivated HOD account", async () => {
@@ -99,25 +106,86 @@ describe("grade moderation: HOD is school-wide, not scoped to subjects_taught", 
     // reaching the HOD-specific check.
     adminState.queue = [{ data: { role: "teacher", is_active: false }, error: null }];
 
-    await expect(approveAssessmentGrades("assessment-1")).rejects.toThrow(
-      "Only an admin or HOD can approve grades."
-    );
+    expect(await approveAssessmentGrades("assessment-1")).toEqual({
+      ok: false,
+      error: "Only an admin or HOD can review grades.",
+    });
   });
 
   it("approveSingleGrade: lets a HOD approve a single grade outside their subjects_taught", async () => {
     mockAuthenticatedAs("hod-1");
     adminState.queue = [
+      { data: { role: "teacher", is_active: true }, error: null }, // assertRole
+      { data: { role: "teacher" }, error: null }, // not admin
+      { data: { staff_role: "hod" }, error: null }, // hod -- no department check
       {
         data: { assessment_id: "assessment-outside-hod-department", student_id: "student-1" },
         error: null,
       }, // grade lookup
-      { data: { role: "teacher", is_active: true }, error: null }, // assertRole
-      { data: { role: "teacher" }, error: null }, // not admin
-      { data: { staff_role: "hod" }, error: null }, // hod -- no department check
       { data: null, error: null }, // grades.update by id
       { data: null, error: null }, // writeAuditLog insert
     ];
 
-    await expect(approveSingleGrade("grade-1")).resolves.toBeUndefined();
+    expect(await approveSingleGrade("grade-1")).toEqual({ ok: true });
+  });
+});
+
+describe("grade moderation: rejecting", () => {
+  it("requires a reason before touching the database", async () => {
+    mockAuthenticatedAs("hod-1");
+    adminState.queue = [
+      { data: { role: "teacher", is_active: true }, error: null }, // assertRole
+      { data: { role: "teacher" }, error: null },
+      { data: { staff_role: "hod" }, error: null },
+    ];
+
+    expect(await rejectAssessmentGrades("assessment-1", "   ")).toEqual({
+      ok: false,
+      error: "Give the teacher a reason so they know what to fix.",
+    });
+  });
+
+  it("lets a HOD reject all pending grades with a reason", async () => {
+    mockAuthenticatedAs("hod-1");
+    adminState.queue = [
+      { data: { role: "teacher", is_active: true }, error: null },
+      { data: { role: "teacher" }, error: null },
+      { data: { staff_role: "hod" }, error: null },
+      { data: null, error: null, count: 2 } as MockResult & { count: number },
+      { data: null, error: null }, // writeAuditLog
+    ];
+
+    expect(await rejectAssessmentGrades("assessment-1", "Scores look swapped")).toEqual({
+      ok: true,
+      data: { count: 2 },
+    });
+  });
+
+  it("lets a HOD reject a single grade with a reason", async () => {
+    mockAuthenticatedAs("hod-1");
+    adminState.queue = [
+      { data: { role: "teacher", is_active: true }, error: null },
+      { data: { role: "teacher" }, error: null },
+      { data: { staff_role: "hod" }, error: null },
+      { data: { assessment_id: "assessment-1", student_id: "student-1" }, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+    ];
+
+    expect(await rejectSingleGrade("grade-1", "Check this score")).toEqual({ ok: true });
+  });
+
+  it("does not let a non-HOD teacher reject", async () => {
+    mockAuthenticatedAs("teacher-1");
+    adminState.queue = [
+      { data: { role: "teacher", is_active: true }, error: null },
+      { data: { role: "teacher" }, error: null },
+      { data: { staff_role: "teacher" }, error: null },
+    ];
+
+    expect(await rejectSingleGrade("grade-1", "No")).toEqual({
+      ok: false,
+      error: "Only an admin or HOD can review grades.",
+    });
   });
 });

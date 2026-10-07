@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { CreateAssessmentForm } from "@/components/CreateAssessmentForm";
-import { ApproveAssessmentButton } from "@/components/ApproveAssessmentButton";
 import { redirect } from "next/navigation";
 
 export default async function TeacherGradesPage() {
@@ -60,11 +59,17 @@ export default async function TeacherGradesPage() {
         .in("assessment_id", moderationIds)
     : { data: [] };
   const pendingByAssessment = new Map<string, number>();
+  const rejectedByAssessment = new Map<string, number>();
   for (const grade of moderationGrades ?? []) {
     if (grade.moderation_status === "pending")
       pendingByAssessment.set(
         grade.assessment_id,
         (pendingByAssessment.get(grade.assessment_id) ?? 0) + 1
+      );
+    if (grade.moderation_status === "rejected")
+      rejectedByAssessment.set(
+        grade.assessment_id,
+        (rejectedByAssessment.get(grade.assessment_id) ?? 0) + 1
       );
   }
 
@@ -111,11 +116,12 @@ export default async function TeacherGradesPage() {
         <section className="mt-10">
           <h2 className="font-display text-lg font-semibold text-ink">HOD moderation</h2>
           <p className="mb-3 text-sm text-ink-soft">
-            Approve pending grades for subjects assigned to you.
+            Review grades before students and parents can see them. Open an assessment to approve or reject scores.
           </p>
           <div className="space-y-2">
             {(moderationAssessments ?? []).map((assessment) => {
               const pending = pendingByAssessment.get(assessment.id) ?? 0;
+              const rejected = rejectedByAssessment.get(assessment.id) ?? 0;
               return (
                 <div
                   key={assessment.id}
@@ -128,11 +134,16 @@ export default async function TeacherGradesPage() {
                       {assessment.classes?.arm}
                     </p>
                   </div>
-                  {pending ? (
-                    <ApproveAssessmentButton assessmentId={assessment.id} />
-                  ) : (
-                    <span className="text-xs text-leaf">All approved</span>
-                  )}
+                  <Link
+                    href={`/dashboard/teacher/grades/${assessment.id}/review`}
+                    className="rounded-lg border border-leaf px-3 py-1.5 text-sm font-medium text-leaf hover:bg-leaf-soft"
+                  >
+                    {pending
+                      ? `Review ${pending} pending`
+                      : rejected
+                        ? `${rejected} sent back`
+                        : "View grades"}
+                  </Link>
                 </div>
               );
             })}

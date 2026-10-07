@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
+import { runAction, type ActionResult } from "@/lib/actionResult";
 
 async function assertCanManageHostelFees(hostelId: string): Promise<{ actorId: string }> {
   const { id } = await assertRole(
@@ -25,7 +26,7 @@ async function assertCanManageHostelFees(hostelId: string): Promise<{ actorId: s
   return { actorId: id };
 }
 
-export async function createHostelFeeStructure(input: {
+async function insertHostelFeeStructure(input: {
   hostelId: string;
   term: number;
   academicYear: string;
@@ -43,7 +44,7 @@ export async function createHostelFeeStructure(input: {
     hostel_id: input.hostelId,
     term: input.term,
     academic_year: input.academicYear,
-    title: input.title?.trim() || "Hostel Fee",
+    title: input.title?.trim().slice(0, 120) || "Hostel Fee",
     amount_kobo: input.amountKobo,
     due_date: input.dueDate || null,
     created_by: actorId,
@@ -52,6 +53,13 @@ export async function createHostelFeeStructure(input: {
 
   revalidatePath("/dashboard/admin/hostels");
   revalidatePath("/dashboard/hostels");
+}
+
+/** Returns failures as values -- thrown messages are redacted in production (see lib/actionResult.ts). */
+export async function createHostelFeeStructure(
+  input: Parameters<typeof insertHostelFeeStructure>[0]
+): Promise<ActionResult> {
+  return runAction(() => insertHostelFeeStructure(input));
 }
 
 export async function voidHostelFeeStructure(id: string, hostelId: string) {

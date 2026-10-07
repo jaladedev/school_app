@@ -59,7 +59,7 @@ export default async function AdminLessonPlansPage({
             >
               <div>
                 <Link
-                  href={`/dashboard/teacher/notes/${note.topic_id}`}
+                  href={`/dashboard/admin/lesson-plans/${note.id}`}
                   className="text-sm font-medium text-ink hover:underline"
                 >
                   {note.curriculum_topics?.title ?? "Untitled topic"}

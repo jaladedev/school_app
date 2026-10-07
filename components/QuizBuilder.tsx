@@ -3,6 +3,12 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createQuiz } from "@/lib/actions/quiz";
+import {
+  joinDateTime,
+  localIsoDate,
+  quizWindowError,
+  splitDateTime,
+} from "@/lib/quizWindow";
 import { emitToast } from "@/lib/toast";
 import { QuestionText } from "@/components/QuestionText";
 import { MathInsertButton } from "@/components/MathInsertButton";
@@ -68,19 +74,6 @@ function blankQuestion(): QuestionDraft {
 // can set the time before the date (or vice versa); joinDateTime fills
 // in today's date / midnight for whichever side is still blank so the
 // combined value stays valid either way.
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-function splitDateTime(value: string): { date: string; time: string } {
-  if (!value) return { date: "", time: "" };
-  const [date, time] = value.split("T");
-  return { date: date ?? "", time: time ?? "" };
-}
-function joinDateTime(date: string, time: string): string {
-  if (!date && !time) return "";
-  return `${date || todayIsoDate()}T${time || "00:00"}`;
-}
-
 export function QuizBuilder({
   subjects,
   classes,
@@ -227,13 +220,12 @@ export function QuizBuilder({
 
     if (!title.trim()) return setError("Title is required.");
     if (!subjectId || !classId) return setError("Pick a subject and class.");
-    if (opensAt && closesAt && new Date(closesAt) <= new Date(opensAt)) {
-      return setError("Closing time must be after the opening time.");
-    }
+    const windowError = quizWindowError(opensAt, closesAt);
+    if (windowError) return setError(windowError);
 
     startTransition(async () => {
-      try {
-        const quizId = await createQuiz({
+      {
+        const result = await createQuiz({
           title,
           subjectId,
           classId,
@@ -254,10 +246,12 @@ export function QuizBuilder({
             })),
           })),
         });
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
         emitToast("Quiz created — publish it when you're ready.");
-        router.push(`/dashboard/teacher/quizzes/${quizId}`);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        router.push(`/dashboard/teacher/quizzes/${result.data}`);
       }
     });
   }
@@ -325,6 +319,7 @@ export function QuizBuilder({
           <div className="flex gap-2">
             <input
               type="date"
+              min={localIsoDate()}
               value={splitDateTime(opensAt).date}
               onChange={(e) =>
                 setOpensAt(joinDateTime(e.target.value, splitDateTime(opensAt).time))
@@ -342,6 +337,7 @@ export function QuizBuilder({
           <div className="flex gap-2">
             <input
               type="date"
+              min={localIsoDate()}
               value={splitDateTime(closesAt).date}
               onChange={(e) =>
                 setClosesAt(joinDateTime(e.target.value, splitDateTime(closesAt).time))

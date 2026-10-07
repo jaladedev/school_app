@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
 import { computeInvoiceStatus } from "@/lib/invoiceStatus";
@@ -134,9 +135,8 @@ export async function issueLibraryLoan(input: {
   dueAt: string;
 }) {
   const { actorId } = await assertCanManageLibrary();
-  const admin = createAdminClient();
 
-  const { data: loan, error } = await admin.rpc("borrow_library_book", {
+  const { data: loan, error } = await createClient().rpc("borrow_library_book", {
     p_book_id: input.bookId,
     p_student_id: input.studentId,
     p_due_at: input.dueAt,
@@ -160,9 +160,8 @@ export async function issueLibraryLoan(input: {
 
 export async function returnLibraryLoan(loanId: string) {
   const { actorId } = await assertCanManageLibrary();
-  const admin = createAdminClient();
 
-  const { data: result, error } = await admin.rpc("return_library_book", { p_loan_id: loanId });
+  const { data: result, error } = await createClient().rpc("return_library_book", { p_loan_id: loanId });
   if (error) throwDbError(error);
   const loan = result?.[0];
   if (!loan) throw new Error("Return could not be recorded.");

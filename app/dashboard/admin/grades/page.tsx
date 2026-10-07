@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ApproveAssessmentButton } from "@/components/ApproveAssessmentButton";
 import { ExportGradeSheetButton } from "@/components/ExportGradeSheetButton";
@@ -74,6 +75,12 @@ export default async function AdminGradesModerationPage({
                   classId={a.class_id}
                   maxScore={a.max_score}
                 />
+                <Link
+                  href={`/dashboard/admin/grades/${a.id}`}
+                  className="rounded-lg border border-rule px-3 py-1.5 text-sm font-medium text-ink hover:bg-paper"
+                >
+                  Review
+                </Link>
                 {stats.pending > 0 ? (
                   <ApproveAssessmentButton assessmentId={a.id} />
                 ) : (

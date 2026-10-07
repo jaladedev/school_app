@@ -149,8 +149,7 @@ export default async function TeacherHome() {
         {WEEKDAY_NAMES[todayWeekday]}&apos;s lessons
       </h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Log each lesson as you teach it. Class attendance is taken once a day from the Attendance
-        page.
+        Log each lesson as you teach it. Class attendance is taken once a day from the Attendance page.
       </p>
 
       <div className="mb-10 space-y-2">

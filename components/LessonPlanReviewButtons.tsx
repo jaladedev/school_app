@@ -15,7 +15,11 @@ export function LessonPlanReviewButtons({ noteId }: { noteId: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        await approveLessonPlan(noteId);
+        const result = await approveLessonPlan(noteId);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
         router.refresh();
       } catch (err: any) {
         setError(err.message ?? "Something went wrong.");
@@ -27,7 +31,11 @@ export function LessonPlanReviewButtons({ noteId }: { noteId: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        await rejectLessonPlan(noteId, reason || undefined);
+        const result = await rejectLessonPlan(noteId, reason || undefined);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
         setRejecting(false);
         router.refresh();
       } catch (err: any) {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { RoomOccupants } from "@/components/RoomOccupants";
 import { AssignStudentForm } from "@/components/AssignStudentForm";
 import { HostelWaitlistPanel } from "@/components/HostelWaitlistPanel";
@@ -11,6 +11,9 @@ export default async function HostelRoomPage({
 }) {
   const { hostelId, roomId } = await params;
   const supabase = createClient();
+  const viewer = await getCurrentProfile();
+  // Admins came from their hostels page, a house parent from theirs.
+  const backHref = viewer?.role === "admin" ? "/dashboard/admin/hostels" : "/dashboard/hostels";
 
   const { data: room } = await supabase
     .from("hostel_rooms")
@@ -76,7 +79,7 @@ export default async function HostelRoomPage({
   return (
     <div className="max-w-2xl">
       <Link
-        href="/dashboard/admin/hostels"
+        href={backHref}
         className="mb-4 inline-block text-sm text-leaf hover:underline"
       >
         ← Back to hostels

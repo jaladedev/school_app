@@ -34,6 +34,10 @@ export function HostelFeeSection({
   const [open, setOpen] = useState(false);
   const [amountNaira, setAmountNaira] = useState("");
   const [term, setTerm] = useState(defaultTerm);
+  // The title follows the term ("Term 2 Hostel Fee") until the person types their own.
+  const [title, setTitle] = useState(`Term ${defaultTerm} Hostel Fee`);
+  const [titleEdited, setTitleEdited] = useState(false);
+  const [dueDate, setDueDate] = useState("");
   const [academicYear, setAcademicYear] = useState(defaultAcademicYear);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -47,20 +51,25 @@ export function HostelFeeSection({
     if (!naira || naira <= 0) return setError("Enter a valid amount.");
 
     startTransition(async () => {
-      try {
-        await createHostelFeeStructure({
-          hostelId,
-          term,
-          academicYear,
-          amountKobo: Math.round(naira * 100),
-        });
-        emitToast("Hostel fee added.");
-        setAmountNaira("");
-        setOpen(false);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+      const result = await createHostelFeeStructure({
+        hostelId: hostelId,
+        term,
+        academicYear,
+        title: title.trim() || undefined,
+        dueDate: dueDate || undefined,
+        amountKobo: Math.round(naira * 100),
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
       }
+      emitToast("Hostel fee added.");
+      setAmountNaira("");
+      setDueDate("");
+      setTitleEdited(false);
+      setTitle(`Term ${term} Hostel Fee`);
+      setOpen(false);
+      router.refresh();
     });
   }
 
@@ -145,47 +154,83 @@ export function HostelFeeSection({
       {open && (
         <form
           onSubmit={handleCreate}
-          className="mt-2 flex flex-wrap items-start gap-1.5 border-t border-rule pt-2"
+          className="mt-3 grid grid-cols-2 gap-3 border-t border-rule pt-3 sm:grid-cols-4"
         >
-          <input
-            type="number"
-            min={1}
-            step="0.01"
-            required
-            placeholder="Amount (₦)"
-            value={amountNaira}
-            onChange={(e) => setAmountNaira(e.target.value)}
-            className="w-28 rounded-lg border border-rule px-2 py-1.5 text-xs outline-none focus-visible:border-marigold"
-          />
-          <input
-            type="number"
-            min={1}
-            max={3}
-            value={term}
-            onChange={(e) => setTerm(Number(e.target.value))}
-            className="w-16 rounded-lg border border-rule px-2 py-1.5 text-xs"
-          />
-          <input
-            value={academicYear}
-            onChange={(e) => setAcademicYear(e.target.value)}
-            placeholder="2026/2027"
-            className="w-28 rounded-lg border border-rule px-2 py-1.5 text-xs"
-          />
-          <button
-            type="submit"
-            disabled={isPending}
-            className="rounded-lg bg-leaf px-2.5 py-1.5 text-xs font-medium text-white hover:bg-leaf/90 disabled:opacity-60"
-          >
-            {isPending ? "Adding…" : "Add"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="rounded-lg border border-rule px-2.5 py-1.5 text-xs text-ink-soft"
-          >
-            Cancel
-          </button>
-          {error && <p className="w-full text-xs text-clay">{error}</p>}
+          <label className="col-span-2 flex flex-col gap-1 text-xs font-medium text-ink sm:col-span-4">
+            Fee title
+            <input
+              value={title}
+              maxLength={120}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setTitleEdited(true);
+              }}
+              placeholder="e.g. Term 1 Hostel Fee"
+              className="rounded-lg border border-rule px-3 py-2 text-sm font-normal outline-none focus-visible:border-marigold"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-ink">
+            Amount (₦)
+            <input
+              type="number"
+              min={1}
+              step="0.01"
+              required
+              value={amountNaira}
+              onChange={(e) => setAmountNaira(e.target.value)}
+              className="rounded-lg border border-rule px-3 py-2 text-sm font-normal outline-none focus-visible:border-marigold"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-ink">
+            Term
+            <input
+              type="number"
+              min={1}
+              max={3}
+              value={term}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setTerm(next);
+                if (!titleEdited) setTitle(`Term ${next} Hostel Fee`);
+              }}
+              className="rounded-lg border border-rule px-3 py-2 text-sm font-normal"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-ink">
+            Academic year
+            <input
+              value={academicYear}
+              onChange={(e) => setAcademicYear(e.target.value)}
+              placeholder="2026/2027"
+              className="rounded-lg border border-rule px-3 py-2 text-sm font-normal"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-ink">
+            Due date <span className="font-normal text-ink-soft">(optional)</span>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="rounded-lg border border-rule px-3 py-2 text-sm font-normal"
+            />
+          </label>
+          <div className="col-span-2 flex items-center gap-2 sm:col-span-4">
+            <button
+              type="submit"
+              disabled={isPending}
+              className="rounded-lg bg-leaf px-3 py-2 text-sm font-medium text-white hover:bg-leaf/90 disabled:opacity-60"
+            >
+              {isPending ? "Adding…" : "Add fee"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-lg border border-rule px-3 py-2 text-sm text-ink-soft"
+            >
+              Cancel
+            </button>
+          </div>
+          {error && <p className="col-span-2 text-sm text-clay sm:col-span-4">{error}</p>}
         </form>
       )}
     </div>
