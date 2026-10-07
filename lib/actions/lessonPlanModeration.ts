@@ -83,6 +83,9 @@ async function setNoteModerationStatus(
   });
 
   revalidatePath("/dashboard/teacher/notes");
+  revalidatePath("/dashboard/teacher/lesson-plans");
+  revalidatePath(`/dashboard/teacher/lesson-plans/${noteId}`);
+  revalidatePath("/dashboard/admin/lesson-plans");
   revalidatePath(`/dashboard/teacher/notes/${note.topic_id}`);
   revalidatePath(`/dashboard/student/topics/${note.topic_id}`);
 }

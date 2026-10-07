@@ -23,6 +23,23 @@ export default async function TeacherHome() {
   }
   const supabase = createClient();
 
+  // Non-teaching staff have no classes -- send them to their own service
+  // area instead of an empty "My classes" page that's no longer in their nav.
+  const { data: staff } = await supabase
+    .from("teacher_profiles")
+    .select("staff_role")
+    .eq("id", profile.id)
+    .single();
+  const SERVICE_HOME: Record<string, string> = {
+    librarian: "/dashboard/library",
+    house_parent: "/dashboard/hostels",
+    transport_officer: "/dashboard/transport",
+    driver: "/dashboard/driver",
+    bursar: "/dashboard/bursar",
+  };
+  const serviceHome = staff?.staff_role ? SERVICE_HOME[staff.staff_role] : undefined;
+  if (serviceHome) redirect(serviceHome);
+
   const today = new Date();
   const todayWeekday = today.getDay() === 0 ? 7 : today.getDay();
   const todayDate = today.toISOString().slice(0, 10);
@@ -149,7 +166,8 @@ export default async function TeacherHome() {
         {WEEKDAY_NAMES[todayWeekday]}&apos;s lessons
       </h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Log each lesson as you teach it. Class attendance is taken once a day from the Attendance page.
+        Log each lesson as you teach it. Class attendance is taken once a day from the Attendance
+        page.
       </p>
 
       <div className="mb-10 space-y-2">

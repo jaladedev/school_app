@@ -94,9 +94,17 @@ export default async function TeacherNotesPage({
 
       {isHod && (
         <section className="mb-6 rounded-xl border border-rule bg-white p-4">
-          <h2 className="font-display text-lg font-semibold text-ink">
-            Lesson plans awaiting your review
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg font-semibold text-ink">
+              Lesson plans awaiting your review
+            </h2>
+            <Link
+              href="/dashboard/teacher/lesson-plans"
+              className="text-sm font-medium text-leaf hover:underline"
+            >
+              Open review queue →
+            </Link>
+          </div>
           <p className="mb-3 text-xs text-ink-soft">
             Published notes stay hidden from students and other staff until a HOD for that subject
             approves them.
@@ -110,7 +118,7 @@ export default async function TeacherNotesPage({
                 >
                   <div>
                     <Link
-                      href={`/dashboard/teacher/notes/${note.topic_id}`}
+                      href={`/dashboard/teacher/lesson-plans/${note.id}`}
                       className="text-sm font-medium text-ink hover:underline"
                     >
                       {note.curriculum_topics?.title}

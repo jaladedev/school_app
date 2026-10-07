@@ -137,6 +137,31 @@ const BURSAR_NAV: { label: string; href: string }[] = [
   { label: "Announcements", href: "/dashboard/announcements" },
 ];
 
+// Non-teaching staff (librarian, house parent, transport officer) are
+// not classroom staff either, so they get the same shape as the driver
+// and bursar menus: their own service area, then the shared
+// messaging/announcements items -- not the full teacher menu.
+const SERVICE_NAV_BY_STAFF_ROLE: Partial<Record<StaffRole, { label: string; href: string }[]>> = {
+  librarian: [
+    { label: "Library", href: "/dashboard/library" },
+    { label: "Borrow / Return", href: "/dashboard/library/loans" },
+    { label: "Messages", href: "/dashboard/messages" },
+    { label: "Announcements", href: "/dashboard/announcements" },
+  ],
+  house_parent: [
+    { label: "Hostel", href: "/dashboard/hostels" },
+    { label: "Messages", href: "/dashboard/messages" },
+    { label: "Announcements", href: "/dashboard/announcements" },
+  ],
+  transport_officer: [
+    { label: "Transport", href: "/dashboard/transport" },
+    { label: "Messages", href: "/dashboard/messages" },
+    { label: "Announcements", href: "/dashboard/announcements" },
+  ],
+  driver: DRIVER_NAV,
+  bursar: BURSAR_NAV,
+};
+
 /**
  * Picks the single most specific matching nav item for the current path,
  * so a nested route (e.g. /dashboard/admin/classes/promote) doesn't also
@@ -200,18 +225,16 @@ export function Sidebar({
     announcements: 0,
     homework: 0,
   };
+  const serviceNav =
+    role === "teacher" && staffRole ? SERVICE_NAV_BY_STAFF_ROLE[staffRole] : undefined;
   const items =
-    role === "teacher" && staffRole === "librarian"
-      ? [...NAV_BY_ROLE.teacher, { label: "Library", href: "/dashboard/library" }]
-      : role === "teacher" && staffRole === "house_parent"
-        ? [...NAV_BY_ROLE.teacher, { label: "Hostel", href: "/dashboard/hostels" }]
-        : role === "teacher" && staffRole === "transport_officer"
-          ? [...NAV_BY_ROLE.teacher, { label: "Transport", href: "/dashboard/transport" }]
-          : role === "teacher" && staffRole === "driver"
-            ? DRIVER_NAV
-            : role === "teacher" && staffRole === "bursar"
-              ? BURSAR_NAV
-              : NAV_BY_ROLE[role];
+    serviceNav ??
+    (role === "teacher" && staffRole === "hod"
+      ? [
+          ...NAV_BY_ROLE.teacher,
+          { label: "Lesson Plan Review", href: "/dashboard/teacher/lesson-plans" },
+        ]
+      : NAV_BY_ROLE[role]);
   const pathname = usePathname();
   const activeHref = findActiveHref(pathname, items);
   const [mobileOpen, setMobileOpen] = useState(false);
