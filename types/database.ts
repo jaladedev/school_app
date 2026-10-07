@@ -375,6 +375,7 @@ export type SchoolSettings = {
   current_term: number;
   current_term_start_date: string | null;
   library_fine_kobo_per_day: number;
+  student_online_payment_enabled: boolean;
   grade_scale: GradeScaleEntry[];
   updated_at: string;
 };

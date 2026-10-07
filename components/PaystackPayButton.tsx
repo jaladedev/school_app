@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { verifyPaystackPayment } from "@/lib/actions/fees";
+import { checkOnlinePaymentAllowed, verifyPaystackPayment } from "@/lib/actions/fees";
 import { clientEnv } from "@/lib/env.client";
 
 declare global {
@@ -47,6 +47,16 @@ export function PaystackPayButton({
   async function handlePay() {
     setError(null);
     setLoading(true);
+
+    // Server-side gate (e.g. an admin turned off student payments) before
+    // any money can move -- hiding the button alone isn't enforcement.
+    try {
+      await checkOnlinePaymentAllowed(invoiceId);
+    } catch (err: any) {
+      setError(err.message ?? "You can't pay this invoice online.");
+      setLoading(false);
+      return;
+    }
 
     try {
       await loadPaystackScript();

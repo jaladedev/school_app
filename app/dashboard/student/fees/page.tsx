@@ -48,6 +48,14 @@ export default async function StudentFeesPage() {
     .order("created_at", { ascending: false })
     .order("sequence_order", { foreignTable: "invoice_installments", ascending: true });
 
+  const { data: school } = await supabase
+    .from("school_settings")
+    .select("student_online_payment_enabled")
+    .eq("id", 1)
+    .single();
+  // Missing row/column = enabled, matching the server-side check.
+  const canPayOnline = school?.student_online_payment_enabled !== false;
+
   const { data: payments } = await supabase
     .from("payments")
     .select("*, invoices(fee_structures(title))")
@@ -116,7 +124,7 @@ export default async function StudentFeesPage() {
                   amountPaidKobo={inv.amount_paid_kobo}
                 />
               )}
-              {balance > 0 && (
+              {balance > 0 && canPayOnline && (
                 <div className="mt-3">
                   <PaystackPayButton invoiceId={inv.id} email={email} amountKobo={balance} />
                 </div>
@@ -158,8 +166,9 @@ export default async function StudentFeesPage() {
       </div>
 
       <p className="mt-6 text-xs text-ink-soft">
-        You can pay online by card above, or at the school office by cash or bank transfer — office
-        payments are recorded by staff and will show here once entered.
+        {canPayOnline
+          ? "You can pay online by card above, or at the school office by cash or bank transfer — office payments are recorded by staff and will show here once entered."
+          : "Fees are paid online by your parent or guardian, or at the school office by cash or bank transfer — office payments are recorded by staff and will show here once entered."}
       </p>
     </div>
   );

@@ -8,6 +8,8 @@ import type { EducationLevel, PaymentMethod } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
 import { computeInvoiceStatus } from "@/lib/invoiceStatus";
 import { throwDbError } from "@/lib/errors/db";
+import { sendGuardianReceiptCopy } from "@/lib/feeReceiptEmail";
+import { logger } from "@/lib/logger";
 
 /**
  * Admin or the bursar. The DB already grants staff_role: "bursar" write
@@ -247,6 +249,79 @@ export async function voidInvoice(invoiceId: string, reason: string) {
 
 // ---------- Paystack (student-initiated, server-verified) ----------
 
+type InvoicePayer = "student" | "guardian" | "admin";
+
+// Who may pay/verify this invoice:
+//  1. The student themselves — checked against auth.getUser()'s id,
+//     which is JWT-validated and can't be spoofed.
+//  2. A parent/guardian linked to this student via guardian_links —
+//     looked up with the admin client (bypasses RLS, reads ground
+//     truth) keyed off user.id, not a client-suppliable profile field.
+//     NOTE: guardian_links must itself be locked down with RLS so a
+//     parent can't insert their own link to an arbitrary student.
+//  3. An admin — verified via assertRole (service-role verified),
+//     never trusted off a session-scoped profile row.
+// Throws if the caller is none of these. Shared by verifyPaystackPayment
+// and checkOnlinePaymentAllowed so the pre-payment gate and the
+// post-payment check can never disagree about who the payer is.
+async function resolveInvoicePayer(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  studentId: string
+): Promise<InvoicePayer> {
+  if (studentId === userId) return "student";
+
+  const { data: link } = await admin
+    .from("guardian_links")
+    .select("id")
+    .eq("parent_id", userId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+
+  if (link) return "guardian";
+
+  await assertRole(["admin"], "You can't pay an invoice that isn't yours.");
+  return "admin";
+}
+
+export const STUDENT_PAYMENT_DISABLED_MESSAGE =
+  "Online payment by students is turned off at your school. Ask a parent or guardian to pay, or pay at the school office.";
+
+/**
+ * Called by the pay button BEFORE the Paystack popup opens. Checking only
+ * inside verifyPaystackPayment would be too late: by then the card has
+ * already been charged, and refusing to credit a confirmed payment is
+ * worse than never opening the popup. verifyPaystackPayment therefore
+ * deliberately does NOT re-check the toggle.
+ */
+export async function checkOnlinePaymentAllowed(invoiceId: string): Promise<void> {
+  const user = await getAuthenticatedUser();
+  const admin = createAdminClient();
+
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("student_id, voided_at")
+    .eq("id", invoiceId)
+    .single();
+
+  if (!invoice) throw new Error("Invoice not found.");
+  if (invoice.voided_at) throw new Error("This invoice has been voided and can't accept payments.");
+
+  const payer = await resolveInvoicePayer(admin, user.id, invoice.student_id);
+  if (payer !== "student") return;
+
+  const { data: settings } = await admin
+    .from("school_settings")
+    .select("student_online_payment_enabled")
+    .eq("id", 1)
+    .single();
+
+  // A missing row/column reads as "enabled" -- the pre-toggle behavior.
+  if (settings?.student_online_payment_enabled === false) {
+    throw new Error(STUDENT_PAYMENT_DISABLED_MESSAGE);
+  }
+}
+
 // Called from the browser AFTER Paystack's inline popup reports success.
 // The popup callback is NOT trusted on its own — this re-verifies the
 // transaction directly with Paystack's API using the secret key (which
@@ -274,30 +349,7 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
   if (!invoice) throw new Error("Invoice not found.");
   if (invoice.voided_at) throw new Error("This invoice has been voided and can't accept payments.");
 
-  // Who can trigger verification for this invoice:
-  //  1. The student themselves — checked against auth.getUser()'s id,
-  //     which is JWT-validated and can't be spoofed.
-  //  2. A parent/guardian linked to this student via guardian_links —
-  //     looked up with the admin client (bypasses RLS, reads ground
-  //     truth) keyed off user.id, not a client-suppliable profile field.
-  //     NOTE: guardian_links must itself be locked down with RLS so a
-  //     parent can't insert their own link to an arbitrary student.
-  //  3. An admin — verified via assertRole (service-role verified),
-  //     never trusted off a session-scoped profile row. This stays a
-  //     separate, stricter check rather than something like
-  //     `profile.role === "admin"`.
-  if (invoice.student_id !== user.id) {
-    const { data: link } = await admin
-      .from("guardian_links")
-      .select("id")
-      .eq("parent_id", user.id)
-      .eq("student_id", invoice.student_id)
-      .maybeSingle();
-
-    if (!link) {
-      await assertRole(["admin"], "You can't pay an invoice that isn't yours.");
-    }
-  }
+  const payer = await resolveInvoicePayer(admin, user.id, invoice.student_id);
 
   // Idempotency pre-check: advisory only, purely to skip an unnecessary
   // Paystack verify call + network round-trip for a reference we already
@@ -345,11 +397,29 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
 
   if (error) throwDbError(error);
 
+  const alreadyRecorded = result?.[0]?.already_recorded ?? false;
+
+  // A student's own Paystack receipt goes to the student's address, which a
+  // parent may never see -- copy the guardians. Awaited (serverless would
+  // drop a floating promise) but never allowed to fail the payment.
+  if (payer === "student" && !alreadyRecorded) {
+    try {
+      await sendGuardianReceiptCopy({
+        admin,
+        studentId: invoice.student_id,
+        invoiceId: input.invoiceId,
+        amountKobo: paidAmountKobo,
+      });
+    } catch (err) {
+      logger.warn("verifyPaystackPayment: guardian receipt copy failed", { error: err });
+    }
+  }
+
   revalidatePath("/dashboard/student/fees");
   revalidatePath("/dashboard/parent/fees");
   revalidatePath("/dashboard/admin/fees/invoices");
 
-  return { alreadyRecorded: result?.[0]?.already_recorded ?? false, amountKobo: paidAmountKobo };
+  return { alreadyRecorded, amountKobo: paidAmountKobo };
 }
 
 /** Admin/bursar: message every guardian (or the student, if unlinked) of a
