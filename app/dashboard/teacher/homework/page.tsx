@@ -30,14 +30,31 @@ type HomeworkLessonRow = {
   homework_submissions: SubmissionRow[];
 };
 
-function dueLabel(dueAt: string, status: ReturnType<typeof homeworkDueStatus>): string {
+function dueLabel(
+  dueAt: string,
+  status: ReturnType<typeof homeworkDueStatus>,
+  submitted: number,
+  reviewed: number
+): string {
   const formatted = new Date(`${dueAt}T00:00:00`).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
   });
-  if (status === "overdue") return `Overdue since ${formatted} — no submissions reviewed`;
+  if (status === "overdue") {
+    if (submitted === 0) return `Overdue since ${formatted} — no submissions yet`;
+    if (reviewed === 0) {
+      return `Overdue since ${formatted} — ${submitted} submitted, none reviewed`;
+    }
+    return `Past due ${formatted} — ${reviewed} of ${submitted} submission${submitted === 1 ? "" : "s"} reviewed`;
+  }
   if (status === "due_today") return "Due today";
   return `Due ${formatted}`;
+}
+
+/** Overdue only counts as a problem while nothing has been reviewed yet. */
+function isUrgentlyOverdue(lesson: HomeworkLessonRow): boolean {
+  if (homeworkDueStatus(lesson) !== "overdue") return false;
+  return !lesson.homework_submissions?.some((s) => s.status === "reviewed");
 }
 
 function summaryLine(givenCount: number, reviewedCount: number, overdueCount: number): string {
@@ -86,7 +103,7 @@ export default async function TeacherHomeworkPage() {
 
   const givenCount = (lessons ?? []).filter((l) => l.homework_status === "given").length;
   const reviewedCount = (lessons ?? []).filter((l) => l.homework_status === "reviewed").length;
-  const overdueCount = (lessons ?? []).filter((l) => homeworkDueStatus(l) === "overdue").length;
+  const overdueCount = (lessons ?? []).filter((l) => isUrgentlyOverdue(l)).length;
 
   const admin = createAdminClient();
   const signedUrlByPath = new Map<string, string>();
@@ -114,11 +131,15 @@ export default async function TeacherHomeworkPage() {
       <div className="space-y-2">
         {lessons?.map((l) => {
           const dueStatus = homeworkDueStatus(l);
+          const urgent = isUrgentlyOverdue(l);
+          const submittedCount = l.homework_submissions?.length ?? 0;
+          const reviewedSubmissions =
+            l.homework_submissions?.filter((s) => s.status === "reviewed").length ?? 0;
           return (
             <div
               key={l.id}
               className={`rounded-lg border bg-white p-4 ${
-                dueStatus === "overdue" ? "border-clay/50" : "border-rule"
+                urgent ? "border-clay/50" : "border-rule"
               }`}
             >
               <div className="mb-1 flex items-center justify-between gap-3">
@@ -134,10 +155,10 @@ export default async function TeacherHomeworkPage() {
               {l.homework_due_at && dueStatus !== "none" && (
                 <p
                   className={`mb-1 text-xs font-medium ${
-                    dueStatus === "overdue" ? "text-clay" : "text-ink-soft"
+                    urgent ? "text-clay" : "text-ink-soft"
                   }`}
                 >
-                  {dueLabel(l.homework_due_at, dueStatus)}
+                  {dueLabel(l.homework_due_at, dueStatus, submittedCount, reviewedSubmissions)}
                 </p>
               )}
               {l.curriculum_topics?.title && (
