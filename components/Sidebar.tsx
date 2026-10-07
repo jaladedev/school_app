@@ -162,6 +162,18 @@ const SERVICE_NAV_BY_STAFF_ROLE: Partial<Record<StaffRole, { label: string; href
   bursar: BURSAR_NAV,
 };
 
+// What the sidebar header shows under "School". Non-teaching staff are
+// all `role: "teacher"` in the DB, so without this a librarian or bursar
+// just saw "teacher".
+const STAFF_ROLE_LABEL: Partial<Record<StaffRole, string>> = {
+  hod: "Head of department",
+  bursar: "Bursar",
+  librarian: "Librarian",
+  house_parent: "House parent",
+  transport_officer: "Transport officer",
+  driver: "Driver",
+};
+
 /**
  * Picks the single most specific matching nav item for the current path,
  * so a nested route (e.g. /dashboard/admin/classes/promote) doesn't also
@@ -235,6 +247,7 @@ export function Sidebar({
           { label: "Lesson Plan Review", href: "/dashboard/teacher/lesson-plans" },
         ]
       : NAV_BY_ROLE[role]);
+  const roleLabel = (role === "teacher" && staffRole && STAFF_ROLE_LABEL[staffRole]) || role;
   const pathname = usePathname();
   const activeHref = findActiveHref(pathname, items);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -340,7 +353,7 @@ export function Sidebar({
           <div className="mb-8 flex items-center justify-between px-2">
             <div>
               <p className="font-display text-lg font-semibold text-ink">School</p>
-              <p className="text-xs uppercase tracking-wide text-ink-soft">{role}</p>
+              <p className="text-xs uppercase tracking-wide text-ink-soft">{roleLabel}</p>
             </div>
             <button
               onClick={() => setMobileOpen(false)}
