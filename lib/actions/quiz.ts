@@ -7,20 +7,14 @@ import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
 import { throwDbError } from "@/lib/errors/db";
 import { quizWindowError } from "@/lib/quizWindow";
+import {
+  questionsToRpcPayload,
+  validateQuizQuestions,
+  type QuizQuestionInput,
+} from "@/lib/quizValidation";
 import { runAction, type ActionResult } from "@/lib/actionResult";
 
-type QuestionInput = {
-  questionText: string;
-  questionType: "mcq" | "true_false" | "fill_blank" | "matching" | "essay";
-  points: number;
-  // mcq/true_false: the option list, one marked correct.
-  // fill_blank: each option is one accepted answer (all is_correct: true).
-  // matching: each option is a pair — text is the right side, matchPrompt
-  //   the left side; is_correct is unused (every row is "correct" by
-  //   construction — matching is scored on the pairing, not per-option).
-  // essay: options is empty; not used at all.
-  options: { text: string; isCorrect: boolean; matchPrompt?: string }[];
-};
+type QuestionInput = QuizQuestionInput;
 
 async function insertQuiz(input: {
   title: string;
@@ -66,29 +60,10 @@ async function insertQuiz(input: {
   }
 
   if (!input.title.trim()) throw new Error("Title is required.");
-  if (!input.questions.length) throw new Error("Add at least one question.");
   if (!Number.isInteger(input.durationMinutes) || input.durationMinutes < 1) {
     throw new Error("Duration must be a whole number of minutes.");
   }
-  for (const [i, q] of input.questions.entries()) {
-    if (!q.questionText.trim()) throw new Error(`Question ${i + 1} needs text.`);
-    if (q.questionType === "mcq" || q.questionType === "true_false") {
-      if (q.options.length < 2) throw new Error(`Question ${i + 1} needs at least two options.`);
-      if (!q.options.some((o) => o.isCorrect)) {
-        throw new Error(`Question ${i + 1} needs a correct option marked.`);
-      }
-    } else if (q.questionType === "fill_blank") {
-      if (!q.options.length || q.options.every((o) => !o.text.trim())) {
-        throw new Error(`Question ${i + 1} needs at least one accepted answer.`);
-      }
-    } else if (q.questionType === "matching") {
-      if (q.options.length < 2) throw new Error(`Question ${i + 1} needs at least two pairs.`);
-      if (q.options.some((o) => !o.matchPrompt?.trim() || !o.text.trim())) {
-        throw new Error(`Question ${i + 1} has an incomplete pair.`);
-      }
-    }
-    // essay: question text is the only requirement, already checked above.
-  }
+  validateQuizQuestions(input.questions);
 
   const admin = createAdminClient();
 
@@ -107,19 +82,7 @@ async function insertQuiz(input: {
     p_opens_at: input.opensAt || null,
     p_closes_at: input.closesAt || null,
     p_shuffle_questions: input.shuffleQuestions ?? false,
-    p_questions: input.questions.map((q) => ({
-      question_text: q.questionText.trim(),
-      question_type: q.questionType,
-      points: q.points,
-      options: q.options
-        .filter((o) => o.text.trim())
-        .map((o) => ({
-          text: o.text.trim(),
-          match_prompt: o.matchPrompt?.trim() || null,
-          // fill_blank has no "wrong" options — every accepted answer is correct
-          is_correct: q.questionType === "fill_blank" ? true : o.isCorrect,
-        })),
-    })),
+    p_questions: questionsToRpcPayload(input.questions),
   });
   if (error) throwDbError(error);
 
@@ -154,6 +117,80 @@ export async function createQuiz(
   input: Parameters<typeof insertQuiz>[0]
 ): Promise<ActionResult<string>> {
   return runAction(() => insertQuiz(input));
+}
+
+/**
+ * Replace a quiz's questions. Only while the quiz is unpublished and nobody
+ * has attempted it: recorded answers point at question/option ids, so
+ * changing questions under existing attempts would corrupt their scores. The
+ * database function re-checks both rules under a row lock.
+ */
+export async function updateQuizQuestions(
+  quizId: string,
+  questions: QuizQuestionInput[]
+): Promise<ActionResult> {
+  return runAction(async () => {
+    const { id: actorId, role: actorRole } = await assertRole(
+      ["admin", "teacher"],
+      "Only an admin or teacher can do this."
+    );
+    const admin = createAdminClient();
+
+    const { data: quiz } = await admin
+      .from("quizzes")
+      .select("assessment_id, is_published")
+      .eq("id", quizId)
+      .single();
+    if (!quiz) throw new Error("Quiz not found.");
+
+    if (actorRole === "teacher") {
+      const { data: assessment } = await admin
+        .from("assessments")
+        .select("created_by")
+        .eq("id", quiz.assessment_id)
+        .single();
+      if (assessment?.created_by !== actorId) {
+        throw new Error("You can only edit your own quizzes.");
+      }
+    }
+
+    if (quiz.is_published) {
+      throw new Error("Unpublish this quiz before editing its questions.");
+    }
+
+    const { count: attemptCount } = await admin
+      .from("quiz_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("quiz_id", quizId);
+    if (attemptCount) {
+      throw new Error(
+        `${attemptCount} student attempt${attemptCount === 1 ? "" : "s"} already exist, so the questions can't be changed.`
+      );
+    }
+
+    validateQuizQuestions(questions);
+
+    const { error } = await admin.rpc("replace_quiz_questions", {
+      p_quiz_id: quizId,
+      p_questions: questionsToRpcPayload(questions),
+    });
+    if (error) throwDbError(error);
+
+    await writeAuditLog({
+      entityType: "quiz",
+      entityId: quizId,
+      action: "quiz_questions_edited",
+      actorId,
+      metadata: {
+        question_count: questions.length,
+        total_points: questions.reduce((sum, q) => sum + q.points, 0),
+      },
+    });
+
+    revalidatePath("/dashboard/teacher/quizzes");
+    revalidatePath(`/dashboard/teacher/quizzes/${quizId}`);
+    revalidatePath(`/dashboard/teacher/quizzes/${quizId}/preview`);
+  });
 }
 
 /**

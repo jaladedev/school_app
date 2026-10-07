@@ -1996,6 +1996,18 @@ export type Database = {
         Args: { p_attempt_id: string; p_scores: Record<string, number> };
         Returns: { score: number; total_points: number }[];
       };
+      replace_quiz_questions: {
+        Args: {
+          p_quiz_id: string;
+          p_questions: {
+            question_text: string;
+            question_type: string;
+            points: number;
+            options: { text: string; match_prompt: string | null; is_correct: boolean }[];
+          }[];
+        };
+        Returns: undefined;
+      };
       create_quiz_with_questions: {
         Args: {
           p_subject_id: string;

@@ -2,7 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createQuiz } from "@/lib/actions/quiz";
+import { createQuiz, updateQuizQuestions } from "@/lib/actions/quiz";
+import { validateQuizQuestions } from "@/lib/quizValidation";
 import {
   joinDateTime,
   localIsoDate,
@@ -21,9 +22,9 @@ const LEVEL_LABELS: Record<EducationLevel, string> = {
   sss: "Senior Secondary (SS)",
 };
 
-type QuestionType = "mcq" | "true_false" | "fill_blank" | "matching" | "essay";
-type OptionDraft = { text: string; isCorrect: boolean; matchPrompt?: string };
-type QuestionDraft = {
+export type QuestionType = "mcq" | "true_false" | "fill_blank" | "matching" | "essay";
+export type OptionDraft = { text: string; isCorrect: boolean; matchPrompt?: string };
+export type QuestionDraft = {
   questionText: string;
   questionType: QuestionType;
   points: number;
@@ -75,21 +76,24 @@ function blankQuestion(): QuestionDraft {
 // in today's date / midnight for whichever side is still blank so the
 // combined value stays valid either way.
 export function QuizBuilder({
-  subjects,
-  classes,
-  academicYear,
-  term,
+  subjects = [],
+  classes = [],
+  academicYear = "",
+  term = 1,
+  editQuiz,
 }: {
-  subjects: {
+  /** Set to edit an existing quiz's questions instead of creating a new quiz. */
+  editQuiz?: { quizId: string; title: string; questions: QuestionDraft[] };
+  subjects?: {
     id: string;
     name: string;
     education_level: EducationLevel;
     min_level_number: number;
     max_level_number: number;
   }[];
-  classes: { id: string; label: string }[];
-  academicYear: string;
-  term: number;
+  classes?: { id: string; label: string }[];
+  academicYear?: string;
+  term?: number;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
@@ -99,7 +103,9 @@ export function QuizBuilder({
   const [opensAt, setOpensAt] = useState("");
   const [closesAt, setClosesAt] = useState("");
   const [shuffleQuestions, setShuffleQuestions] = useState(false);
-  const [questions, setQuestions] = useState<QuestionDraft[]>([blankQuestion()]);
+  const [questions, setQuestions] = useState<QuestionDraft[]>(
+    editQuiz?.questions.length ? editQuiz.questions : [blankQuestion()]
+  );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   // One textarea ref per question, keyed by index, so MathInsertButton
@@ -214,9 +220,41 @@ export function QuizBuilder({
 
   const totalPoints = questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0);
 
+  function handleEditSubmit() {
+    if (!editQuiz) return;
+    const payload = questions.map((q) => ({
+      questionText: q.questionText,
+      questionType: q.questionType,
+      points: Number(q.points) || 0,
+      options: q.options.map((o) => ({
+        text: o.text,
+        isCorrect: o.isCorrect,
+        matchPrompt: o.matchPrompt,
+      })),
+    }));
+    try {
+      validateQuizQuestions(payload);
+    } catch (err) {
+      return setError(err instanceof Error ? err.message : "Check the questions and try again.");
+    }
+
+    startTransition(async () => {
+      const result = await updateQuizQuestions(editQuiz.quizId, payload);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      emitToast("Questions updated.");
+      router.push(`/dashboard/teacher/quizzes/${editQuiz.quizId}`);
+      router.refresh();
+    });
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (editQuiz) return handleEditSubmit();
 
     if (!title.trim()) return setError("Title is required.");
     if (!subjectId || !classId) return setError("Pick a subject and class.");
@@ -258,6 +296,13 @@ export function QuizBuilder({
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
+      {editQuiz ? (
+        <div className="rounded-xl border border-rule bg-white p-4 text-sm text-ink-soft">
+          Editing the questions of{" "}
+          <span className="font-medium text-ink">{editQuiz.title}</span>. Title, class and
+          schedule are unchanged — use Edit schedule on the quiz page for dates.
+        </div>
+      ) : (
       <div className="grid grid-cols-2 gap-3 rounded-xl border border-rule bg-white p-4">
         <input
           required
@@ -362,6 +407,7 @@ export function QuizBuilder({
           Shuffle question order for each student
         </label>
       </div>
+      )}
 
       <div className="space-y-4">
         {questions.map((q, qIndex) => (
@@ -641,7 +687,13 @@ export function QuizBuilder({
         disabled={isPending}
         className="rounded-lg bg-leaf px-4 py-2 text-sm font-medium text-white hover:bg-leaf/90 disabled:opacity-60"
       >
-        {isPending ? "Creating…" : "Create quiz"}
+        {editQuiz
+          ? isPending
+            ? "Saving…"
+            : "Save questions"
+          : isPending
+            ? "Creating…"
+            : "Create quiz"}
       </button>
 
       {error && <p className="text-sm text-clay">{error}</p>}

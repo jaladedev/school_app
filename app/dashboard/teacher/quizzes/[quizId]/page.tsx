@@ -106,6 +106,25 @@ export default async function TeacherQuizDetailPage({
         >
           Preview / dry-run this quiz
         </Link>
+        {!quiz.is_published && !(attempts ?? []).length ? (
+          <Link
+            href={`/dashboard/teacher/quizzes/${quiz.id}/edit`}
+            className="inline-block rounded-lg border border-rule px-3 py-2 text-sm font-medium text-ink hover:bg-paper"
+          >
+            Edit questions
+          </Link>
+        ) : (
+          <span
+            title={
+              quiz.is_published
+                ? "Unpublish this quiz to edit its questions."
+                : "Students have already attempted this quiz."
+            }
+            className="inline-block cursor-not-allowed rounded-lg border border-dashed border-rule px-3 py-2 text-sm text-ink-soft"
+          >
+            {quiz.is_published ? "Unpublish to edit questions" : "Questions locked (has attempts)"}
+          </span>
+        )}
         <Link
           href={`/dashboard/teacher/quizzes/${quiz.id}/analytics`}
           className="inline-block rounded-lg border border-rule px-3 py-2 text-sm font-medium text-ink hover:bg-paper"

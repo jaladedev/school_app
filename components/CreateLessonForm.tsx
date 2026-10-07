@@ -3,21 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createLesson } from "@/lib/actions/teacher";
-
-/** Local calendar date as YYYY-MM-DD (toISOString() would give the UTC date). */
-function localDate(offsetDays = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${month}-${day}`;
-}
-
-const DUE_PRESETS = [
-  { label: "Tomorrow", days: 1 },
-  { label: "In 2 days", days: 2 },
-  { label: "Next week", days: 7 },
-];
+import { HomeworkDueDateField } from "@/components/HomeworkDueDateField";
+import { localIsoDate } from "@/lib/quizWindow";
 
 const inputClass =
   "w-full rounded-lg border border-rule bg-white px-3 py-2 text-sm outline-none focus-visible:border-marigold";
@@ -43,7 +30,7 @@ export function CreateLessonForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const today = localDate();
+  const today = localIsoDate();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,52 +112,16 @@ export function CreateLessonForm({
           className={inputClass}
         />
 
-        <div className={homework.trim() ? "space-y-2" : "space-y-2 opacity-50"}>
-          <label
-            htmlFor={`due-${timetableEntryId}`}
-            className="block text-xs font-medium text-ink"
-          >
-            Due date
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              id={`due-${timetableEntryId}`}
-              type="date"
-              value={homeworkDueAt}
-              min={today}
-              disabled={!homework.trim()}
-              onChange={(e) => setHomeworkDueAt(e.target.value)}
-              className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm outline-none focus-visible:border-marigold"
-            />
-            {DUE_PRESETS.map((preset) => (
-              <button
-                key={preset.label}
-                type="button"
-                disabled={!homework.trim()}
-                onClick={() => setHomeworkDueAt(localDate(preset.days))}
-                className={`rounded-full border px-2.5 py-1 text-xs ${
-                  homeworkDueAt === localDate(preset.days)
-                    ? "border-leaf bg-leaf-soft text-leaf"
-                    : "border-rule text-ink-soft hover:border-leaf"
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-            {homeworkDueAt && (
-              <button
-                type="button"
-                onClick={() => setHomeworkDueAt("")}
-                className="text-xs text-ink-soft hover:underline"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-          {!homework.trim() && (
-            <p className="text-xs text-ink-soft">Write the homework first to set a due date.</p>
-          )}
-        </div>
+        <HomeworkDueDateField
+          id={`due-${timetableEntryId}`}
+          value={homeworkDueAt}
+          onChange={setHomeworkDueAt}
+          min={today}
+          disabled={!homework.trim()}
+        />
+        {!homework.trim() && (
+          <p className="text-xs text-ink-soft">Write the homework first to set a due date.</p>
+        )}
       </fieldset>
 
       <div className="flex gap-2">

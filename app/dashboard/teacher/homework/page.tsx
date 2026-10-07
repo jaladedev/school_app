@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { HOMEWORK_SUBMISSION_BUCKET } from "@/lib/storageBuckets";
 import { HomeworkStatusToggle } from "@/components/HomeworkStatusToggle";
 import { HomeworkSubmissionReview } from "@/components/HomeworkSubmissionReview";
+import { GiveHomeworkForm } from "@/components/GiveHomeworkForm";
+import { EditHomeworkForm } from "@/components/EditHomeworkForm";
 import { redirect } from "next/navigation";
 import { homeworkDueStatus } from "@/types/database";
 import type { HomeworkStatus, HomeworkSubmissionStatus } from "@/types/database";
@@ -68,6 +70,20 @@ export default async function TeacherHomeworkPage() {
     .limit(50)
     .returns<HomeworkLessonRow[]>();
 
+  // The teacher's own timetable slots -- what "Give homework" picks from.
+  const { data: entryRows } = await supabase
+    .from("timetable_entries")
+    .select("id, weekday, period_number, classes(name, arm), subjects(name)")
+    .eq("teacher_id", profile.id)
+    .order("weekday", { ascending: true })
+    .order("period_number", { ascending: true });
+
+  const WEEKDAYS = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const entries = (entryRows ?? []).map((e) => ({
+    id: e.id,
+    label: `${e.subjects?.name ?? "Subject"} — ${`${e.classes?.name ?? ""} ${e.classes?.arm ?? ""}`.trim()} · ${WEEKDAYS[e.weekday] ?? ""} P${e.period_number}`,
+  }));
+
   const givenCount = (lessons ?? []).filter((l) => l.homework_status === "given").length;
   const reviewedCount = (lessons ?? []).filter((l) => l.homework_status === "reviewed").length;
   const overdueCount = (lessons ?? []).filter((l) => homeworkDueStatus(l) === "overdue").length;
@@ -92,6 +108,8 @@ export default async function TeacherHomeworkPage() {
       <p className="mb-6 text-sm text-ink-soft">
         {summaryLine(givenCount, reviewedCount, overdueCount)}
       </p>
+
+      <GiveHomeworkForm entries={entries} />
 
       <div className="space-y-2">
         {lessons?.map((l) => {
@@ -125,7 +143,17 @@ export default async function TeacherHomeworkPage() {
               {l.curriculum_topics?.title && (
                 <p className="mb-1 text-xs text-ink-soft">{l.curriculum_topics.title}</p>
               )}
-              <p className="text-sm text-ink">{l.homework}</p>
+              <p className="whitespace-pre-line text-sm text-ink">{l.homework}</p>
+              <div className="mt-1">
+                <EditHomeworkForm
+                  lessonId={l.id}
+                  lessonDate={l.lesson_date}
+                  homework={l.homework ?? ""}
+                  dueAt={l.homework_due_at}
+                  submissionCount={l.homework_submissions?.length ?? 0}
+                  locked={l.homework_status === "graded"}
+                />
+              </div>
 
               {l.homework_submissions?.length ? (
                 <div className="mt-3 rounded-lg border border-rule bg-paper p-2">
@@ -150,7 +178,7 @@ export default async function TeacherHomeworkPage() {
 
         {!lessons?.length && (
           <p className="text-sm text-ink-soft">
-            No homework logged yet — add it when logging a lesson.
+            No homework yet. Use Give homework above, or add it when logging a lesson.
           </p>
         )}
       </div>
