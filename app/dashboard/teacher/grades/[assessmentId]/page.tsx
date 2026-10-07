@@ -68,7 +68,7 @@ export default async function GradeEntryPage({
       {sentBack.length > 0 && (
         <div className="mb-6 rounded-lg border border-clay/40 bg-clay/5 p-4">
           <p className="mb-2 text-sm font-medium text-clay">
-            An HOD sent {sentBack.length} grade{sentBack.length === 1 ? "" : "s"} back. Edit and
+            An Academic Head sent {sentBack.length} grade{sentBack.length === 1 ? "" : "s"} back. Edit and
             save to resubmit.
           </p>
           <ul className="space-y-1 text-sm text-ink">

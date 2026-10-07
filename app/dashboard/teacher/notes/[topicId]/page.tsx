@@ -217,7 +217,7 @@ export default async function TeacherNoteEditPage({
           <p className="text-xs font-medium">
             {note.moderation_status === "pending" && (
               <span className="rounded-full bg-marigold/20 px-2.5 py-1 text-marigold-text">
-                Awaiting HOD review — not visible to students yet
+                Awaiting Academic Head review — not visible to students yet
               </span>
             )}
             {note.moderation_status === "approved" && (
@@ -227,7 +227,7 @@ export default async function TeacherNoteEditPage({
             )}
             {note.moderation_status === "rejected" && (
               <span className="rounded-full bg-clay/20 px-2.5 py-1 text-clay">
-                Rejected by HOD — edit and republish to resubmit
+                Rejected by Academic Head — edit and republish to resubmit
               </span>
             )}
           </p>

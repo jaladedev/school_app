@@ -86,7 +86,7 @@ describe("grade moderation: HOD is school-wide, not scoped to subjects_taught", 
 
     expect(await approveAssessmentGrades("assessment-1")).toEqual({
       ok: false,
-      error: "Only an admin or HOD can review grades.",
+      error: "Only an admin or Academic Head can review grades.",
     });
   });
 
@@ -96,7 +96,7 @@ describe("grade moderation: HOD is school-wide, not scoped to subjects_taught", 
 
     expect(await approveAssessmentGrades("assessment-1")).toEqual({
       ok: false,
-      error: "Only an admin or HOD can review grades.",
+      error: "Only an admin or Academic Head can review grades.",
     });
   });
 
@@ -108,7 +108,7 @@ describe("grade moderation: HOD is school-wide, not scoped to subjects_taught", 
 
     expect(await approveAssessmentGrades("assessment-1")).toEqual({
       ok: false,
-      error: "Only an admin or HOD can review grades.",
+      error: "Only an admin or Academic Head can review grades.",
     });
   });
 
@@ -185,7 +185,7 @@ describe("grade moderation: rejecting", () => {
 
     expect(await rejectSingleGrade("grade-1", "No")).toEqual({
       ok: false,
-      error: "Only an admin or HOD can review grades.",
+      error: "Only an admin or Academic Head can review grades.",
     });
   });
 });

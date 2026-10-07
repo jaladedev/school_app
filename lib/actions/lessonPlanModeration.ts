@@ -9,7 +9,7 @@ import { throwDbError } from "@/lib/errors/db";
 async function assertCanModerateTopicNote(topicId: string) {
   const { id } = await assertRole(
     ["admin", "teacher"],
-    "Only an admin or HOD can review lesson plans."
+    "Only an admin or Academic Head can review lesson plans."
   );
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
@@ -21,7 +21,7 @@ async function assertCanModerateTopicNote(topicId: string) {
     .eq("id", id)
     .single();
   if (teacher?.staff_role !== "hod") {
-    throw new Error("Only an admin or HOD can review lesson plans.");
+    throw new Error("Only an admin or Academic Head can review lesson plans.");
   }
 
   return { actorId: id };

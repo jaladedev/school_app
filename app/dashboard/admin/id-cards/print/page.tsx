@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { IdCardBatch, type IdCardData } from "@/components/IdCardBatch";
-import { formatLevel } from "@/types/database";
+import { formatLevel, STAFF_ROLE_LABELS, type StaffRole } from "@/types/database";
 import { STUDENT_PHOTO_BUCKET } from "@/lib/storageBuckets";
 
 async function signStudentPhotos(paths: (string | null)[]): Promise<Map<string, string>> {
@@ -101,7 +101,10 @@ export default async function IdCardsPrintPage({
       fullName: t.profiles?.full_name ?? "Unknown",
       role: "Teacher",
       idNumber: t.staff_id,
-      subLabel: t.staff_role && t.staff_role !== "teacher" ? t.staff_role.toUpperCase() : null,
+      subLabel:
+        t.staff_role && t.staff_role !== "teacher"
+          ? STAFF_ROLE_LABELS[t.staff_role as StaffRole].toUpperCase()
+          : null,
       photoUrl: null,
     }));
   } else if (resolvedSearchParams.type === "staff") {
@@ -116,7 +119,10 @@ export default async function IdCardsPrintPage({
       fullName: t.profiles?.full_name ?? "Unknown",
       role: "Teacher",
       idNumber: t.staff_id,
-      subLabel: t.staff_role && t.staff_role !== "teacher" ? t.staff_role.toUpperCase() : null,
+      subLabel:
+        t.staff_role && t.staff_role !== "teacher"
+          ? STAFF_ROLE_LABELS[t.staff_role as StaffRole].toUpperCase()
+          : null,
       // No staff photo bucket exists yet — only student-photos does. Falls
       // back to initials, same as a student with no photo uploaded.
       photoUrl: null,

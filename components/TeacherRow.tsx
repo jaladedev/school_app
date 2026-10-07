@@ -114,7 +114,7 @@ export function TeacherRow({
             className="rounded-lg border border-rule bg-white px-2 py-1 text-xs font-medium text-ink outline-none focus-visible:border-marigold disabled:opacity-60"
           >
             <option value="teacher">Teacher</option>
-            <option value="hod">HOD</option>
+            <option value="hod">Academic Head</option>
             <option value="bursar">Bursar</option>
             <option value="librarian">Librarian</option>
             <option value="house_parent">House parent</option>

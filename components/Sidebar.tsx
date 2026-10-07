@@ -166,7 +166,7 @@ const SERVICE_NAV_BY_STAFF_ROLE: Partial<Record<StaffRole, { label: string; href
 // all `role: "teacher"` in the DB, so without this a librarian or bursar
 // just saw "teacher".
 const STAFF_ROLE_LABEL: Partial<Record<StaffRole, string>> = {
-  hod: "Head of department",
+  hod: "Academic head",
   bursar: "Bursar",
   librarian: "Librarian",
   house_parent: "House parent",

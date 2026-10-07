@@ -27,6 +27,15 @@ export type InvoiceStatus = "unpaid" | "partial" | "paid";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
 export type StaffRole =
   "teacher" | "hod" | "bursar" | "librarian" | "house_parent" | "transport_officer" | "driver";
+export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
+  teacher: "Teacher",
+  hod: "Academic Head",
+  bursar: "Bursar",
+  librarian: "Librarian",
+  house_parent: "House parent",
+  transport_officer: "Transport officer",
+  driver: "Driver",
+};
 export type GradeModerationStatus = "pending" | "approved" | "rejected";
 export type ResourceType = "image" | "diagram_mermaid" | "video" | "pdf" | "link" | "audio";
 export type AssetCondition = "new" | "good" | "fair" | "poor" | "damaged";

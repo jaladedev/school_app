@@ -8,7 +8,7 @@ import type { StaffRole } from "@/types/database";
 
 const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
   teacher: "Teacher",
-  hod: "HOD",
+  hod: "Academic Head",
   bursar: "Bursar",
   librarian: "Librarian",
   house_parent: "House parent",

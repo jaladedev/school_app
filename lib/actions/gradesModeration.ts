@@ -12,7 +12,7 @@ import { runAction, type ActionResult } from "@/lib/actionResult";
 async function assertCanModerateGrades() {
   const { id } = await assertRole(
     ["admin", "teacher"],
-    "Only an admin or HOD can review grades."
+    "Only an admin or Academic Head can review grades."
   );
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
@@ -23,7 +23,7 @@ async function assertCanModerateGrades() {
     .eq("id", id)
     .single();
   if (teacher?.staff_role !== "hod") {
-    throw new Error("Only an admin or HOD can review grades.");
+    throw new Error("Only an admin or Academic Head can review grades.");
   }
   return { actorId: id };
 }

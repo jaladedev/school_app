@@ -106,7 +106,7 @@ export default async function TeacherNotesPage({
             </Link>
           </div>
           <p className="mb-3 text-xs text-ink-soft">
-            Published notes stay hidden from students and other staff until a HOD for that subject
+            Published notes stay hidden from students and other staff until an Academic Head
             approves them.
           </p>
           {pendingReview.length ? (

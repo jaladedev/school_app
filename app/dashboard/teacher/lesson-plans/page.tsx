@@ -90,7 +90,7 @@ export default async function HodLessonPlansPage({
     <div>
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Lesson plan review</h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Published notes stay hidden from students until a HOD approves them. {counts.pending}{" "}
+        Published notes stay hidden from students until an Academic Head approves them. {counts.pending}{" "}
         awaiting review across all subjects.
       </p>
 

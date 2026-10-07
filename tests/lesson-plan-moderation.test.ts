@@ -98,7 +98,10 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
       { data: { staff_role: "class_teacher" }, error: null }, // not hod
     ];
 
-    expect(await rejectLessonPlan("note-1", "needs revision")).toEqual({ ok: false, error: "Only an admin or HOD can review lesson plans." });
+    expect(await rejectLessonPlan("note-1", "needs revision")).toEqual({
+      ok: false,
+      error: "Only an admin or Academic Head can review lesson plans.",
+    });
   });
 
   it("rejects a student before any DB write", async () => {
@@ -115,7 +118,10 @@ describe("lesson plan moderation: HOD is school-wide, not scoped to subjects_tau
       { data: { role: "student", is_active: true }, error: null }, // assertRole
     ];
 
-    expect(await approveLessonPlan("note-1")).toEqual({ ok: false, error: "Only an admin or HOD can review lesson plans." });
+    expect(await approveLessonPlan("note-1")).toEqual({
+      ok: false,
+      error: "Only an admin or Academic Head can review lesson plans.",
+    });
   });
 
   it("rejects reviewing a note that hasn't been published yet, before checking role", async () => {
