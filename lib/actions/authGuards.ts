@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserRole } from "@/types/database";
 import { throwDbError } from "@/lib/errors/db";
 import { TRANSIENT_AUTH_ERROR_MESSAGE } from "@/lib/authErrors";
+import { runAction } from "@/lib/actionResult";
 
 /**
  * Resolves the JWT-validated current user, distinguishing a transient
@@ -75,13 +76,15 @@ export async function assertRole(
 
 /** Clears only the current user's first-login password-change flag. */
 export async function clearMustChangePassword() {
-  const user = await getAuthenticatedUser();
+  return runAction(async () => {
+    const user = await getAuthenticatedUser();
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("profiles")
-    .update({ must_change_password: false })
-    .eq("id", user.id);
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("profiles")
+      .update({ must_change_password: false })
+      .eq("id", user.id);
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
+  });
 }

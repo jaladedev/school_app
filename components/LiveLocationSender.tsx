@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { recordTransportLocation } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
 import type { TripDirection } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 // Throttles how often a position update is actually sent — watchPosition
 // can fire far more often than that's useful for a bus on a school run.
@@ -44,13 +45,15 @@ export function LiveLocationSender({
         if (now - lastSentRef.current < SEND_INTERVAL_MS) return;
         lastSentRef.current = now;
 
-        recordTransportLocation({
-          routeId,
-          tripDate,
-          direction,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        }).catch((err) => {
+        unwrapAction(
+          recordTransportLocation({
+            routeId,
+            tripDate,
+            direction,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          })
+        ).catch((err) => {
           emitToast(err instanceof Error ? err.message : "Couldn't send location.", "error");
         });
       },

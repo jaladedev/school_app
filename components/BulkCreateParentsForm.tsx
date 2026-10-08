@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { createParentsBulk, type BulkParentResult } from "@/lib/actions/admin";
 import { parseCsv } from "@/lib/csv";
+import { unwrapAction } from "@/lib/actionResult";
 
 type PasswordStrategy = "auto" | "shared";
 
@@ -70,11 +71,13 @@ export function BulkCreateParentsForm() {
 
     startTransition(async () => {
       try {
-        const res = await createParentsBulk({
-          parents: parsed,
-          passwordStrategy: strategy,
-          sharedPassword: strategy === "shared" ? sharedPassword : undefined,
-        });
+        const res = await unwrapAction(
+          createParentsBulk({
+            parents: parsed,
+            passwordStrategy: strategy,
+            sharedPassword: strategy === "shared" ? sharedPassword : undefined,
+          })
+        );
         setResults(res);
       } catch (err: any) {
         setError(err.message ?? "Something went wrong.");

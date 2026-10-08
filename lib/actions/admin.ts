@@ -9,6 +9,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { STUDENT_PHOTO_BUCKET } from "@/lib/storageBuckets";
 import type { StaffRole } from "@/types/database";
 import { throwDbError } from "@/lib/errors/db";
+import { runAction, type ActionResult } from "@/lib/actionResult";
 
 const TEMP_PASSWORD_WORDS = [
   "acorn",
@@ -228,55 +229,57 @@ export async function createTeacherAccount(input: {
   staffRole: StaffRole;
   subjectIds: string[];
 }) {
-  await assertRole(["admin"], "Only an admin can perform this action.");
-  const admin = createAdminClient();
-  await assertEmailAvailable(admin, input.email);
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
+    const admin = createAdminClient();
+    await assertEmailAvailable(admin, input.email);
 
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: input.email,
-    password: input.temporaryPassword,
-    email_confirm: true,
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: input.email,
+      password: input.temporaryPassword,
+      email_confirm: true,
+    });
+
+    if (createError || !created.user) {
+      throw new Error(createError?.message ?? "Failed to create the auth account.");
+    }
+
+    const userId = created.user.id;
+
+    const { error: profileError } = await admin.from("profiles").insert({
+      id: userId,
+      role: "teacher",
+      full_name: input.fullName,
+    });
+
+    if (profileError) {
+      await deleteUserAfterFailedSetup(admin, userId);
+      throwDbError(profileError);
+    }
+
+    await insertProfileContact(admin, userId, input.email);
+
+    // Only teaching roles (teacher/HOD) carry subjects_taught -- every
+    // other staff role (bursar, librarian, house parent, transport
+    // officer, driver) isn't assigned subjects at all, so store an empty
+    // array for them regardless of what the form happened to send.
+    const isTeachingRole = input.staffRole === "teacher" || input.staffRole === "hod";
+
+    const { error: teacherError } = await admin.from("teacher_profiles").insert({
+      id: userId,
+      staff_role: input.staffRole,
+      subjects_taught: isTeachingRole ? input.subjectIds : [],
+      hire_date: new Date().toISOString().slice(0, 10),
+    });
+
+    if (teacherError) {
+      await deleteUserAfterFailedSetup(admin, userId);
+      throwDbError(teacherError);
+    }
+
+    revalidatePath("/dashboard/admin/staff");
+    return { userId };
   });
-
-  if (createError || !created.user) {
-    throw new Error(createError?.message ?? "Failed to create the auth account.");
-  }
-
-  const userId = created.user.id;
-
-  const { error: profileError } = await admin.from("profiles").insert({
-    id: userId,
-    role: "teacher",
-    full_name: input.fullName,
-  });
-
-  if (profileError) {
-    await deleteUserAfterFailedSetup(admin, userId);
-    throwDbError(profileError);
-  }
-
-  await insertProfileContact(admin, userId, input.email);
-
-  // Only teaching roles (teacher/HOD) carry subjects_taught -- every
-  // other staff role (bursar, librarian, house parent, transport
-  // officer, driver) isn't assigned subjects at all, so store an empty
-  // array for them regardless of what the form happened to send.
-  const isTeachingRole = input.staffRole === "teacher" || input.staffRole === "hod";
-
-  const { error: teacherError } = await admin.from("teacher_profiles").insert({
-    id: userId,
-    staff_role: input.staffRole,
-    subjects_taught: isTeachingRole ? input.subjectIds : [],
-    hire_date: new Date().toISOString().slice(0, 10),
-  });
-
-  if (teacherError) {
-    await deleteUserAfterFailedSetup(admin, userId);
-    throwDbError(teacherError);
-  }
-
-  revalidatePath("/dashboard/admin/staff");
-  return { userId };
 }
 
 export async function createStudentAccount(input: {
@@ -289,58 +292,60 @@ export async function createStudentAccount(input: {
   guardianPhone?: string;
   gender?: "male" | "female" | "";
 }) {
-  await assertRole(["admin"], "Only an admin can perform this action.");
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
 
-  if (!input.classId) {
-    throw new Error("Please select a class before creating the student.");
-  }
+    if (!input.classId) {
+      throw new Error("Please select a class before creating the student.");
+    }
 
-  const admin = createAdminClient();
-  await assertEmailAvailable(admin, input.email);
+    const admin = createAdminClient();
+    await assertEmailAvailable(admin, input.email);
 
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: input.email,
-    password: input.temporaryPassword,
-    email_confirm: true,
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: input.email,
+      password: input.temporaryPassword,
+      email_confirm: true,
+    });
+
+    if (createError || !created.user) {
+      throw new Error(createError?.message ?? "Failed to create the auth account.");
+    }
+
+    const userId = created.user.id;
+
+    const { error: profileError } = await admin.from("profiles").insert({
+      id: userId,
+      role: "student",
+      full_name: input.fullName,
+    });
+
+    if (profileError) {
+      await deleteUserAfterFailedSetup(admin, userId);
+      throwDbError(profileError);
+    }
+
+    await insertProfileContact(admin, userId, input.email);
+
+    const { error: studentError } = await admin.from("student_profiles").insert({
+      id: userId,
+      class_id: input.classId,
+      admission_no: input.admissionNo ?? null,
+      guardian_name: input.guardianName ?? null,
+      guardian_phone: input.guardianPhone ?? null,
+      gender: input.gender || null,
+    });
+
+    if (studentError) {
+      await deleteUserAfterFailedSetup(admin, userId);
+      throwDbError(studentError);
+    }
+
+    await recordEnrollment(admin, userId, input.classId);
+
+    revalidatePath("/dashboard/admin/students");
+    return { userId };
   });
-
-  if (createError || !created.user) {
-    throw new Error(createError?.message ?? "Failed to create the auth account.");
-  }
-
-  const userId = created.user.id;
-
-  const { error: profileError } = await admin.from("profiles").insert({
-    id: userId,
-    role: "student",
-    full_name: input.fullName,
-  });
-
-  if (profileError) {
-    await deleteUserAfterFailedSetup(admin, userId);
-    throwDbError(profileError);
-  }
-
-  await insertProfileContact(admin, userId, input.email);
-
-  const { error: studentError } = await admin.from("student_profiles").insert({
-    id: userId,
-    class_id: input.classId,
-    admission_no: input.admissionNo ?? null,
-    guardian_name: input.guardianName ?? null,
-    guardian_phone: input.guardianPhone ?? null,
-    gender: input.gender || null,
-  });
-
-  if (studentError) {
-    await deleteUserAfterFailedSetup(admin, userId);
-    throwDbError(studentError);
-  }
-
-  await recordEnrollment(admin, userId, input.classId);
-
-  revalidatePath("/dashboard/admin/students");
-  return { userId };
 }
 
 export type BulkStudentRow = {
@@ -371,184 +376,188 @@ export async function createStudentsBulk(input: {
   students: BulkStudentRow[];
   passwordStrategy: "auto" | "shared";
   sharedPassword?: string;
-}): Promise<BulkStudentResult[]> {
-  await assertRole(["admin"], "Only an admin can perform this action.");
+}): Promise<ActionResult<BulkStudentResult[]>> {
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
 
-  if (!input.classId) {
-    throw new Error("Please select a class before creating students.");
-  }
-
-  const admin = createAdminClient();
-
-  if (
-    input.passwordStrategy === "shared" &&
-    (!input.sharedPassword || input.sharedPassword.length < 8)
-  ) {
-    throw new Error("Shared password must be at least 8 characters.");
-  }
-
-  const emails = input.students.map((student) => student.email.trim().toLowerCase());
-  const seenEmails = new Set<string>();
-  const duplicateInputEmails = new Set<string>();
-  for (const email of emails) {
-    if (seenEmails.has(email)) duplicateInputEmails.add(email);
-    else seenEmails.add(email);
-  }
-
-  // Case-insensitive existence check, scoped to just this import's emails
-  // instead of pulling every row in profile_contacts into JS. A plain
-  // `.in("email", [...])` does an exact-case match, so it would silently
-  // miss a DB row like "John@Example.com" against an import row of
-  // "john@example.com" -- the ilike-per-email .or() filter keeps the
-  // case-insensitive comparison but lets Postgres do the filtering, so
-  // this stays cheap as the whole school's roster grows, not just as
-  // this one import grows.
-  const uniqueEmails = Array.from(seenEmails);
-  const emailFilter = uniqueEmails
-    .map((email) => `email.ilike."${email.replace(/"/g, '\\"')}"`)
-    .join(",");
-
-  const { data: matchingContacts, error: existingProfilesError } = uniqueEmails.length
-    ? await admin.from("profile_contacts").select("email").or(emailFilter)
-    : { data: [], error: null };
-
-  if (existingProfilesError) throwDbError(existingProfilesError);
-
-  const existingEmails = new Set((matchingContacts ?? []).map((c) => c.email.toLowerCase()));
-
-  const created = await mapWithConcurrency<BulkStudentRow, BulkCreationAttempt>(
-    input.students,
-    5,
-    async (row) => {
-      const password =
-        input.passwordStrategy === "shared" ? input.sharedPassword! : generateTempPassword();
-
-      try {
-        const email = row.email.trim().toLowerCase();
-        if (existingEmails.has(email) || duplicateInputEmails.has(email)) {
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: `An account with the email "${row.email}" already exists.`,
-          } satisfies BulkStudentResult;
-        }
-
-        const { data: created, error: createError } = await admin.auth.admin.createUser({
-          email: row.email,
-          password,
-          email_confirm: true,
-        });
-
-        if (createError || !created.user) {
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: createError?.message ?? "Account creation failed.",
-          } satisfies BulkStudentResult;
-        }
-
-        const userId = created.user.id;
-
-        const { error: profileError } = await admin.from("profiles").insert({
-          id: userId,
-          role: "student",
-          full_name: row.fullName,
-        });
-
-        if (profileError) {
-          await deleteUserAfterFailedSetup(admin, userId);
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: profileError.message,
-          } satisfies BulkStudentResult;
-        }
-
-        const { error: contactError } = await admin
-          .from("profile_contacts")
-          .insert({ id: userId, email: row.email });
-
-        if (contactError) {
-          await deleteUserAfterFailedSetup(admin, userId);
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: contactError.message,
-          } satisfies BulkStudentResult;
-        }
-
-        const { error: studentError } = await admin.from("student_profiles").insert({
-          id: userId,
-          class_id: input.classId,
-          admission_no: row.admissionNo ?? null,
-          guardian_name: row.guardianName ?? null,
-          guardian_phone: row.guardianPhone ?? null,
-        });
-
-        if (studentError) {
-          await deleteUserAfterFailedSetup(admin, userId);
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: studentError.message,
-          } satisfies BulkStudentResult;
-        }
-
-        return {
-          result: { email: row.email, fullName: row.fullName, success: true, password },
-          userId,
-        };
-      } catch (err: any) {
-        return {
-          email: row.email,
-          fullName: row.fullName,
-          success: false,
-          error: err.message ?? "Unexpected error.",
-        } satisfies BulkStudentResult;
-      }
+    if (!input.classId) {
+      throw new Error("Please select a class before creating students.");
     }
-  );
 
-  const successful = created.filter(
-    (row): row is { result: BulkStudentResult; userId: string } => "userId" in row
-  );
+    const admin = createAdminClient();
 
-  await recordEnrollments(
-    admin,
-    successful.map((row) => row.userId),
-    input.classId
-  );
+    if (
+      input.passwordStrategy === "shared" &&
+      (!input.sharedPassword || input.sharedPassword.length < 8)
+    ) {
+      throw new Error("Shared password must be at least 8 characters.");
+    }
 
-  const results = created.map((row) => ("result" in row ? row.result : row));
+    const emails = input.students.map((student) => student.email.trim().toLowerCase());
+    const seenEmails = new Set<string>();
+    const duplicateInputEmails = new Set<string>();
+    for (const email of emails) {
+      if (seenEmails.has(email)) duplicateInputEmails.add(email);
+      else seenEmails.add(email);
+    }
 
-  revalidatePath("/dashboard/admin/students");
-  return results;
+    // Case-insensitive existence check, scoped to just this import's emails
+    // instead of pulling every row in profile_contacts into JS. A plain
+    // `.in("email", [...])` does an exact-case match, so it would silently
+    // miss a DB row like "John@Example.com" against an import row of
+    // "john@example.com" -- the ilike-per-email .or() filter keeps the
+    // case-insensitive comparison but lets Postgres do the filtering, so
+    // this stays cheap as the whole school's roster grows, not just as
+    // this one import grows.
+    const uniqueEmails = Array.from(seenEmails);
+    const emailFilter = uniqueEmails
+      .map((email) => `email.ilike."${email.replace(/"/g, '\\"')}"`)
+      .join(",");
+
+    const { data: matchingContacts, error: existingProfilesError } = uniqueEmails.length
+      ? await admin.from("profile_contacts").select("email").or(emailFilter)
+      : { data: [], error: null };
+
+    if (existingProfilesError) throwDbError(existingProfilesError);
+
+    const existingEmails = new Set((matchingContacts ?? []).map((c) => c.email.toLowerCase()));
+
+    const created = await mapWithConcurrency<BulkStudentRow, BulkCreationAttempt>(
+      input.students,
+      5,
+      async (row) => {
+        const password =
+          input.passwordStrategy === "shared" ? input.sharedPassword! : generateTempPassword();
+
+        try {
+          const email = row.email.trim().toLowerCase();
+          if (existingEmails.has(email) || duplicateInputEmails.has(email)) {
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: `An account with the email "${row.email}" already exists.`,
+            } satisfies BulkStudentResult;
+          }
+
+          const { data: created, error: createError } = await admin.auth.admin.createUser({
+            email: row.email,
+            password,
+            email_confirm: true,
+          });
+
+          if (createError || !created.user) {
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: createError?.message ?? "Account creation failed.",
+            } satisfies BulkStudentResult;
+          }
+
+          const userId = created.user.id;
+
+          const { error: profileError } = await admin.from("profiles").insert({
+            id: userId,
+            role: "student",
+            full_name: row.fullName,
+          });
+
+          if (profileError) {
+            await deleteUserAfterFailedSetup(admin, userId);
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: profileError.message,
+            } satisfies BulkStudentResult;
+          }
+
+          const { error: contactError } = await admin
+            .from("profile_contacts")
+            .insert({ id: userId, email: row.email });
+
+          if (contactError) {
+            await deleteUserAfterFailedSetup(admin, userId);
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: contactError.message,
+            } satisfies BulkStudentResult;
+          }
+
+          const { error: studentError } = await admin.from("student_profiles").insert({
+            id: userId,
+            class_id: input.classId,
+            admission_no: row.admissionNo ?? null,
+            guardian_name: row.guardianName ?? null,
+            guardian_phone: row.guardianPhone ?? null,
+          });
+
+          if (studentError) {
+            await deleteUserAfterFailedSetup(admin, userId);
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: studentError.message,
+            } satisfies BulkStudentResult;
+          }
+
+          return {
+            result: { email: row.email, fullName: row.fullName, success: true, password },
+            userId,
+          };
+        } catch (err: any) {
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: err.message ?? "Unexpected error.",
+          } satisfies BulkStudentResult;
+        }
+      }
+    );
+
+    const successful = created.filter(
+      (row): row is { result: BulkStudentResult; userId: string } => "userId" in row
+    );
+
+    await recordEnrollments(
+      admin,
+      successful.map((row) => row.userId),
+      input.classId
+    );
+
+    const results = created.map((row) => ("result" in row ? row.result : row));
+
+    revalidatePath("/dashboard/admin/students");
+    return results;
+  });
 }
 
 export async function reassignStudentClass(studentId: string, classId: string) {
-  await assertRole(["admin"], "Only an admin can perform this action.");
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
 
-  if (!classId) {
-    throw new Error("Please select a valid class.");
-  }
+    if (!classId) {
+      throw new Error("Please select a valid class.");
+    }
 
-  const admin = createAdminClient();
+    const admin = createAdminClient();
 
-  const { error } = await admin
-    .from("student_profiles")
-    .update({ class_id: classId })
-    .eq("id", studentId);
+    const { error } = await admin
+      .from("student_profiles")
+      .update({ class_id: classId })
+      .eq("id", studentId);
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
 
-  await recordEnrollment(admin, studentId, classId);
+    await recordEnrollment(admin, studentId, classId);
 
-  revalidatePath("/dashboard/admin/students");
+    revalidatePath("/dashboard/admin/students");
+  });
 }
 
 // ---------- Edit student ----------
@@ -562,41 +571,43 @@ export async function updateStudentAccount(input: {
   classId?: string | null;
   gender?: "male" | "female" | "";
 }) {
-  await assertRole(["admin"], "Only an admin can perform this action.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
+    const admin = createAdminClient();
 
-  const { error: profileError } = await admin
-    .from("profiles")
-    .update({ full_name: input.fullName })
-    .eq("id", input.studentId);
+    const { error: profileError } = await admin
+      .from("profiles")
+      .update({ full_name: input.fullName })
+      .eq("id", input.studentId);
 
-  if (profileError) throwDbError(profileError);
+    if (profileError) throwDbError(profileError);
 
-  const { error: studentError } = await admin
-    .from("student_profiles")
-    .update({
-      admission_no: input.admissionNo || null,
-      guardian_name: input.guardianName || null,
-      guardian_phone: input.guardianPhone || null,
-      gender: input.gender || null,
-      // classId is only present at all when the form detected an actual
-      // change (see EditStudentForm) -- undefined here means "leave the
-      // class alone", while an empty string is the admin explicitly
-      // picking "Unassigned" and must still clear class_id to null rather
-      // than being treated as falsy-and-skipped like the other fields
-      // above.
-      ...(input.classId !== undefined ? { class_id: input.classId || null } : {}),
-    })
-    .eq("id", input.studentId);
+    const { error: studentError } = await admin
+      .from("student_profiles")
+      .update({
+        admission_no: input.admissionNo || null,
+        guardian_name: input.guardianName || null,
+        guardian_phone: input.guardianPhone || null,
+        gender: input.gender || null,
+        // classId is only present at all when the form detected an actual
+        // change (see EditStudentForm) -- undefined here means "leave the
+        // class alone", while an empty string is the admin explicitly
+        // picking "Unassigned" and must still clear class_id to null rather
+        // than being treated as falsy-and-skipped like the other fields
+        // above.
+        ...(input.classId !== undefined ? { class_id: input.classId || null } : {}),
+      })
+      .eq("id", input.studentId);
 
-  if (studentError) throwDbError(studentError);
+    if (studentError) throwDbError(studentError);
 
-  if (input.classId) {
-    await recordEnrollment(admin, input.studentId, input.classId);
-  }
+    if (input.classId) {
+      await recordEnrollment(admin, input.studentId, input.classId);
+    }
 
-  revalidatePath(`/dashboard/admin/students/${input.studentId}`);
-  revalidatePath("/dashboard/admin/students");
+    revalidatePath(`/dashboard/admin/students/${input.studentId}`);
+    revalidatePath("/dashboard/admin/students");
+  });
 }
 
 const MAX_STUDENT_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -615,124 +626,132 @@ async function ensureStudentPhotoBucket(admin: ReturnType<typeof createAdminClie
 }
 
 export async function uploadStudentPhoto(studentId: string, formData: FormData) {
-  await assertRole(["admin"], "Only an admin can upload student photos.");
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can upload student photos.");
 
-  const photo = formData.get("photo");
-  if (!(photo instanceof File) || !photo.size) throw new Error("Choose an image to upload.");
-  if (!ALLOWED_STUDENT_PHOTO_TYPES.has(photo.type)) {
-    throw new Error("Use a JPEG, PNG, or WebP image.");
-  }
-  if (photo.size > MAX_STUDENT_PHOTO_BYTES) throw new Error("The photo must be 5 MB or smaller.");
+    const photo = formData.get("photo");
+    if (!(photo instanceof File) || !photo.size) throw new Error("Choose an image to upload.");
+    if (!ALLOWED_STUDENT_PHOTO_TYPES.has(photo.type)) {
+      throw new Error("Use a JPEG, PNG, or WebP image.");
+    }
+    if (photo.size > MAX_STUDENT_PHOTO_BYTES) throw new Error("The photo must be 5 MB or smaller.");
 
-  const admin = createAdminClient();
-  await ensureStudentPhotoBucket(admin);
+    const admin = createAdminClient();
+    await ensureStudentPhotoBucket(admin);
 
-  const { data: profile, error: profileReadError } = await admin
-    .from("profiles")
-    .select("avatar_url")
-    .eq("id", studentId)
-    .single();
+    const { data: profile, error: profileReadError } = await admin
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", studentId)
+      .single();
 
-  if (profileReadError || !profile) throw new Error("Student profile not found.");
+    if (profileReadError || !profile) throw new Error("Student profile not found.");
 
-  const extension = photo.type === "image/jpeg" ? "jpg" : photo.type.split("/")[1];
-  const objectPath = `${studentId}/profile.${extension}`;
-  const { error: uploadError } = await admin.storage
-    .from(STUDENT_PHOTO_BUCKET)
-    .upload(objectPath, photo, {
-      contentType: photo.type,
-      upsert: true,
-    });
+    const extension = photo.type === "image/jpeg" ? "jpg" : photo.type.split("/")[1];
+    const objectPath = `${studentId}/profile.${extension}`;
+    const { error: uploadError } = await admin.storage
+      .from(STUDENT_PHOTO_BUCKET)
+      .upload(objectPath, photo, {
+        contentType: photo.type,
+        upsert: true,
+      });
 
-  if (uploadError) throwDbError(uploadError);
+    if (uploadError) throwDbError(uploadError);
 
-  const { error: updateError } = await admin
-    .from("profiles")
-    .update({ avatar_url: objectPath })
-    .eq("id", studentId);
+    const { error: updateError } = await admin
+      .from("profiles")
+      .update({ avatar_url: objectPath })
+      .eq("id", studentId);
 
-  if (updateError) {
-    await admin.storage.from(STUDENT_PHOTO_BUCKET).remove([objectPath]);
-    throwDbError(updateError);
-  }
+    if (updateError) {
+      await admin.storage.from(STUDENT_PHOTO_BUCKET).remove([objectPath]);
+      throwDbError(updateError);
+    }
 
-  if (profile.avatar_url && profile.avatar_url !== objectPath) {
-    await admin.storage.from(STUDENT_PHOTO_BUCKET).remove([profile.avatar_url]);
-  }
+    if (profile.avatar_url && profile.avatar_url !== objectPath) {
+      await admin.storage.from(STUDENT_PHOTO_BUCKET).remove([profile.avatar_url]);
+    }
 
-  revalidatePath(`/dashboard/admin/students/${studentId}`);
-  revalidatePath("/dashboard/admin/students");
+    revalidatePath(`/dashboard/admin/students/${studentId}`);
+    revalidatePath("/dashboard/admin/students");
+  });
 }
 
 // ---------- Edit teacher ----------
 
 export async function updateTeacherAccount(input: { teacherId: string; fullName: string }) {
-  await assertRole(["admin"], "Only an admin can perform this action.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
+    const admin = createAdminClient();
 
-  const { error } = await admin
-    .from("profiles")
-    .update({ full_name: input.fullName })
-    .eq("id", input.teacherId);
+    const { error } = await admin
+      .from("profiles")
+      .update({ full_name: input.fullName })
+      .eq("id", input.teacherId);
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/admin/staff");
-  revalidatePath(`/dashboard/admin/staff/${input.teacherId}`);
+    revalidatePath("/dashboard/admin/staff");
+    revalidatePath(`/dashboard/admin/staff/${input.teacherId}`);
+  });
 }
 
 export async function updateTeacherSubjects(teacherId: string, subjectIds: string[]) {
-  await assertRole(["admin"], "Only an admin can update teacher subjects.");
-  const admin = createAdminClient();
-  const uniqueSubjectIds = [...new Set(subjectIds.filter(Boolean))];
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can update teacher subjects.");
+    const admin = createAdminClient();
+    const uniqueSubjectIds = [...new Set(subjectIds.filter(Boolean))];
 
-  const { data: subjects, error: subjectsError } = uniqueSubjectIds.length
-    ? await admin.from("subjects").select("id").in("id", uniqueSubjectIds)
-    : { data: [], error: null };
+    const { data: subjects, error: subjectsError } = uniqueSubjectIds.length
+      ? await admin.from("subjects").select("id").in("id", uniqueSubjectIds)
+      : { data: [], error: null };
 
-  if (subjectsError) throwDbError(subjectsError);
-  if ((subjects ?? []).length !== uniqueSubjectIds.length) {
-    throw new Error("One or more selected subjects no longer exist.");
-  }
+    if (subjectsError) throwDbError(subjectsError);
+    if ((subjects ?? []).length !== uniqueSubjectIds.length) {
+      throw new Error("One or more selected subjects no longer exist.");
+    }
 
-  const { error } = await admin
-    .from("teacher_profiles")
-    .update({ subjects_taught: uniqueSubjectIds })
-    .eq("id", teacherId);
+    const { error } = await admin
+      .from("teacher_profiles")
+      .update({ subjects_taught: uniqueSubjectIds })
+      .eq("id", teacherId);
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
 
-  revalidatePath(`/dashboard/admin/staff/${teacherId}`);
-  revalidatePath("/dashboard/admin/staff");
-  revalidatePath("/dashboard/admin/classes");
+    revalidatePath(`/dashboard/admin/staff/${teacherId}`);
+    revalidatePath("/dashboard/admin/staff");
+    revalidatePath("/dashboard/admin/classes");
+  });
 }
 
 export async function updateTeacherStaffRole(teacherId: string, staffRole: StaffRole) {
-  const { id: actorId } = await assertRole(["admin"], "Only an admin can assign staff roles.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    const { id: actorId } = await assertRole(["admin"], "Only an admin can assign staff roles.");
+    const admin = createAdminClient();
 
-  const { data: before } = await admin
-    .from("teacher_profiles")
-    .select("staff_role")
-    .eq("id", teacherId)
-    .single();
+    const { data: before } = await admin
+      .from("teacher_profiles")
+      .select("staff_role")
+      .eq("id", teacherId)
+      .single();
 
-  const { error } = await admin
-    .from("teacher_profiles")
-    .update({ staff_role: staffRole })
-    .eq("id", teacherId);
-  if (error) throwDbError(error);
+    const { error } = await admin
+      .from("teacher_profiles")
+      .update({ staff_role: staffRole })
+      .eq("id", teacherId);
+    if (error) throwDbError(error);
 
-  await writeAuditLog({
-    entityType: "teacher_profile",
-    entityId: teacherId,
-    action: "staff_role_changed",
-    actorId,
-    metadata: { old_staff_role: before?.staff_role ?? null, new_staff_role: staffRole },
+    await writeAuditLog({
+      entityType: "teacher_profile",
+      entityId: teacherId,
+      action: "staff_role_changed",
+      actorId,
+      metadata: { old_staff_role: before?.staff_role ?? null, new_staff_role: staffRole },
+    });
+
+    revalidatePath("/dashboard/admin/staff");
+    revalidatePath(`/dashboard/admin/staff/${teacherId}`);
   });
-
-  revalidatePath("/dashboard/admin/staff");
-  revalidatePath(`/dashboard/admin/staff/${teacherId}`);
 }
 
 // ---------- Parent accounts ----------
@@ -771,213 +790,215 @@ export async function createParentsBulk(input: {
   parents: BulkParentRow[];
   passwordStrategy: "auto" | "shared";
   sharedPassword?: string;
-}): Promise<BulkParentResult[]> {
-  await assertRole(["admin"], "Only an admin can perform this action.");
+}): Promise<ActionResult<BulkParentResult[]>> {
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
 
-  const admin = createAdminClient();
+    const admin = createAdminClient();
 
-  if (
-    input.passwordStrategy === "shared" &&
-    (!input.sharedPassword || input.sharedPassword.length < 8)
-  ) {
-    throw new Error("Shared password must be at least 8 characters.");
-  }
-
-  const emails = input.parents.map((p) => p.email.trim().toLowerCase());
-  const seenEmails = new Set<string>();
-  const duplicateInputEmails = new Set<string>();
-  for (const email of emails) {
-    if (seenEmails.has(email)) duplicateInputEmails.add(email);
-    else seenEmails.add(email);
-  }
-
-  const uniqueEmails = Array.from(seenEmails);
-  const emailFilter = uniqueEmails
-    .map((email) => `email.ilike."${email.replace(/"/g, '\\"')}"`)
-    .join(",");
-
-  const { data: matchingContacts, error: existingProfilesError } = uniqueEmails.length
-    ? await admin.from("profile_contacts").select("email").or(emailFilter)
-    : { data: [], error: null };
-
-  if (existingProfilesError) throwDbError(existingProfilesError);
-
-  const existingEmails = new Set((matchingContacts ?? []).map((c) => c.email.toLowerCase()));
-
-  // Resolve every admission number across every row in one query rather
-  // than one lookup per row, same reasoning as the email-existence check
-  // above: cheap regardless of how large this import gets.
-  const allAdmissionNos = Array.from(
-    new Set(input.parents.flatMap((p) => p.admissionNos).filter(Boolean))
-  );
-
-  const { data: matchingStudents, error: studentsError } = allAdmissionNos.length
-    ? await admin
-        .from("student_profiles")
-        .select("id, admission_no")
-        .in("admission_no", allAdmissionNos)
-    : { data: [], error: null };
-
-  if (studentsError) throwDbError(studentsError);
-
-  // admission_no has no uniqueness constraint at the DB level, so group
-  // rather than overwrite -- a collision must be surfaced as an error for
-  // that row, never silently resolved to whichever match happened to
-  // come back first (that could link a parent to the wrong child).
-  const studentIdsByAdmissionNo = new Map<string, string[]>();
-  for (const s of matchingStudents ?? []) {
-    const key = s.admission_no as string;
-    const list = studentIdsByAdmissionNo.get(key) ?? [];
-    list.push(s.id as string);
-    studentIdsByAdmissionNo.set(key, list);
-  }
-
-  const created = await mapWithConcurrency<BulkParentRow, BulkParentAttempt>(
-    input.parents,
-    5,
-    async (row) => {
-      const password =
-        input.passwordStrategy === "shared" ? input.sharedPassword! : generateTempPassword();
-      const email = row.email.trim().toLowerCase();
-
-      try {
-        if (existingEmails.has(email) || duplicateInputEmails.has(email)) {
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: `An account with the email "${row.email}" already exists.`,
-          } satisfies BulkParentResult;
-        }
-
-        if (!row.admissionNos.length) {
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: "No admission number given for this parent.",
-          } satisfies BulkParentResult;
-        }
-
-        const studentIds: string[] = [];
-        const missing: string[] = [];
-        const ambiguous: string[] = [];
-        for (const admissionNo of row.admissionNos) {
-          const ids = studentIdsByAdmissionNo.get(admissionNo);
-          if (!ids || ids.length === 0) missing.push(admissionNo);
-          else if (ids.length > 1) ambiguous.push(admissionNo);
-          else studentIds.push(ids[0]);
-        }
-
-        if (missing.length) {
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: `No student found with admission no. ${missing.join(", ")}.`,
-          } satisfies BulkParentResult;
-        }
-
-        if (ambiguous.length) {
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: `Admission no. ${ambiguous.join(", ")} matches more than one student — fix the duplicate before importing.`,
-          } satisfies BulkParentResult;
-        }
-
-        const { data: createdUser, error: createError } = await admin.auth.admin.createUser({
-          email: row.email,
-          password,
-          email_confirm: true,
-        });
-
-        if (createError || !createdUser.user) {
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: createError?.message ?? "Account creation failed.",
-          } satisfies BulkParentResult;
-        }
-
-        const userId = createdUser.user.id;
-
-        const { error: profileError } = await admin.from("profiles").insert({
-          id: userId,
-          role: "parent",
-          full_name: row.fullName,
-        });
-
-        if (profileError) {
-          await deleteUserAfterFailedSetup(admin, userId);
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: profileError.message,
-          } satisfies BulkParentResult;
-        }
-
-        const { error: contactError } = await admin
-          .from("profile_contacts")
-          .insert({ id: userId, email: row.email });
-
-        if (contactError) {
-          await deleteUserAfterFailedSetup(admin, userId);
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: contactError.message,
-          } satisfies BulkParentResult;
-        }
-
-        const { error: linksError } = await admin.from("guardian_links").insert(
-          studentIds.map((studentId, i) => ({
-            parent_id: userId,
-            student_id: studentId,
-            relationship: row.relationship || null,
-            is_primary: i === 0 ? (row.isPrimary ?? true) : false,
-          }))
-        );
-
-        if (linksError) {
-          await deleteUserAfterFailedSetup(admin, userId);
-          return {
-            email: row.email,
-            fullName: row.fullName,
-            success: false,
-            error: linksError.message,
-          } satisfies BulkParentResult;
-        }
-
-        return {
-          result: {
-            email: row.email,
-            fullName: row.fullName,
-            success: true,
-            password,
-            childrenLinked: studentIds.length,
-          },
-          userId,
-        };
-      } catch (err: any) {
-        return {
-          email: row.email,
-          fullName: row.fullName,
-          success: false,
-          error: err.message ?? "Unexpected error.",
-        } satisfies BulkParentResult;
-      }
+    if (
+      input.passwordStrategy === "shared" &&
+      (!input.sharedPassword || input.sharedPassword.length < 8)
+    ) {
+      throw new Error("Shared password must be at least 8 characters.");
     }
-  );
 
-  const results = created.map((row) => ("result" in row ? row.result : row));
+    const emails = input.parents.map((p) => p.email.trim().toLowerCase());
+    const seenEmails = new Set<string>();
+    const duplicateInputEmails = new Set<string>();
+    for (const email of emails) {
+      if (seenEmails.has(email)) duplicateInputEmails.add(email);
+      else seenEmails.add(email);
+    }
 
-  revalidatePath("/dashboard/admin/parents");
-  return results;
+    const uniqueEmails = Array.from(seenEmails);
+    const emailFilter = uniqueEmails
+      .map((email) => `email.ilike."${email.replace(/"/g, '\\"')}"`)
+      .join(",");
+
+    const { data: matchingContacts, error: existingProfilesError } = uniqueEmails.length
+      ? await admin.from("profile_contacts").select("email").or(emailFilter)
+      : { data: [], error: null };
+
+    if (existingProfilesError) throwDbError(existingProfilesError);
+
+    const existingEmails = new Set((matchingContacts ?? []).map((c) => c.email.toLowerCase()));
+
+    // Resolve every admission number across every row in one query rather
+    // than one lookup per row, same reasoning as the email-existence check
+    // above: cheap regardless of how large this import gets.
+    const allAdmissionNos = Array.from(
+      new Set(input.parents.flatMap((p) => p.admissionNos).filter(Boolean))
+    );
+
+    const { data: matchingStudents, error: studentsError } = allAdmissionNos.length
+      ? await admin
+          .from("student_profiles")
+          .select("id, admission_no")
+          .in("admission_no", allAdmissionNos)
+      : { data: [], error: null };
+
+    if (studentsError) throwDbError(studentsError);
+
+    // admission_no has no uniqueness constraint at the DB level, so group
+    // rather than overwrite -- a collision must be surfaced as an error for
+    // that row, never silently resolved to whichever match happened to
+    // come back first (that could link a parent to the wrong child).
+    const studentIdsByAdmissionNo = new Map<string, string[]>();
+    for (const s of matchingStudents ?? []) {
+      const key = s.admission_no as string;
+      const list = studentIdsByAdmissionNo.get(key) ?? [];
+      list.push(s.id as string);
+      studentIdsByAdmissionNo.set(key, list);
+    }
+
+    const created = await mapWithConcurrency<BulkParentRow, BulkParentAttempt>(
+      input.parents,
+      5,
+      async (row) => {
+        const password =
+          input.passwordStrategy === "shared" ? input.sharedPassword! : generateTempPassword();
+        const email = row.email.trim().toLowerCase();
+
+        try {
+          if (existingEmails.has(email) || duplicateInputEmails.has(email)) {
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: `An account with the email "${row.email}" already exists.`,
+            } satisfies BulkParentResult;
+          }
+
+          if (!row.admissionNos.length) {
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: "No admission number given for this parent.",
+            } satisfies BulkParentResult;
+          }
+
+          const studentIds: string[] = [];
+          const missing: string[] = [];
+          const ambiguous: string[] = [];
+          for (const admissionNo of row.admissionNos) {
+            const ids = studentIdsByAdmissionNo.get(admissionNo);
+            if (!ids || ids.length === 0) missing.push(admissionNo);
+            else if (ids.length > 1) ambiguous.push(admissionNo);
+            else studentIds.push(ids[0]);
+          }
+
+          if (missing.length) {
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: `No student found with admission no. ${missing.join(", ")}.`,
+            } satisfies BulkParentResult;
+          }
+
+          if (ambiguous.length) {
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: `Admission no. ${ambiguous.join(", ")} matches more than one student — fix the duplicate before importing.`,
+            } satisfies BulkParentResult;
+          }
+
+          const { data: createdUser, error: createError } = await admin.auth.admin.createUser({
+            email: row.email,
+            password,
+            email_confirm: true,
+          });
+
+          if (createError || !createdUser.user) {
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: createError?.message ?? "Account creation failed.",
+            } satisfies BulkParentResult;
+          }
+
+          const userId = createdUser.user.id;
+
+          const { error: profileError } = await admin.from("profiles").insert({
+            id: userId,
+            role: "parent",
+            full_name: row.fullName,
+          });
+
+          if (profileError) {
+            await deleteUserAfterFailedSetup(admin, userId);
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: profileError.message,
+            } satisfies BulkParentResult;
+          }
+
+          const { error: contactError } = await admin
+            .from("profile_contacts")
+            .insert({ id: userId, email: row.email });
+
+          if (contactError) {
+            await deleteUserAfterFailedSetup(admin, userId);
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: contactError.message,
+            } satisfies BulkParentResult;
+          }
+
+          const { error: linksError } = await admin.from("guardian_links").insert(
+            studentIds.map((studentId, i) => ({
+              parent_id: userId,
+              student_id: studentId,
+              relationship: row.relationship || null,
+              is_primary: i === 0 ? (row.isPrimary ?? true) : false,
+            }))
+          );
+
+          if (linksError) {
+            await deleteUserAfterFailedSetup(admin, userId);
+            return {
+              email: row.email,
+              fullName: row.fullName,
+              success: false,
+              error: linksError.message,
+            } satisfies BulkParentResult;
+          }
+
+          return {
+            result: {
+              email: row.email,
+              fullName: row.fullName,
+              success: true,
+              password,
+              childrenLinked: studentIds.length,
+            },
+            userId,
+          };
+        } catch (err: any) {
+          return {
+            email: row.email,
+            fullName: row.fullName,
+            success: false,
+            error: err.message ?? "Unexpected error.",
+          } satisfies BulkParentResult;
+        }
+      }
+    );
+
+    const results = created.map((row) => ("result" in row ? row.result : row));
+
+    revalidatePath("/dashboard/admin/parents");
+    return results;
+  });
 }
 
 export type ParentChildLink = {
@@ -1024,127 +1045,135 @@ export async function createParentAccount(input: {
   temporaryPassword: string;
   children: ParentChildLink[];
 }) {
-  await assertRole(["admin"], "Only an admin can perform this action.");
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
 
-  const admin = createAdminClient();
-  await assertValidParentChildLinks(admin, input.children);
-  await assertEmailAvailable(admin, input.email);
+    const admin = createAdminClient();
+    await assertValidParentChildLinks(admin, input.children);
+    await assertEmailAvailable(admin, input.email);
 
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: input.email,
-    password: input.temporaryPassword,
-    email_confirm: true,
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: input.email,
+      password: input.temporaryPassword,
+      email_confirm: true,
+    });
+
+    if (createError || !created.user) {
+      throw new Error(createError?.message ?? "Failed to create the auth account.");
+    }
+
+    const userId = created.user.id;
+
+    const { error: profileError } = await admin.from("profiles").insert({
+      id: userId,
+      role: "parent",
+      full_name: input.fullName,
+    });
+
+    if (profileError) {
+      await deleteUserAfterFailedSetup(admin, userId);
+      throwDbError(profileError);
+    }
+
+    await insertProfileContact(admin, userId, input.email);
+
+    const { error: linksError } = await admin.from("guardian_links").insert(
+      input.children.map((c) => ({
+        parent_id: userId,
+        student_id: c.studentId,
+        relationship: c.relationship || null,
+        is_primary: c.isPrimary,
+      }))
+    );
+
+    if (linksError) {
+      await deleteUserAfterFailedSetup(admin, userId);
+      throwDbError(linksError);
+    }
+
+    revalidatePath("/dashboard/admin/parents");
+    return { userId };
   });
-
-  if (createError || !created.user) {
-    throw new Error(createError?.message ?? "Failed to create the auth account.");
-  }
-
-  const userId = created.user.id;
-
-  const { error: profileError } = await admin.from("profiles").insert({
-    id: userId,
-    role: "parent",
-    full_name: input.fullName,
-  });
-
-  if (profileError) {
-    await deleteUserAfterFailedSetup(admin, userId);
-    throwDbError(profileError);
-  }
-
-  await insertProfileContact(admin, userId, input.email);
-
-  const { error: linksError } = await admin.from("guardian_links").insert(
-    input.children.map((c) => ({
-      parent_id: userId,
-      student_id: c.studentId,
-      relationship: c.relationship || null,
-      is_primary: c.isPrimary,
-    }))
-  );
-
-  if (linksError) {
-    await deleteUserAfterFailedSetup(admin, userId);
-    throwDbError(linksError);
-  }
-
-  revalidatePath("/dashboard/admin/parents");
-  return { userId };
 }
 
 export async function addChildToParent(parentId: string, studentId: string, relationship?: string) {
-  await assertRole(["admin"], "Only an admin can perform this action.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
+    const admin = createAdminClient();
 
-  const { data: student, error: studentError } = await admin
-    .from("student_profiles")
-    .select("id")
-    .eq("id", studentId)
-    .maybeSingle();
+    const { data: student, error: studentError } = await admin
+      .from("student_profiles")
+      .select("id")
+      .eq("id", studentId)
+      .maybeSingle();
 
-  if (studentError) throwDbError(studentError);
-  if (!student) throw new Error("The selected student does not exist.");
+    if (studentError) throwDbError(studentError);
+    if (!student) throw new Error("The selected student does not exist.");
 
-  const { error } = await admin.from("guardian_links").insert({
-    parent_id: parentId,
-    student_id: studentId,
-    relationship: relationship || null,
-    is_primary: false,
+    const { error } = await admin.from("guardian_links").insert({
+      parent_id: parentId,
+      student_id: studentId,
+      relationship: relationship || null,
+      is_primary: false,
+    });
+
+    if (error) throwDbError(error);
+
+    revalidatePath("/dashboard/admin/parents");
+    revalidatePath(`/dashboard/admin/parents/${parentId}`);
   });
-
-  if (error) throwDbError(error);
-
-  revalidatePath("/dashboard/admin/parents");
-  revalidatePath(`/dashboard/admin/parents/${parentId}`);
 }
 
 export async function removeChildFromParent(guardianLinkId: string) {
-  await assertRole(["admin"], "Only an admin can perform this action.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
+    const admin = createAdminClient();
 
-  const { error } = await admin.from("guardian_links").delete().eq("id", guardianLinkId);
+    const { error } = await admin.from("guardian_links").delete().eq("id", guardianLinkId);
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/admin/parents");
+    revalidatePath("/dashboard/admin/parents");
+  });
 }
 
 // ---------- Deactivation (any role) ----------
 
 export async function deactivateUser(userId: string, deactivate: boolean) {
-  const { id: actorId } = await assertRole(["admin"], "Only an admin can perform this action.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    const { id: actorId } = await assertRole(["admin"], "Only an admin can perform this action.");
+    const admin = createAdminClient();
 
-  // ban_duration actually blocks sign-in at the auth level. "none" lifts
-  // an existing ban; a long duration ("87600h" ≈ 10 years) is Supabase's
-  // recommended way to represent an indefinite ban, since the API has no
-  // literal "forever" value.
-  const { error: authError } = await admin.auth.admin.updateUserById(userId, {
-    ban_duration: deactivate ? "87600h" : "none",
+    // ban_duration actually blocks sign-in at the auth level. "none" lifts
+    // an existing ban; a long duration ("87600h" ≈ 10 years) is Supabase's
+    // recommended way to represent an indefinite ban, since the API has no
+    // literal "forever" value.
+    const { error: authError } = await admin.auth.admin.updateUserById(userId, {
+      ban_duration: deactivate ? "87600h" : "none",
+    });
+
+    if (authError) throwDbError(authError);
+
+    const { error: profileError } = await admin
+      .from("profiles")
+      .update({ is_active: !deactivate })
+      .eq("id", userId);
+
+    if (profileError) throwDbError(profileError);
+
+    await writeAuditLog({
+      entityType: "profile",
+      entityId: userId,
+      action: deactivate ? "user_deactivated" : "user_reactivated",
+      actorId,
+    });
+
+    revalidatePath("/dashboard/admin/staff");
+    revalidatePath("/dashboard/admin/students");
+    revalidatePath("/dashboard/admin/parents");
+    revalidatePath(`/dashboard/admin/staff/${userId}`);
+    revalidatePath(`/dashboard/admin/students/${userId}`);
   });
-
-  if (authError) throwDbError(authError);
-
-  const { error: profileError } = await admin
-    .from("profiles")
-    .update({ is_active: !deactivate })
-    .eq("id", userId);
-
-  if (profileError) throwDbError(profileError);
-
-  await writeAuditLog({
-    entityType: "profile",
-    entityId: userId,
-    action: deactivate ? "user_deactivated" : "user_reactivated",
-    actorId,
-  });
-
-  revalidatePath("/dashboard/admin/staff");
-  revalidatePath("/dashboard/admin/students");
-  revalidatePath("/dashboard/admin/parents");
-  revalidatePath(`/dashboard/admin/staff/${userId}`);
-  revalidatePath(`/dashboard/admin/students/${userId}`);
 }
 
 // ---------- Promotion ----------
@@ -1156,64 +1185,70 @@ export async function promoteStudents(input: {
   targetClassId: string | null;
   outcome: PromotionOutcome;
 }) {
-  await assertRole(["admin"], "Only an admin can perform this action.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
+    const admin = createAdminClient();
 
-  if (input.outcome !== "graduate" && !input.targetClassId) {
-    throw new Error("Select a target class for promotion or repeat.");
-  }
+    if (input.outcome !== "graduate" && !input.targetClassId) {
+      throw new Error("Select a target class for promotion or repeat.");
+    }
 
-  const studentIds = [...new Set(input.studentIds)];
-  if (!studentIds.length) return { succeeded: 0, failed: 0, errors: [] };
+    const studentIds = [...new Set(input.studentIds)];
+    if (!studentIds.length) return { succeeded: 0, failed: 0, errors: [] };
 
-  const { data: updatedStudents, error: updateError } = await admin
-    .from("student_profiles")
-    .update({ class_id: input.outcome === "graduate" ? null : input.targetClassId! })
-    .in("id", studentIds)
-    .select("id");
+    const { data: updatedStudents, error: updateError } = await admin
+      .from("student_profiles")
+      .update({ class_id: input.outcome === "graduate" ? null : input.targetClassId! })
+      .in("id", studentIds)
+      .select("id");
 
-  if (updateError) throwDbError(updateError);
+    if (updateError) throwDbError(updateError);
 
-  const updatedIds = (updatedStudents ?? []).map((student) => student.id);
-  const missingIds = studentIds.filter((id) => !updatedIds.includes(id));
-  const errors = missingIds.map((id) => `${id}: Student not found or could not be updated.`);
+    const updatedIds = (updatedStudents ?? []).map((student) => student.id);
+    const missingIds = studentIds.filter((id) => !updatedIds.includes(id));
+    const errors = missingIds.map((id) => `${id}: Student not found or could not be updated.`);
 
-  if (input.outcome !== "graduate" && updatedIds.length) {
-    await recordEnrollments(admin, updatedIds, input.targetClassId!);
-  }
+    if (input.outcome !== "graduate" && updatedIds.length) {
+      await recordEnrollments(admin, updatedIds, input.targetClassId!);
+    }
 
-  revalidatePath("/dashboard/admin/classes");
-  revalidatePath("/dashboard/admin/students");
+    revalidatePath("/dashboard/admin/classes");
+    revalidatePath("/dashboard/admin/students");
 
-  return { succeeded: updatedIds.length, failed: errors.length, errors };
+    return { succeeded: updatedIds.length, failed: errors.length, errors };
+  });
 }
 
 // ---------- Password reset ----------
 
-export async function resetUserPassword(userId: string): Promise<{ password: string }> {
-  await assertRole(["admin"], "Only an admin can perform this action.");
-  const admin = createAdminClient();
+export async function resetUserPassword(
+  userId: string
+): Promise<ActionResult<{ password: string }>> {
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can perform this action.");
+    const admin = createAdminClient();
 
-  const newPassword = generateTempPassword();
+    const newPassword = generateTempPassword();
 
-  const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
-    password: newPassword,
+    const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
+      password: newPassword,
+    });
+
+    if (updateError) throwDbError(updateError);
+
+    const { error: profileError } = await admin
+      .from("profiles")
+      .update({ must_change_password: true })
+      .eq("id", userId);
+
+    if (profileError) throwDbError(profileError);
+
+    revalidatePath("/dashboard/admin/staff");
+    revalidatePath("/dashboard/admin/students");
+    revalidatePath("/dashboard/admin/parents");
+    revalidatePath(`/dashboard/admin/staff/${userId}`);
+    revalidatePath(`/dashboard/admin/students/${userId}`);
+
+    return { password: newPassword };
   });
-
-  if (updateError) throwDbError(updateError);
-
-  const { error: profileError } = await admin
-    .from("profiles")
-    .update({ must_change_password: true })
-    .eq("id", userId);
-
-  if (profileError) throwDbError(profileError);
-
-  revalidatePath("/dashboard/admin/staff");
-  revalidatePath("/dashboard/admin/students");
-  revalidatePath("/dashboard/admin/parents");
-  revalidatePath(`/dashboard/admin/staff/${userId}`);
-  revalidatePath(`/dashboard/admin/students/${userId}`);
-
-  return { password: newPassword };
 }

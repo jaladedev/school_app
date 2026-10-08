@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordInput } from "@/components/PasswordInput";
 import { clearMustChangePassword } from "@/lib/actions/authGuards";
+import { unwrapAction } from "@/lib/actionResult";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function ChangePasswordPage() {
     }
 
     try {
-      await clearMustChangePassword();
+      await unwrapAction(clearMustChangePassword());
     } catch (err: any) {
       setLoading(false);
       setError(err.message ?? "Could not complete the password update.");

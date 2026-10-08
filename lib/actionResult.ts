@@ -16,6 +16,27 @@ export async function runAction<T = void>(fn: () => Promise<T>): Promise<ActionR
     const data = await fn();
     return (data === undefined ? { ok: true } : { ok: true, data }) as ActionResult<T>;
   } catch (err) {
+    // redirect() / notFound() work by throwing; swallowing them would
+    // silently cancel the navigation.
+    if (isNextControlFlowError(err)) throw err;
     return { ok: false, error: err instanceof Error ? err.message : "Something went wrong." };
   }
+}
+
+function isNextControlFlowError(err: unknown): boolean {
+  const digest = (err as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_");
+}
+
+/**
+ * Caller-side counterpart to runAction: awaits an action's result and, on
+ * failure, throws an Error carrying the *real* message. The throw happens in
+ * the caller's own (client) code, so it is never redacted by Next.js, and
+ * existing `catch (err) { err.message }` handlers keep working unchanged.
+ * New code can instead branch on `result.ok` directly.
+ */
+export async function unwrapAction<T>(pending: Promise<ActionResult<T>>): Promise<T> {
+  const result = await pending;
+  if (!result.ok) throw new Error(result.error);
+  return (result as { data?: T }).data as T;
 }

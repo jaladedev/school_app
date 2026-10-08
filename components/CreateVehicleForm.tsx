@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createVehicle } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function CreateVehicleForm() {
   const router = useRouter();
@@ -26,13 +27,15 @@ export function CreateVehicleForm() {
 
     startTransition(async () => {
       try {
-        await createVehicle({
-          plateNumber,
-          model: model || undefined,
-          capacity: Number(capacity),
-          driverName: driverName || undefined,
-          driverPhone: driverPhone || undefined,
-        });
+        await unwrapAction(
+          createVehicle({
+            plateNumber,
+            model: model || undefined,
+            capacity: Number(capacity),
+            driverName: driverName || undefined,
+            driverPhone: driverPhone || undefined,
+          })
+        );
         emitToast("Vehicle added.");
         setPlateNumber("");
         setModel("");

@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { importGrades } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
@@ -78,7 +79,7 @@ export function GradeCsvImport({ assessmentId }: { assessmentId: string }) {
 
         startTransition(async () => {
           try {
-            await importGrades(assessmentId, entries);
+            await unwrapAction(importGrades(assessmentId, entries));
             emitToast(`${entries.length} grade${entries.length === 1 ? "" : "s"} imported.`);
             router.refresh();
           } catch (err: any) {

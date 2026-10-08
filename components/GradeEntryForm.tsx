@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { saveGrade } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 const COMMENT_BANK = [
   "Excellent work",
@@ -59,7 +60,9 @@ export function GradeEntryForm({
 
     startTransition(async () => {
       try {
-        await saveGrade(assessmentId, studentId, score, remarks[studentId] || undefined);
+        await unwrapAction(
+          saveGrade(assessmentId, studentId, score, remarks[studentId] || undefined)
+        );
         emitToast("Grade saved.");
       } catch (err: any) {
         // Previously unhandled — a rejected saveGrade() call here (e.g.

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { waiveLibraryFine } from "@/lib/actions/library";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function WaiveFineButton({ invoiceId }: { invoiceId: string }) {
   const router = useRouter();
@@ -16,7 +17,7 @@ export function WaiveFineButton({ invoiceId }: { invoiceId: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        await waiveLibraryFine(invoiceId, reason || undefined);
+        await unwrapAction(waiveLibraryFine(invoiceId, reason || undefined));
         setWaived(true);
         setOpen(false);
         setTimeout(() => router.refresh(), 2000);

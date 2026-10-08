@@ -5,6 +5,7 @@ import { saveSchoolSettings } from "@/lib/actions/settings";
 import { emitToast } from "@/lib/toast";
 import { StudentPaymentToggle } from "@/components/StudentPaymentToggle";
 import type { GradeScaleEntry, SchoolSettings } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
   const [name, setName] = useState(settings.name);
@@ -40,17 +41,19 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
 
     startTransition(async () => {
       try {
-        await saveSchoolSettings({
-          name,
-          motto,
-          address,
-          logoUrl,
-          currentAcademicYear: academicYear,
-          currentTerm: term,
-          currentTermStartDate: termStartDate || null,
-          libraryFineKoboPerDay: fineNaira ? Math.round(fine * 100) : 0,
-          gradeScale,
-        });
+        await unwrapAction(
+          saveSchoolSettings({
+            name,
+            motto,
+            address,
+            logoUrl,
+            currentAcademicYear: academicYear,
+            currentTerm: term,
+            currentTermStartDate: termStartDate || null,
+            libraryFineKoboPerDay: fineNaira ? Math.round(fine * 100) : 0,
+            gradeScale,
+          })
+        );
         emitToast("School settings saved.");
       } catch (err: any) {
         const message = err.message ?? "Something went wrong.";

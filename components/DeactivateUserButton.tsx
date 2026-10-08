@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deactivateUser } from "@/lib/actions/admin";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function DeactivateUserButton({ userId, isActive }: { userId: string; isActive: boolean }) {
   const router = useRouter();
@@ -14,7 +15,7 @@ export function DeactivateUserButton({ userId, isActive }: { userId: string; isA
     setError(null);
     startTransition(async () => {
       try {
-        await deactivateUser(userId, isActive);
+        await unwrapAction(deactivateUser(userId, isActive));
         setConfirming(false);
         router.refresh();
       } catch (err: any) {

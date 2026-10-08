@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { createFeeStructure } from "@/lib/actions/fees";
 import type { EducationLevel } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 const LEVEL_OPTIONS: Record<EducationLevel, { label: string; numbers: number[] }> = {
   primary: { label: "Primary", numbers: [1, 2, 3, 4, 5, 6] },
@@ -43,15 +44,17 @@ export function CreateFeeStructureForm() {
 
     startTransition(async () => {
       try {
-        await createFeeStructure({
-          educationLevel,
-          levelNumber,
-          term,
-          academicYear,
-          title,
-          amountKobo: Math.round(naira * 100),
-          dueDate: dueDate || undefined,
-        });
+        await unwrapAction(
+          createFeeStructure({
+            educationLevel,
+            levelNumber,
+            term,
+            academicYear,
+            title,
+            amountKobo: Math.round(naira * 100),
+            dueDate: dueDate || undefined,
+          })
+        );
         setSuccess(true);
         setAmountNaira("");
       } catch (err: any) {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { StudentTypeahead, type StudentOption } from "@/components/StudentTypeahead";
 import { assignStudentToRoute } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function AssignStudentToRouteForm({
   routeId,
@@ -40,12 +41,14 @@ export function AssignStudentToRouteForm({
 
     startTransition(async () => {
       try {
-        await assignStudentToRoute({
-          studentId,
-          routeId,
-          stopId,
-          academicYear: academicYear.trim(),
-        });
+        await unwrapAction(
+          assignStudentToRoute({
+            studentId,
+            routeId,
+            stopId,
+            academicYear: academicYear.trim(),
+          })
+        );
         emitToast("Student assigned.");
         setStudentId("");
         router.refresh();

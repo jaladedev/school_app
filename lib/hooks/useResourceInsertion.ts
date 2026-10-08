@@ -5,6 +5,7 @@ import { emitToast } from "@/lib/toast";
 import type { TopicResource } from "@/types/database";
 import type { LinkableAssessment } from "@/lib/tiptap/assessment-node";
 import type { LinkableTopic } from "@/lib/tiptap/topic-link-node";
+import { unwrapAction } from "@/lib/actionResult";
 
 const DEFAULT_MERMAID = "flowchart TD\n  A[Start] --> B[End]";
 
@@ -131,11 +132,8 @@ export function useResourceInsertion({
     try {
       const neededNoteCreation = !currentNoteId;
       const noteIdToUse = await ensureNoteId();
-      const resource = await createMermaidResource(
-        topicId,
-        noteIdToUse,
-        diagramTitle || "Diagram",
-        diagramCode
+      const resource = await unwrapAction(
+        createMermaidResource(topicId, noteIdToUse, diagramTitle || "Diagram", diagramCode)
       );
       onResourceCreated(resource);
       insertResourceMarker(resource);

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { issueLibraryLoan } from "@/lib/actions/library";
 import { StudentTypeahead, type StudentOption } from "@/components/StudentTypeahead";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function IssueLoanForm({
   books,
@@ -30,7 +31,7 @@ export function IssueLoanForm({
 
     startTransition(async () => {
       try {
-        await issueLibraryLoan({ bookId, studentId, dueAt });
+        await unwrapAction(issueLibraryLoan({ bookId, studentId, dueAt }));
         setBookId("");
         setStudentId("");
         setDueAt("");

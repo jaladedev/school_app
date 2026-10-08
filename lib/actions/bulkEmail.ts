@@ -5,6 +5,7 @@ import { assertRole } from "@/lib/actions/authGuards";
 import { sendBulkEmail } from "@/lib/email";
 import { writeAuditLog } from "@/lib/audit";
 import DOMPurify from "isomorphic-dompurify";
+import { runAction, type ActionResult } from "@/lib/actionResult";
 
 export type BulkEmailAudienceRole = "student" | "parent" | "teacher" | "admin";
 
@@ -108,61 +109,63 @@ export async function sendBulkEmailToAudience({
   subject: string;
   /** Raw HTML from the compose form's rich text editor -- sanitized below before it ever reaches an email. */
   body: string;
-}): Promise<{ sent: number; failed: number; recipientCount: number }> {
-  const { id: actorId } = await assertCanSendBulkEmail();
+}): Promise<ActionResult<{ sent: number; failed: number; recipientCount: number }>> {
+  return runAction(async () => {
+    const { id: actorId } = await assertCanSendBulkEmail();
 
-  const trimmedSubject = subject.trim();
-  // The editor leaves stray "<br>"/empty tags behind when "cleared" -- treat
-  // that as empty rather than sending a blank-looking email. Stripping
-  // tags alone isn't enough: a lone "&nbsp;" (a common leftover when
-  // someone deletes all visible text but a non-breaking space survives)
-  // has no tags to strip and isn't whitespace by .trim()'s definition,
-  // so it used to sail through this check as "non-empty" while looking
-  // completely blank to anyone reading the sent email. Decode the common
-  // whitespace-producing entities before the emptiness check.
-  const bodyIsEmpty =
-    body
-      .replace(/<[^>]*>/g, "")
-      .replace(/&nbsp;|&#160;|&#xa0;|&ensp;|&emsp;|&thinsp;/gi, " ")
-      .trim() === "";
-  if (!trimmedSubject) throw new Error("Enter a subject.");
-  if (bodyIsEmpty) throw new Error("Enter a message body.");
-  if (audience.roles.length === 0) throw new Error("Select at least one recipient group.");
+    const trimmedSubject = subject.trim();
+    // The editor leaves stray "<br>"/empty tags behind when "cleared" -- treat
+    // that as empty rather than sending a blank-looking email. Stripping
+    // tags alone isn't enough: a lone "&nbsp;" (a common leftover when
+    // someone deletes all visible text but a non-breaking space survives)
+    // has no tags to strip and isn't whitespace by .trim()'s definition,
+    // so it used to sail through this check as "non-empty" while looking
+    // completely blank to anyone reading the sent email. Decode the common
+    // whitespace-producing entities before the emptiness check.
+    const bodyIsEmpty =
+      body
+        .replace(/<[^>]*>/g, "")
+        .replace(/&nbsp;|&#160;|&#xa0;|&ensp;|&emsp;|&thinsp;/gi, " ")
+        .trim() === "";
+    if (!trimmedSubject) throw new Error("Enter a subject.");
+    if (bodyIsEmpty) throw new Error("Enter a message body.");
+    if (audience.roles.length === 0) throw new Error("Select at least one recipient group.");
 
-  const recipients = await fetchRecipients(audience);
-  if (recipients.length === 0) {
-    throw new Error("No recipients match this selection (or none have an email on file).");
-  }
+    const recipients = await fetchRecipients(audience);
+    if (recipients.length === 0) {
+      throw new Error("No recipients match this selection (or none have an email on file).");
+    }
 
-  // The editor's contentEditable innerHTML is untrusted input (whatever the
-  // browser let through, plus anything pasted) -- sanitize before it's ever
-  // wrapped in an email, same as any other user-supplied HTML.
-  const sanitizedBody = DOMPurify.sanitize(body);
-  const html = `<div style="font-family: sans-serif;">${sanitizedBody}</div>`;
-  const text = htmlToPlainText(sanitizedBody);
+    // The editor's contentEditable innerHTML is untrusted input (whatever the
+    // browser let through, plus anything pasted) -- sanitize before it's ever
+    // wrapped in an email, same as any other user-supplied HTML.
+    const sanitizedBody = DOMPurify.sanitize(body);
+    const html = `<div style="font-family: sans-serif;">${sanitizedBody}</div>`;
+    const text = htmlToPlainText(sanitizedBody);
 
-  const result = await sendBulkEmail({
-    recipients: recipients.map((r) => ({ email: r.email, name: r.fullName })),
-    subject: trimmedSubject,
-    html,
-    text,
-  });
-
-  await writeAuditLog({
-    entityType: "bulk_email",
-    entityId: actorId,
-    action: "bulk_email_sent",
-    actorId,
-    metadata: {
-      audience,
+    const result = await sendBulkEmail({
+      recipients: recipients.map((r) => ({ email: r.email, name: r.fullName })),
       subject: trimmedSubject,
-      recipientCount: recipients.length,
-      sent: result.sent,
-      failed: result.failed.length,
-    },
-  });
+      html,
+      text,
+    });
 
-  return { sent: result.sent, failed: result.failed.length, recipientCount: recipients.length };
+    await writeAuditLog({
+      entityType: "bulk_email",
+      entityId: actorId,
+      action: "bulk_email_sent",
+      actorId,
+      metadata: {
+        audience,
+        subject: trimmedSubject,
+        recipientCount: recipients.length,
+        sent: result.sent,
+        failed: result.failed.length,
+      },
+    });
+
+    return { sent: result.sent, failed: result.failed.length, recipientCount: recipients.length };
+  });
 }
 
 /**

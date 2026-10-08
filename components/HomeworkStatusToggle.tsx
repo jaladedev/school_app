@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateHomeworkStatus } from "@/lib/actions/teacher";
 import type { HomeworkStatus } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function HomeworkStatusToggle({
   lessonId,
@@ -21,7 +22,7 @@ export function HomeworkStatusToggle({
 
   function handleToggle() {
     startTransition(async () => {
-      await updateHomeworkStatus(lessonId, nextStatus);
+      await unwrapAction(updateHomeworkStatus(lessonId, nextStatus));
       router.refresh();
     });
   }

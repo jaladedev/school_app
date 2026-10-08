@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SubjectPicker, type PickableSubject } from "@/components/SubjectPicker";
 import { updateTeacherSubjects } from "@/lib/actions/admin";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function EditTeacherSubjectsForm({
   teacherId,
@@ -33,7 +34,7 @@ export function EditTeacherSubjectsForm({
     setError(null);
 
     try {
-      await updateTeacherSubjects(teacherId, selectedSubjects);
+      await unwrapAction(updateTeacherSubjects(teacherId, selectedSubjects));
     } catch (err: any) {
       setSaving(false);
       setError(err.message ?? "Could not save subjects.");

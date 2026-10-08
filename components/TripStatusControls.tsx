@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateTripStatus } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
 import { TRIP_STATUS_LABELS, type TripDirection, type TripStatusValue } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 const STATUSES: TripStatusValue[] = ["not_started", "en_route", "arrived"];
 
@@ -25,7 +26,7 @@ export function TripStatusControls({
   function setStatus(status: TripStatusValue) {
     startTransition(async () => {
       try {
-        await updateTripStatus({ routeId, tripDate, direction, status });
+        await unwrapAction(updateTripStatus({ routeId, tripDate, direction, status }));
         router.refresh();
       } catch (err) {
         emitToast(err instanceof Error ? err.message : "Something went wrong.", "error");

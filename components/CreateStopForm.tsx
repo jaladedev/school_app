@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createStop } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function CreateStopForm({
   routeId,
@@ -29,12 +30,14 @@ export function CreateStopForm({
 
     startTransition(async () => {
       try {
-        await createStop({
-          routeId,
-          name,
-          sequenceOrder: nextSequence,
-          approxTime: approxTime || undefined,
-        });
+        await unwrapAction(
+          createStop({
+            routeId,
+            name,
+            sequenceOrder: nextSequence,
+            approxTime: approxTime || undefined,
+          })
+        );
         emitToast("Stop added.");
         setName("");
         setApproxTime("");

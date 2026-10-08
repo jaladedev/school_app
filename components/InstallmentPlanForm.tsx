@@ -8,6 +8,7 @@ import {
   type InstallmentInput,
 } from "@/lib/actions/installments";
 import { formatKobo } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 type Row = { dueDate: string; amountNaira: string };
 
@@ -80,7 +81,7 @@ export function InstallmentPlanForm({
 
     startTransition(async () => {
       try {
-        await createOrReplaceInstallmentPlan(invoiceId, parsed);
+        await unwrapAction(createOrReplaceInstallmentPlan(invoiceId, parsed));
         setOpen(false);
         router.refresh();
       } catch (err: any) {
@@ -93,7 +94,7 @@ export function InstallmentPlanForm({
     setError(null);
     startTransition(async () => {
       try {
-        await deleteInstallmentPlan(invoiceId);
+        await unwrapAction(deleteInstallmentPlan(invoiceId));
         setOpen(false);
         router.refresh();
       } catch (err: any) {

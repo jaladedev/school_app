@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cancelHostelWaitlistEntry } from "@/lib/actions/hostel";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 type WaitlistEntry = {
   id: string;
@@ -25,7 +26,7 @@ export function HostelWaitlistPanel({
   function handleCancel(entryId: string) {
     startTransition(async () => {
       try {
-        await cancelHostelWaitlistEntry(entryId, hostelId);
+        await unwrapAction(cancelHostelWaitlistEntry(entryId, hostelId));
         emitToast("Removed from the waitlist.");
         router.refresh();
       } catch (err) {

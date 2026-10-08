@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { resetUserPassword } from "@/lib/actions/admin";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function ResetPasswordButton({ userId }: { userId: string }) {
   const [isPending, startTransition] = useTransition();
@@ -13,7 +14,7 @@ export function ResetPasswordButton({ userId }: { userId: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        const result = await resetUserPassword(userId);
+        const result = await unwrapAction(resetUserPassword(userId));
         setNewPassword(result.password);
         setConfirming(false);
       } catch (err: any) {

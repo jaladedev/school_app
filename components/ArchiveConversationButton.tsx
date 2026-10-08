@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { archiveConversation, unarchiveConversation } from "@/lib/actions/messages";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function ArchiveConversationButton({
   partnerId,
@@ -17,9 +18,9 @@ export function ArchiveConversationButton({
   function toggle() {
     startTransition(async () => {
       if (isArchived) {
-        await unarchiveConversation(partnerId);
+        await unwrapAction(unarchiveConversation(partnerId));
       } else {
-        await archiveConversation(partnerId);
+        await unwrapAction(archiveConversation(partnerId));
       }
       router.refresh();
     });

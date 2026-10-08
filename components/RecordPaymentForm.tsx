@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { recordPayment } from "@/lib/actions/fees";
 import type { PaymentMethod } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function RecordPaymentForm({ invoiceId }: { invoiceId: string }) {
   const router = useRouter();
@@ -26,12 +27,14 @@ export function RecordPaymentForm({ invoiceId }: { invoiceId: string }) {
 
     startTransition(async () => {
       try {
-        await recordPayment({
-          invoiceId,
-          amountKobo: Math.round(naira * 100),
-          method,
-          reference: reference || undefined,
-        });
+        await unwrapAction(
+          recordPayment({
+            invoiceId,
+            amountKobo: Math.round(naira * 100),
+            method,
+            reference: reference || undefined,
+          })
+        );
         setAmountNaira("");
         setReference("");
         setOpen(false);

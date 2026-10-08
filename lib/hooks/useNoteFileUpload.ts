@@ -2,6 +2,7 @@ import { useRef, useState, type DragEvent } from "react";
 import { uploadTopicResource } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import type { TopicResource } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 const ACCEPTED_RESOURCE_MIME_TYPES = new Set([
   "image/jpeg",
@@ -77,7 +78,7 @@ export function useNoteFileUpload({
       formData.set("file", file);
       formData.set("title", "");
       try {
-        const resource = await uploadTopicResource(topicId, noteIdToUse, formData);
+        const resource = await unwrapAction(uploadTopicResource(topicId, noteIdToUse, formData));
         if (resource) {
           onResourceCreated(resource);
           insertResourceMarker(resource);

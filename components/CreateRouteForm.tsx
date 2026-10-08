@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createRoute } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function CreateRouteForm({ vehicles }: { vehicles: { id: string; label: string }[] }) {
   const router = useRouter();
@@ -24,11 +25,13 @@ export function CreateRouteForm({ vehicles }: { vehicles: { id: string; label: s
 
     startTransition(async () => {
       try {
-        await createRoute({
-          name,
-          description: description || undefined,
-          vehicleId: vehicleId || undefined,
-        });
+        await unwrapAction(
+          createRoute({
+            name,
+            description: description || undefined,
+            vehicleId: vehicleId || undefined,
+          })
+        );
         emitToast("Route added.");
         setName("");
         setDescription("");

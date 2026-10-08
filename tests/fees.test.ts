@@ -54,6 +54,7 @@ vi.mock("@/lib/env.server", () => ({
 vi.mock("next/cache", () => ({ revalidatePath }));
 
 import { recordPayment, verifyPaystackPayment } from "@/lib/actions/fees";
+import { unwrapAction } from "@/lib/actionResult";
 
 function mockAuthenticatedAs(userId: string) {
   getUserWithRetry.mockResolvedValue({
@@ -92,7 +93,7 @@ describe("recordPayment", () => {
     ];
 
     await expect(
-      recordPayment({ invoiceId: "inv-1", amountKobo: 5000, method: "cash" })
+      unwrapAction(recordPayment({ invoiceId: "inv-1", amountKobo: 5000, method: "cash" }))
     ).rejects.toThrow(/more than the/);
   });
 
@@ -113,7 +114,7 @@ describe("recordPayment", () => {
     ];
 
     await expect(
-      recordPayment({ invoiceId: "inv-1", amountKobo: 2000, method: "cash" })
+      unwrapAction(recordPayment({ invoiceId: "inv-1", amountKobo: 2000, method: "cash" }))
     ).resolves.toBeUndefined();
   });
 
@@ -122,7 +123,7 @@ describe("recordPayment", () => {
     adminState.queue = [{ data: { role: "admin", is_active: true }, error: null }];
 
     await expect(
-      recordPayment({ invoiceId: "inv-1", amountKobo: 0, method: "cash" })
+      unwrapAction(recordPayment({ invoiceId: "inv-1", amountKobo: 0, method: "cash" }))
     ).rejects.toThrow("Payment amount must be greater than zero.");
   });
 
@@ -142,7 +143,7 @@ describe("recordPayment", () => {
     ];
 
     await expect(
-      recordPayment({ invoiceId: "inv-1", amountKobo: 1000, method: "cash" })
+      unwrapAction(recordPayment({ invoiceId: "inv-1", amountKobo: 1000, method: "cash" }))
     ).rejects.toThrow("This invoice has been voided and can't accept payments.");
   });
 });
@@ -160,7 +161,7 @@ describe("verifyPaystackPayment", () => {
     ];
 
     await expect(
-      verifyPaystackPayment({ reference: "ref-123", invoiceId: "inv-1" })
+      unwrapAction(verifyPaystackPayment({ reference: "ref-123", invoiceId: "inv-1" }))
     ).resolves.toEqual({ alreadyRecorded: true });
 
     // The whole point of the idempotency check is to short-circuit before
@@ -175,7 +176,7 @@ describe("verifyPaystackPayment", () => {
     ];
 
     await expect(
-      verifyPaystackPayment({ reference: "ref-456", invoiceId: "inv-1" })
+      unwrapAction(verifyPaystackPayment({ reference: "ref-456", invoiceId: "inv-1" }))
     ).rejects.toThrow("This invoice has been voided and can't accept payments.");
   });
 
@@ -188,7 +189,7 @@ describe("verifyPaystackPayment", () => {
     ];
 
     await expect(
-      verifyPaystackPayment({ reference: "ref-789", invoiceId: "inv-1" })
+      unwrapAction(verifyPaystackPayment({ reference: "ref-789", invoiceId: "inv-1" }))
     ).rejects.toThrow("You can't pay an invoice that isn't yours.");
   });
 });

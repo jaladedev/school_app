@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { createStudentsBulk, type BulkStudentResult } from "@/lib/actions/admin";
 import { parseCsv } from "@/lib/csv";
+import { unwrapAction } from "@/lib/actionResult";
 
 type PasswordStrategy = "auto" | "shared";
 
@@ -69,12 +70,14 @@ export function BulkCreateStudentsForm({
 
     startTransition(async () => {
       try {
-        const res = await createStudentsBulk({
-          classId,
-          students: parsed,
-          passwordStrategy: strategy,
-          sharedPassword: strategy === "shared" ? sharedPassword : undefined,
-        });
+        const res = await unwrapAction(
+          createStudentsBulk({
+            classId,
+            students: parsed,
+            passwordStrategy: strategy,
+            sharedPassword: strategy === "shared" ? sharedPassword : undefined,
+          })
+        );
         setResults(res);
       } catch (err: any) {
         setError(err.message ?? "Something went wrong.");

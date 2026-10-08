@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { checkOnlinePaymentAllowed, verifyPaystackPayment } from "@/lib/actions/fees";
 import { clientEnv } from "@/lib/env.client";
+import { unwrapAction } from "@/lib/actionResult";
 
 declare global {
   interface Window {
@@ -86,7 +87,7 @@ export function PaystackPayButton({
         // This callback firing is a UI cue only — verifyPaystackPayment
         // re-checks the transaction against Paystack's own API server-side
         // before crediting anything, so a tampered client can't fake this.
-        verifyPaystackPayment({ reference: response.reference, invoiceId })
+        unwrapAction(verifyPaystackPayment({ reference: response.reference, invoiceId }))
           .then(() => {
             setSuccess(true);
             setLoading(false);

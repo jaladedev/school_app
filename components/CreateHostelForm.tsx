@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createHostel } from "@/lib/actions/hostel";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function CreateHostelForm({
   houseParents,
@@ -29,12 +30,14 @@ export function CreateHostelForm({
 
     startTransition(async () => {
       try {
-        await createHostel({
-          name,
-          gender,
-          houseParentId: houseParentId || undefined,
-          capacity: capacity ? Number(capacity) : undefined,
-        });
+        await unwrapAction(
+          createHostel({
+            name,
+            gender,
+            houseParentId: houseParentId || undefined,
+            capacity: capacity ? Number(capacity) : undefined,
+          })
+        );
         emitToast("Hostel added.");
         setName("");
         setHouseParentId("");

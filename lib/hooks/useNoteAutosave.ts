@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/core";
 import { applySectionGrouping } from "@/lib/tiptap/section-node";
 import { saveTopicNoteDraft, getTopicNoteDraft, clearTopicNoteDraft } from "@/lib/actions/teacher";
+import { unwrapAction } from "@/lib/actionResult";
 
 /**
  * Everything about "is this note saved, and is there unsaved work
@@ -84,7 +85,7 @@ export function useNoteAutosave(
       if (!isDirtyRef.current || !isOnlineRef.current) return;
       const content = getMarkdown();
       setAutosaveStatus("saving");
-      saveTopicNoteDraft(topicId, content)
+      unwrapAction(saveTopicNoteDraft(topicId, content))
         .then(() => {
           setAutosaveStatus("saved");
           setLastAutosaveAt(new Date());
@@ -110,7 +111,7 @@ export function useNoteAutosave(
   );
   useEffect(() => {
     let cancelled = false;
-    getTopicNoteDraft(topicId)
+    unwrapAction(getTopicNoteDraft(topicId))
       .then((draft) => {
         if (!cancelled && draft && draft.content !== initialContent) {
           setDraftBanner(draft);
@@ -139,7 +140,7 @@ export function useNoteAutosave(
 
   function discardDraft() {
     setDraftBanner(null);
-    clearTopicNoteDraft(topicId).catch(() => {
+    unwrapAction(clearTopicNoteDraft(topicId)).catch(() => {
       // Non-critical -- worst case the banner reappears next load.
     });
   }

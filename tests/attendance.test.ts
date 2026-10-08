@@ -39,6 +39,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("next/cache", () => ({ revalidatePath }));
 
 import { markAttendance } from "@/lib/actions/teacher";
+import { unwrapAction } from "@/lib/actionResult";
 
 function mockAuthenticatedAs(userId: string) {
   getUserWithRetry.mockResolvedValue({
@@ -72,7 +73,9 @@ describe("markAttendance", () => {
     ];
 
     await expect(
-      markAttendance("class-1", "2026-09-01", [{ studentId: "student-1", status: "present" }])
+      unwrapAction(
+        markAttendance("class-1", "2026-09-01", [{ studentId: "student-1", status: "present" }])
+      )
     ).rejects.toThrow(/aren't the class teacher/);
   });
 
@@ -82,7 +85,11 @@ describe("markAttendance", () => {
     clientState.queue = [{ data: null, error: null }];
 
     await expect(
-      markAttendance("missing-class", "2026-09-01", [{ studentId: "student-1", status: "present" }])
+      unwrapAction(
+        markAttendance("missing-class", "2026-09-01", [
+          { studentId: "student-1", status: "present" },
+        ])
+      )
     ).rejects.toThrow(/Class not found/);
   });
 
@@ -94,7 +101,9 @@ describe("markAttendance", () => {
     adminState.queue = [{ data: { role: "admin", is_active: true }, error: null }];
 
     await expect(
-      markAttendance("class-1", "2026-09-01", [{ studentId: "student-1", status: "present" }])
+      unwrapAction(
+        markAttendance("class-1", "2026-09-01", [{ studentId: "student-1", status: "present" }])
+      )
     ).rejects.toThrow(/Only teachers can mark attendance/);
   });
 
@@ -110,10 +119,12 @@ describe("markAttendance", () => {
       { data: null, error: null },
     ];
 
-    await markAttendance("class-1", "2026-09-01", [
-      { studentId: "student-1", status: "present" },
-      { studentId: "student-2", status: "absent" },
-    ]);
+    await unwrapAction(
+      markAttendance("class-1", "2026-09-01", [
+        { studentId: "student-1", status: "present" },
+        { studentId: "student-2", status: "absent" },
+      ])
+    );
 
     const attendanceClient = clientState.client!;
     const upsertCalls = (attendanceClient.from as ReturnType<typeof vi.fn>).mock.results;
@@ -162,7 +173,9 @@ describe("markAttendance", () => {
     ];
 
     await expect(
-      markAttendance("class-1", "2026-09-01", [{ studentId: "student-1", status: "present" }])
+      unwrapAction(
+        markAttendance("class-1", "2026-09-01", [{ studentId: "student-1", status: "present" }])
+      )
     ).rejects.toThrow();
   });
 });

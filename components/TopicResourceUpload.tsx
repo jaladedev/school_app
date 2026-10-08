@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { uploadTopicResource } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function TopicResourceUpload({ topicId, noteId }: { topicId: string; noteId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -21,7 +22,7 @@ export function TopicResourceUpload({ topicId, noteId }: { topicId: string; note
     setError(null);
     startTransition(async () => {
       try {
-        await uploadTopicResource(topicId, noteId, formData);
+        await unwrapAction(uploadTopicResource(topicId, noteId, formData));
         setTitle("");
         emitToast("Resource uploaded.");
         router.refresh();

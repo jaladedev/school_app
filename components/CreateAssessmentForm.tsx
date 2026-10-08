@@ -11,6 +11,7 @@ import {
 import { createAssessmentSchema, fieldErrorsFrom } from "@/lib/validation";
 import { levelLabel } from "@/lib/educationLevel";
 import type { AssessmentType } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 const CUSTOM_ASSESSMENT_TYPES: { value: AssessmentType; label: string }[] = [
   { value: "test", label: "Test" },
@@ -54,10 +55,12 @@ export function CreateAssessmentForm({
 
     startBulkTransition(async () => {
       try {
-        const { results } = await createStandardAssessmentSetForAllMyClasses({
-          term,
-          academicYear,
-        });
+        const { results } = await unwrapAction(
+          createStandardAssessmentSetForAllMyClasses({
+            term,
+            academicYear,
+          })
+        );
         setBulkResults(results);
         router.refresh();
       } catch (e) {
@@ -91,12 +94,14 @@ export function CreateAssessmentForm({
 
     startTransition(async () => {
       try {
-        const { created } = await createStandardAssessmentSet({
-          subjectId,
-          classId,
-          term,
-          academicYear,
-        });
+        const { created } = await unwrapAction(
+          createStandardAssessmentSet({
+            subjectId,
+            classId,
+            term,
+            academicYear,
+          })
+        );
 
         if (!created.length) {
           setMessage({
@@ -140,15 +145,17 @@ export function CreateAssessmentForm({
 
     startTransition(async () => {
       try {
-        await createCustomAssessment({
-          subjectId,
-          classId,
-          term,
-          academicYear,
-          assessmentType: customType,
-          title: customTitle,
-          maxScore: customMaxScore,
-        });
+        await unwrapAction(
+          createCustomAssessment({
+            subjectId,
+            classId,
+            term,
+            academicYear,
+            assessmentType: customType,
+            title: customTitle,
+            maxScore: customMaxScore,
+          })
+        );
 
         setMessage({
           kind: "success",

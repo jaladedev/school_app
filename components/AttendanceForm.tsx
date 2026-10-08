@@ -6,6 +6,7 @@ import { emitToast } from "@/lib/toast";
 import { ExportAttendanceRegisterButton } from "@/components/ExportAttendanceRegisterButton";
 import { queueAttendance, looksLikeNetworkFailure } from "@/lib/offlineAttendanceQueue";
 import type { AttendanceStatus } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string }[] = [
   { value: "present", label: "Present" },
@@ -61,7 +62,7 @@ export function AttendanceForm({
     startTransition(async () => {
       const records = students.map((s) => ({ studentId: s.id, status: statuses[s.id] }));
       try {
-        await markAttendance(classId, date, records);
+        await unwrapAction(markAttendance(classId, date, records));
         emitToast("Attendance saved.");
       } catch (err: unknown) {
         if (looksLikeNetworkFailure(err)) {

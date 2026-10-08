@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { sendMessage } from "@/lib/actions/messages";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function MessageComposer({ recipientId }: { recipientId: string }) {
   const router = useRouter();
@@ -18,7 +19,7 @@ export function MessageComposer({ recipientId }: { recipientId: string }) {
 
     startTransition(async () => {
       try {
-        await sendMessage(recipientId, content);
+        await unwrapAction(sendMessage(recipientId, content));
         setContent("");
         router.refresh();
       } catch (err: any) {

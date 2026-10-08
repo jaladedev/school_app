@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { voidInvoice } from "@/lib/actions/fees";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function VoidInvoiceForm({ invoiceId }: { invoiceId: string }) {
   const router = useRouter();
@@ -22,7 +23,7 @@ export function VoidInvoiceForm({ invoiceId }: { invoiceId: string }) {
 
     startTransition(async () => {
       try {
-        await voidInvoice(invoiceId, reason);
+        await unwrapAction(voidInvoice(invoiceId, reason));
         setReason("");
         setOpen(false);
         router.refresh();

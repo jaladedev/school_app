@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveReportCardRemark } from "@/lib/actions/reportCard";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function RemarkForm({
   studentId,
@@ -28,13 +29,15 @@ export function RemarkForm({
     setError(null);
     startTransition(async () => {
       try {
-        await saveReportCardRemark({
-          studentId,
-          term,
-          academicYear,
-          classTeacherRemark,
-          adminRemark,
-        });
+        await unwrapAction(
+          saveReportCardRemark({
+            studentId,
+            term,
+            academicYear,
+            classTeacherRemark,
+            adminRemark,
+          })
+        );
         emitToast("Remarks saved.");
         router.refresh();
       } catch (err: any) {

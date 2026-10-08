@@ -9,6 +9,7 @@ import {
 } from "@/lib/actions/hostelFees";
 import { emitToast } from "@/lib/toast";
 import { formatKobo } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 type FeeStructure = {
   id: string;
@@ -76,7 +77,7 @@ export function HostelFeeSection({
   function handleVoid(id: string) {
     startTransition(async () => {
       try {
-        await voidHostelFeeStructure(id, hostelId);
+        await unwrapAction(voidHostelFeeStructure(id, hostelId));
         emitToast("Fee voided.");
         router.refresh();
       } catch (err) {
@@ -88,7 +89,7 @@ export function HostelFeeSection({
   function handleGenerate(id: string) {
     startTransition(async () => {
       try {
-        const result = await generateHostelInvoices(id);
+        const result = await unwrapAction(generateHostelInvoices(id));
         emitToast(
           result.created
             ? `${result.created} invoice${result.created === 1 ? "" : "s"} created.`

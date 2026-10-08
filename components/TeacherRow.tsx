@@ -9,6 +9,7 @@ import { DeactivateUserButton } from "@/components/DeactivateUserButton";
 import { updateTeacherAccount, updateTeacherStaffRole } from "@/lib/actions/admin";
 import type { PickableSubject } from "@/components/SubjectPicker";
 import type { StaffRole } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function TeacherRow({
   teacherId,
@@ -38,7 +39,7 @@ export function TeacherRow({
   function handleSaveName(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      await updateTeacherAccount({ teacherId, fullName: nameValue });
+      await unwrapAction(updateTeacherAccount({ teacherId, fullName: nameValue }));
       setEditingName(false);
       router.refresh();
     });
@@ -47,7 +48,7 @@ export function TeacherRow({
   function handleStaffRoleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const nextRole = e.target.value as StaffRole;
     startRoleTransition(async () => {
-      await updateTeacherStaffRole(teacherId, nextRole);
+      await unwrapAction(updateTeacherStaffRole(teacherId, nextRole));
       router.refresh();
     });
   }

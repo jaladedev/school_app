@@ -9,6 +9,7 @@ import {
   type RolloverResult,
 } from "@/lib/actions/rollover";
 import { formatLevel } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 type DecisionAction = RolloverClassDecision["action"];
 
@@ -71,12 +72,14 @@ export function RolloverWizard({ preview }: { preview: RolloverPreview }) {
 
     startTransition(async () => {
       try {
-        const res = await runAcademicYearRollover({
-          nextAcademicYear: nextAcademicYear.trim(),
-          nextTermStartDate: nextTermStartDate || null,
-          decisions,
-          archiveSourceClasses,
-        });
+        const res = await unwrapAction(
+          runAcademicYearRollover({
+            nextAcademicYear: nextAcademicYear.trim(),
+            nextTermStartDate: nextTermStartDate || null,
+            decisions,
+            archiveSourceClasses,
+          })
+        );
         setResult(res);
         router.refresh();
       } catch (err: any) {

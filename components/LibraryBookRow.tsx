@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateLibraryBookCopies, archiveLibraryBook } from "@/lib/actions/library";
 import type { LibraryBook } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function LibraryBookRow({ book }: { book: LibraryBook }) {
   const router = useRouter();
@@ -31,7 +32,7 @@ export function LibraryBookRow({ book }: { book: LibraryBook }) {
     }
     startTransition(async () => {
       try {
-        await updateLibraryBookCopies(book.id, totalCopies);
+        await unwrapAction(updateLibraryBookCopies(book.id, totalCopies));
         setEditingCopies(false);
         router.refresh();
       } catch (err: any) {
@@ -43,7 +44,7 @@ export function LibraryBookRow({ book }: { book: LibraryBook }) {
   function toggleArchive() {
     startTransition(async () => {
       try {
-        await archiveLibraryBook(book.id, !book.is_archived);
+        await unwrapAction(archiveLibraryBook(book.id, !book.is_archived));
         router.refresh();
       } catch (err: any) {
         setError(err.message ?? "Something went wrong.");

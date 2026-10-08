@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createHostelRoom } from "@/lib/actions/hostel";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function CreateHostelRoomForm({ hostelId }: { hostelId: string }) {
   const router = useRouter();
@@ -23,7 +24,7 @@ export function CreateHostelRoomForm({ hostelId }: { hostelId: string }) {
 
     startTransition(async () => {
       try {
-        await createHostelRoom({ hostelId, roomNumber, capacity: Number(capacity) });
+        await unwrapAction(createHostelRoom({ hostelId, roomNumber, capacity: Number(capacity) }));
         emitToast("Room added.");
         setRoomNumber("");
         setCapacity("4");

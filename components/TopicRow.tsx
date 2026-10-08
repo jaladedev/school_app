@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { deleteCurriculumTopic } from "@/lib/actions/curriculum";
 import { curriculumTopicSchema, fieldErrorsFrom } from "@/lib/validation";
 import type { CurriculumTopic } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function TopicRow({
   topic,
@@ -93,7 +94,7 @@ export function TopicRow({
     setError(null);
     startTransition(async () => {
       try {
-        await deleteCurriculumTopic(topic.id);
+        await unwrapAction(deleteCurriculumTopic(topic.id));
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong.");

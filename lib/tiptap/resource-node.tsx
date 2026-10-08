@@ -29,6 +29,7 @@ import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { emitToast } from "@/lib/toast";
 import type { TopicResource } from "@/types/database";
 import { dragAwareStopEvent } from "./drag-utils";
+import { unwrapAction } from "@/lib/actionResult";
 
 export const RESOURCE_TYPE_ICON: Record<TopicResource["resource_type"], string> = {
   image: "🖼️",
@@ -187,7 +188,7 @@ function MermaidNodeView({
     setIsSaving(true);
     try {
       const { updateMermaidResource } = await import("@/lib/actions/teacher");
-      const updated = await updateMermaidResource(resource.id, title, code);
+      const updated = await unwrapAction(updateMermaidResource(resource.id, title, code));
       const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
       storage.onResourceUpdated?.(updated);
       emitToast("Diagram updated.");
@@ -578,7 +579,7 @@ function ResourceChipDefaultView({
     setIsSaving(true);
     try {
       const { updateTopicResource } = await import("@/lib/actions/teacher");
-      const updated = await updateTopicResource(resource.id, formData);
+      const updated = await unwrapAction(updateTopicResource(resource.id, formData));
       const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
       storage.onResourceUpdated?.(updated);
       emitToast(replaceFile ? "Resource replaced." : "Resource renamed.");
@@ -602,7 +603,7 @@ function ResourceChipDefaultView({
     setIsRefreshingPreview(true);
     try {
       const { refreshLinkPreview } = await import("@/lib/actions/teacher");
-      const updated = await refreshLinkPreview(resource.id);
+      const updated = await unwrapAction(refreshLinkPreview(resource.id));
       const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
       storage.onResourceUpdated?.(updated);
       setEditTitle(updated.title ?? "");

@@ -5,6 +5,7 @@ import { createTeacherAccount } from "@/lib/actions/admin";
 import { createTeacherSchema, fieldErrorsFrom } from "@/lib/validation";
 import { SubjectPicker, type PickableSubject } from "@/components/SubjectPicker";
 import type { StaffRole } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
   teacher: "Teacher",
@@ -61,7 +62,7 @@ export function CreateTeacherForm({ subjects }: { subjects: PickableSubject[] })
 
     startTransition(async () => {
       try {
-        await createTeacherAccount(input);
+        await unwrapAction(createTeacherAccount(input));
         setCreated(email);
         setFullName("");
         setEmail("");

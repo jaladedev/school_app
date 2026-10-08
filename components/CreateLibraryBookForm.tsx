@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createLibraryBook } from "@/lib/actions/library";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function CreateLibraryBookForm() {
   const router = useRouter();
@@ -31,13 +32,15 @@ export function CreateLibraryBookForm() {
 
     startTransition(async () => {
       try {
-        await createLibraryBook({
-          title,
-          author: author || undefined,
-          isbn: isbn || undefined,
-          category: category || undefined,
-          totalCopies,
-        });
+        await unwrapAction(
+          createLibraryBook({
+            title,
+            author: author || undefined,
+            isbn: isbn || undefined,
+            category: category || undefined,
+            totalCopies,
+          })
+        );
         setTitle("");
         setAuthor("");
         setIsbn("");

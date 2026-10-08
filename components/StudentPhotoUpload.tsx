@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { uploadStudentPhoto } from "@/lib/actions/admin";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function StudentPhotoUpload({
   studentId,
@@ -29,7 +30,7 @@ export function StudentPhotoUpload({
 
     startTransition(async () => {
       try {
-        await uploadStudentPhoto(studentId, formData);
+        await unwrapAction(uploadStudentPhoto(studentId, formData));
         emitToast("Student photo updated.");
         router.refresh();
       } catch (err: any) {

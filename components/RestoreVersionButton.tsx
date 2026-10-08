@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { restoreTopicNoteVersion } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function RestoreVersionButton({
   topicId,
@@ -46,7 +47,7 @@ export function RestoreVersionButton({
         onClick={() =>
           startTransition(async () => {
             try {
-              await restoreTopicNoteVersion(topicId, versionNoteId);
+              await unwrapAction(restoreTopicNoteVersion(topicId, versionNoteId));
               emitToast(`Version ${versionNumber} restored as a new draft.`);
               setConfirming(false);
               // The note editor above holds its own client-side state

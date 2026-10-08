@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createStudentNote } from "@/lib/actions/studentNotes";
 import type { StudentNoteType } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 const TYPE_OPTIONS: { value: StudentNoteType; label: string }[] = [
   { value: "academic", label: "Academic" },
@@ -26,7 +27,7 @@ export function StudentNoteForm({ studentId }: { studentId: string }) {
 
     startTransition(async () => {
       try {
-        await createStudentNote({ studentId, noteType, content, visibleToStudent });
+        await unwrapAction(createStudentNote({ studentId, noteType, content, visibleToStudent }));
         setContent("");
         router.refresh();
       } catch (err: any) {

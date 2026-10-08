@@ -8,6 +8,7 @@ import {
   removeQueuedAttendance,
   type QueuedAttendance,
 } from "@/lib/offlineAttendanceQueue";
+import { unwrapAction } from "@/lib/actionResult";
 
 /**
  * Mounted once in the root layout so a queued attendance write syncs
@@ -35,7 +36,7 @@ export function OfflineAttendanceSync() {
       const queued = await getQueuedAttendance();
       for (const item of queued) {
         try {
-          await markAttendance(item.classId, item.date, item.records);
+          await unwrapAction(markAttendance(item.classId, item.date, item.records));
           await removeQueuedAttendance(item.id);
         } catch {
           // Leave it queued — next online event or manual retry will

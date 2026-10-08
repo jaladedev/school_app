@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteConversation } from "@/lib/actions/messages";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function DeleteConversationButton({ partnerId }: { partnerId: string }) {
   const router = useRouter();
@@ -15,7 +16,7 @@ export function DeleteConversationButton({ partnerId }: { partnerId: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        await deleteConversation(partnerId);
+        await unwrapAction(deleteConversation(partnerId));
         router.push("/dashboard/messages");
         router.refresh();
       } catch (err: any) {

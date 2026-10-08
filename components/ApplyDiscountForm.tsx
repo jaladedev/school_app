@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { applyDiscount } from "@/lib/actions/fees";
 import { formatKobo } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function ApplyDiscountForm({
   invoiceId,
@@ -43,7 +44,7 @@ export function ApplyDiscountForm({
 
     startTransition(async () => {
       try {
-        await applyDiscount(invoiceId, discountKobo);
+        await unwrapAction(applyDiscount(invoiceId, discountKobo));
         setOpen(false);
         router.refresh();
       } catch (err: any) {

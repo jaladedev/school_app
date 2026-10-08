@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { linkVehicleDriver } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function LinkDriverForm({
   vehicleId,
@@ -23,7 +24,7 @@ export function LinkDriverForm({
     setValue(next);
     startTransition(async () => {
       try {
-        await linkVehicleDriver(vehicleId, next || null);
+        await unwrapAction(linkVehicleDriver(vehicleId, next || null));
         emitToast(next ? "Driver account linked." : "Driver account unlinked.");
         router.refresh();
       } catch (err) {

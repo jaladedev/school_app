@@ -12,6 +12,7 @@ import { getQuizPreviewQuestions } from "@/lib/actions/quiz";
 import { emitToast } from "@/lib/toast";
 import { QuestionText } from "@/components/QuestionText";
 import type { QuizAttemptQuestionRow } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 type Question = {
   id: string;
@@ -159,7 +160,7 @@ export function QuizAttemptRunner({
           // attempt for a deadline to bind to) — just a plain
           // duration_minutes countdown for a realistic feel.
           setSecondsLeft(durationMinutes * 60);
-          const rows = await getQuizPreviewQuestions(quizId);
+          const rows = await unwrapAction(getQuizPreviewQuestions(quizId));
           if (cancelled) return;
           const qs: Question[] = [];
           const key: Record<string, AnswerKeyEntry> = {};
@@ -204,7 +205,7 @@ export function QuizAttemptRunner({
           return;
         }
 
-        const attempt = await startQuizAttempt(quizId);
+        const attempt = await unwrapAction(startQuizAttempt(quizId));
         if (cancelled) return;
         setAttemptId(attempt.id);
 
@@ -229,7 +230,7 @@ export function QuizAttemptRunner({
           if (remaining <= t) firedWarnings.current.add(t);
         }
 
-        const rows = await getQuizAttemptQuestions(attempt.id);
+        const rows = await unwrapAction(getQuizAttemptQuestions(attempt.id));
         if (cancelled) return;
         const { questions: qs, selected, text, matched } = groupQuestions(rows);
         setQuestions(qs);
@@ -293,7 +294,7 @@ export function QuizAttemptRunner({
     });
     await Promise.all(pendingSaves);
     try {
-      const res = await submitQuizAttempt(attemptId!);
+      const res = await unwrapAction(submitQuizAttempt(attemptId!));
       setResult(res);
     } catch (err) {
       emitToast(err instanceof Error ? err.message : "Something went wrong.", "error");
@@ -325,9 +326,11 @@ export function QuizAttemptRunner({
   function selectOption(questionId: string, optionId: string) {
     setSelectedAnswers((a) => ({ ...a, [questionId]: optionId }));
     if (attemptId) {
-      answerQuizQuestion(attemptId, questionId, { selectedOptionId: optionId }).catch((err) => {
-        emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
-      });
+      unwrapAction(answerQuizQuestion(attemptId, questionId, { selectedOptionId: optionId })).catch(
+        (err) => {
+          emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
+        }
+      );
     }
   }
 
@@ -335,9 +338,11 @@ export function QuizAttemptRunner({
     setTextAnswers((a) => ({ ...a, [questionId]: value }));
     if (attemptId) {
       debouncedSave(questionId, () =>
-        answerQuizQuestion(attemptId, questionId, { answerText: value }).catch((err) => {
-          emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
-        })
+        unwrapAction(answerQuizQuestion(attemptId, questionId, { answerText: value })).catch(
+          (err) => {
+            emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
+          }
+        )
       );
     }
   }
@@ -348,9 +353,11 @@ export function QuizAttemptRunner({
       if (attemptId) {
         const pairs = next[questionId];
         debouncedSave(questionId, () =>
-          answerQuizQuestion(attemptId, questionId, { matchedPairs: pairs }).catch((err) => {
-            emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
-          })
+          unwrapAction(answerQuizQuestion(attemptId, questionId, { matchedPairs: pairs })).catch(
+            (err) => {
+              emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
+            }
+          )
         );
       }
       return next;

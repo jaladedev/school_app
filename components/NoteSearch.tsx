@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { searchTopicNotes } from "@/lib/actions/search";
 import type { TopicNoteSearchResult } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 // ts_headline's snippet is delimited with chr(1)/chr(2) markers rather
 // than HTML tags (see the search_topic_notes migration) -- split on them
@@ -42,7 +43,7 @@ export function NoteSearch({ resultBasePath }: { resultBasePath: string }) {
 
     setLoading(true);
     const timer = setTimeout(() => {
-      searchTopicNotes(trimmed)
+      unwrapAction(searchTopicNotes(trimmed))
         .then((rows) => {
           setResults(rows);
           setSearched(true);

@@ -50,7 +50,9 @@ export async function giveHomework(input: {
       .single();
     if (!entry) throw new Error("Pick a class and subject from your timetable.");
     if (entry.teacher_id !== teacherId) {
-      throw new Error(`You aren't assigned to this period for ${entry.classes?.name ?? "this class"}.`);
+      throw new Error(
+        `You aren't assigned to this period for ${entry.classes?.name ?? "this class"}.`
+      );
     }
 
     const { data: existing } = await supabase

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { gradeQuizEssayAnswers } from "@/lib/actions/quiz";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 type EssayAnswer = {
   questionId: string;
@@ -47,7 +48,7 @@ export function EssayGradingForm({
 
     startTransition(async () => {
       try {
-        await gradeQuizEssayAnswers(quizId, attemptId, parsed);
+        await unwrapAction(gradeQuizEssayAnswers(quizId, attemptId, parsed));
         emitToast("Essay scores saved.");
       } catch (err) {
         emitToast(err instanceof Error ? err.message : "Something went wrong.", "error");

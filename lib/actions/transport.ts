@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assertRole } from "@/lib/actions/authGuards";
 import type { TripDirection, TripStatusValue } from "@/types/database";
 import { throwDbError } from "@/lib/errors/db";
+import { runAction } from "@/lib/actionResult";
 
 /** Admin or the transport officer — global, unlike the hostel version,
  * since there's normally just the one transport officer running the
@@ -81,23 +82,25 @@ export async function createVehicle(input: {
   driverName?: string;
   driverPhone?: string;
 }) {
-  await assertRole(["admin"], "Only an admin can add vehicles.");
-  if (!input.plateNumber.trim()) throw new Error("Plate number is required.");
-  if (!Number.isInteger(input.capacity) || input.capacity < 1) {
-    throw new Error("Capacity must be a whole number of at least 1.");
-  }
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can add vehicles.");
+    if (!input.plateNumber.trim()) throw new Error("Plate number is required.");
+    if (!Number.isInteger(input.capacity) || input.capacity < 1) {
+      throw new Error("Capacity must be a whole number of at least 1.");
+    }
 
-  const admin = createAdminClient();
-  const { error } = await admin.from("vehicles").insert({
-    plate_number: input.plateNumber.trim(),
-    model: input.model?.trim() || null,
-    capacity: input.capacity,
-    driver_name: input.driverName?.trim() || null,
-    driver_phone: input.driverPhone?.trim() || null,
+    const admin = createAdminClient();
+    const { error } = await admin.from("vehicles").insert({
+      plate_number: input.plateNumber.trim(),
+      model: input.model?.trim() || null,
+      capacity: input.capacity,
+      driver_name: input.driverName?.trim() || null,
+      driver_phone: input.driverPhone?.trim() || null,
+    });
+    if (error) throwDbError(error);
+
+    revalidatePath("/dashboard/admin/transport");
   });
-  if (error) throwDbError(error);
-
-  revalidatePath("/dashboard/admin/transport");
 }
 
 /**
@@ -109,27 +112,29 @@ export async function createVehicle(input: {
  * the driver's behalf via driver_name/driver_phone alone.
  */
 export async function linkVehicleDriver(vehicleId: string, driverProfileId: string | null) {
-  await assertRole(["admin"], "Only an admin can link a driver account to a vehicle.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can link a driver account to a vehicle.");
+    const admin = createAdminClient();
 
-  if (driverProfileId) {
-    const { data: teacherProfile } = await admin
-      .from("teacher_profiles")
-      .select("staff_role")
-      .eq("id", driverProfileId)
-      .single();
-    if (teacherProfile?.staff_role !== "driver") {
-      throw new Error("That account isn't set up with the driver staff role.");
+    if (driverProfileId) {
+      const { data: teacherProfile } = await admin
+        .from("teacher_profiles")
+        .select("staff_role")
+        .eq("id", driverProfileId)
+        .single();
+      if (teacherProfile?.staff_role !== "driver") {
+        throw new Error("That account isn't set up with the driver staff role.");
+      }
     }
-  }
 
-  const { error } = await admin
-    .from("vehicles")
-    .update({ driver_profile_id: driverProfileId })
-    .eq("id", vehicleId);
-  if (error) throwDbError(error);
+    const { error } = await admin
+      .from("vehicles")
+      .update({ driver_profile_id: driverProfileId })
+      .eq("id", vehicleId);
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/admin/transport");
+    revalidatePath("/dashboard/admin/transport");
+  });
 }
 
 export async function createRoute(input: {
@@ -137,18 +142,20 @@ export async function createRoute(input: {
   description?: string;
   vehicleId?: string;
 }) {
-  await assertRole(["admin"], "Only an admin can create routes.");
-  if (!input.name.trim()) throw new Error("Name is required.");
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can create routes.");
+    if (!input.name.trim()) throw new Error("Name is required.");
 
-  const admin = createAdminClient();
-  const { error } = await admin.from("transport_routes").insert({
-    name: input.name.trim(),
-    description: input.description?.trim() || null,
-    vehicle_id: input.vehicleId || null,
+    const admin = createAdminClient();
+    const { error } = await admin.from("transport_routes").insert({
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      vehicle_id: input.vehicleId || null,
+    });
+    if (error) throwDbError(error);
+
+    revalidatePath("/dashboard/admin/transport");
   });
-  if (error) throwDbError(error);
-
-  revalidatePath("/dashboard/admin/transport");
 }
 
 export async function createStop(input: {
@@ -157,34 +164,38 @@ export async function createStop(input: {
   sequenceOrder: number;
   approxTime?: string;
 }) {
-  await assertRole(["admin"], "Only an admin can add stops.");
-  if (!input.name.trim()) throw new Error("Stop name is required.");
+  return runAction(async () => {
+    await assertRole(["admin"], "Only an admin can add stops.");
+    if (!input.name.trim()) throw new Error("Stop name is required.");
 
-  const admin = createAdminClient();
-  const { error } = await admin.from("transport_stops").insert({
-    route_id: input.routeId,
-    name: input.name.trim(),
-    sequence_order: input.sequenceOrder,
-    approx_time: input.approxTime || null,
+    const admin = createAdminClient();
+    const { error } = await admin.from("transport_stops").insert({
+      route_id: input.routeId,
+      name: input.name.trim(),
+      sequence_order: input.sequenceOrder,
+      approx_time: input.approxTime || null,
+    });
+    if (error) throwDbError(error);
+
+    revalidatePath("/dashboard/admin/transport");
   });
-  if (error) throwDbError(error);
-
-  revalidatePath("/dashboard/admin/transport");
 }
 
 export async function updateStop(input: { stopId: string; name: string; approxTime?: string }) {
-  await assertCanManageTransport();
-  if (!input.name.trim()) throw new Error("Stop name is required.");
+  return runAction(async () => {
+    await assertCanManageTransport();
+    if (!input.name.trim()) throw new Error("Stop name is required.");
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("transport_stops")
-    .update({ name: input.name.trim(), approx_time: input.approxTime || null })
-    .eq("id", input.stopId);
-  if (error) throwDbError(error);
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("transport_stops")
+      .update({ name: input.name.trim(), approx_time: input.approxTime || null })
+      .eq("id", input.stopId);
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/admin/transport");
-  revalidatePath("/dashboard/transport");
+    revalidatePath("/dashboard/admin/transport");
+    revalidatePath("/dashboard/transport");
+  });
 }
 
 /**
@@ -194,82 +205,90 @@ export async function updateStop(input: { stopId: string; name: string; approxTi
  * the extra client-side complexity a drag interface would add.
  */
 export async function moveStop(stopId: string, direction: "up" | "down") {
-  await assertCanManageTransport();
-  const admin = createAdminClient();
+  return runAction(async () => {
+    await assertCanManageTransport();
+    const admin = createAdminClient();
 
-  const { data: stop } = await admin
-    .from("transport_stops")
-    .select("route_id, sequence_order")
-    .eq("id", stopId)
-    .single();
-  if (!stop) throw new Error("Stop not found.");
+    const { data: stop } = await admin
+      .from("transport_stops")
+      .select("route_id, sequence_order")
+      .eq("id", stopId)
+      .single();
+    if (!stop) throw new Error("Stop not found.");
 
-  const { data: neighbor } = await admin
-    .from("transport_stops")
-    .select("id, sequence_order")
-    .eq("route_id", stop.route_id)
-    .eq("sequence_order", direction === "up" ? stop.sequence_order - 1 : stop.sequence_order + 1)
-    .maybeSingle();
-  if (!neighbor) return; // already at the top/bottom — nothing to do
+    const { data: neighbor } = await admin
+      .from("transport_stops")
+      .select("id, sequence_order")
+      .eq("route_id", stop.route_id)
+      .eq("sequence_order", direction === "up" ? stop.sequence_order - 1 : stop.sequence_order + 1)
+      .maybeSingle();
+    if (!neighbor) return; // already at the top/bottom — nothing to do
 
-  // Swap inside a single Postgres transaction via RPC so concurrent
-  // moveStop() calls on the same route can't interleave and corrupt the
-  // ordering. The old three-sequential-UPDATE approach had a race window
-  // between reads and writes that this closes.
-  // Migration: 2026_08_06c_swap_transport_stops_rpc.sql
-  const { error } = await admin.rpc("swap_transport_stop_order", {
-    p_stop_a: stopId,
-    p_stop_b: neighbor.id,
+    // Swap inside a single Postgres transaction via RPC so concurrent
+    // moveStop() calls on the same route can't interleave and corrupt the
+    // ordering. The old three-sequential-UPDATE approach had a race window
+    // between reads and writes that this closes.
+    // Migration: 2026_08_06c_swap_transport_stops_rpc.sql
+    const { error } = await admin.rpc("swap_transport_stop_order", {
+      p_stop_a: stopId,
+      p_stop_b: neighbor.id,
+    });
+    if (error) throwDbError(error);
+
+    revalidatePath("/dashboard/admin/transport");
+    revalidatePath("/dashboard/transport");
   });
-  if (error) throwDbError(error);
-
-  revalidatePath("/dashboard/admin/transport");
-  revalidatePath("/dashboard/transport");
 }
 
 export async function reassignRouteVehicle(routeId: string, vehicleId: string | null) {
-  const { id: actorId } = await assertRole(
-    ["admin", "teacher"],
-    "Only an admin or the transport officer can do this."
-  );
-  const admin = createAdminClient();
-  const { data: profile } = await admin.from("profiles").select("role").eq("id", actorId).single();
-  if (profile?.role !== "admin") {
-    const { data: teacherProfile } = await admin
-      .from("teacher_profiles")
-      .select("staff_role")
+  return runAction(async () => {
+    const { id: actorId } = await assertRole(
+      ["admin", "teacher"],
+      "Only an admin or the transport officer can do this."
+    );
+    const admin = createAdminClient();
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("role")
       .eq("id", actorId)
       .single();
-    if (teacherProfile?.staff_role !== "transport_officer") {
-      throw new Error("Only an admin or the transport officer can do this.");
+    if (profile?.role !== "admin") {
+      const { data: teacherProfile } = await admin
+        .from("teacher_profiles")
+        .select("staff_role")
+        .eq("id", actorId)
+        .single();
+      if (teacherProfile?.staff_role !== "transport_officer") {
+        throw new Error("Only an admin or the transport officer can do this.");
+      }
     }
-  }
 
-  // Close out the current history row for this route, if any.
-  const { error: closeError } = await admin
-    .from("route_vehicle_history")
-    .update({ unassigned_at: new Date().toISOString() })
-    .eq("route_id", routeId)
-    .is("unassigned_at", null);
-  if (closeError) throwDbError(closeError);
+    // Close out the current history row for this route, if any.
+    const { error: closeError } = await admin
+      .from("route_vehicle_history")
+      .update({ unassigned_at: new Date().toISOString() })
+      .eq("route_id", routeId)
+      .is("unassigned_at", null);
+    if (closeError) throwDbError(closeError);
 
-  if (vehicleId) {
-    const { error: insertError } = await admin.from("route_vehicle_history").insert({
-      route_id: routeId,
-      vehicle_id: vehicleId,
-      assigned_by: actorId,
-    });
-    if (insertError) throwDbError(insertError);
-  }
+    if (vehicleId) {
+      const { error: insertError } = await admin.from("route_vehicle_history").insert({
+        route_id: routeId,
+        vehicle_id: vehicleId,
+        assigned_by: actorId,
+      });
+      if (insertError) throwDbError(insertError);
+    }
 
-  const { error: updateError } = await admin
-    .from("transport_routes")
-    .update({ vehicle_id: vehicleId })
-    .eq("id", routeId);
-  if (updateError) throwDbError(updateError);
+    const { error: updateError } = await admin
+      .from("transport_routes")
+      .update({ vehicle_id: vehicleId })
+      .eq("id", routeId);
+    if (updateError) throwDbError(updateError);
 
-  revalidatePath("/dashboard/admin/transport");
-  revalidatePath("/dashboard/transport");
+    revalidatePath("/dashboard/admin/transport");
+    revalidatePath("/dashboard/transport");
+  });
 }
 
 // ---------- Admin or transport officer: assignments ----------
@@ -280,36 +299,40 @@ export async function assignStudentToRoute(input: {
   stopId: string;
   academicYear: string;
 }) {
-  await assertCanManageTransport();
+  return runAction(async () => {
+    await assertCanManageTransport();
 
-  // The route lock, capacity check, stop-belongs-to-route check,
-  // close-old-assignment, and insert-new-assignment all happen inside
-  // assign_student_to_route in one transaction — closes the race window
-  // the old sequential app-side calls had (mirrors
-  // assign_student_to_hostel_room for hostels).
-  const { error } = await createClient().rpc("assign_student_to_route", {
-    p_student_id: input.studentId,
-    p_route_id: input.routeId,
-    p_stop_id: input.stopId,
-    p_academic_year: input.academicYear,
+    // The route lock, capacity check, stop-belongs-to-route check,
+    // close-old-assignment, and insert-new-assignment all happen inside
+    // assign_student_to_route in one transaction — closes the race window
+    // the old sequential app-side calls had (mirrors
+    // assign_student_to_hostel_room for hostels).
+    const { error } = await createClient().rpc("assign_student_to_route", {
+      p_student_id: input.studentId,
+      p_route_id: input.routeId,
+      p_stop_id: input.stopId,
+      p_academic_year: input.academicYear,
+    });
+    if (error) throwDbError(error);
+
+    revalidatePath("/dashboard/admin/transport");
   });
-  if (error) throwDbError(error);
-
-  revalidatePath("/dashboard/admin/transport");
 }
 
 export async function unassignStudentFromRoute(assignmentId: string) {
-  await assertCanManageTransport();
-  const admin = createAdminClient();
+  return runAction(async () => {
+    await assertCanManageTransport();
+    const admin = createAdminClient();
 
-  const { error } = await admin
-    .from("transport_assignments")
-    .update({ unassigned_at: new Date().toISOString() })
-    .eq("id", assignmentId)
-    .is("unassigned_at", null);
-  if (error) throwDbError(error);
+    const { error } = await admin
+      .from("transport_assignments")
+      .update({ unassigned_at: new Date().toISOString() })
+      .eq("id", assignmentId)
+      .is("unassigned_at", null);
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/admin/transport");
+    revalidatePath("/dashboard/admin/transport");
+  });
 }
 
 // ---------- Admin, transport officer, or that route's driver: live status ----------
@@ -320,24 +343,26 @@ export async function updateTripStatus(input: {
   direction: TripDirection;
   status: TripStatusValue;
 }) {
-  const { actorId } = await assertCanUpdateTrip(input.routeId);
-  const admin = createAdminClient();
+  return runAction(async () => {
+    const { actorId } = await assertCanUpdateTrip(input.routeId);
+    const admin = createAdminClient();
 
-  const { error } = await admin.from("transport_trip_status").upsert(
-    {
-      route_id: input.routeId,
-      trip_date: input.tripDate,
-      direction: input.direction,
-      status: input.status,
-      updated_by: actorId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "route_id,trip_date,direction" }
-  );
-  if (error) throwDbError(error);
+    const { error } = await admin.from("transport_trip_status").upsert(
+      {
+        route_id: input.routeId,
+        trip_date: input.tripDate,
+        direction: input.direction,
+        status: input.status,
+        updated_by: actorId,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "route_id,trip_date,direction" }
+    );
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/admin/transport");
-  revalidatePath("/dashboard/transport");
+    revalidatePath("/dashboard/admin/transport");
+    revalidatePath("/dashboard/transport");
+  });
 }
 
 /**
@@ -354,61 +379,63 @@ export async function markStudentPickup(input: {
   direction: TripDirection;
   event: "picked_up" | "dropped_off";
 }) {
-  const { actorId } = await assertCanUpdateTrip(input.routeId);
-  const admin = createAdminClient();
+  return runAction(async () => {
+    const { actorId } = await assertCanUpdateTrip(input.routeId);
+    const admin = createAdminClient();
 
-  // Without this, a bogus studentId only ever surfaces as a raw
-  // Postgres foreign-key-violation message from the upsert below
-  // (transport_pickup_logs.student_id references student_profiles) --
-  // not a data-integrity risk since the FK already blocks it, but an
-  // ugly error rather than a clean one. More importantly, this also
-  // catches a *valid* student id that just isn't assigned to *this*
-  // route: assertCanUpdateTrip only authorizes the driver against the
-  // route itself, not the student-route pairing, so without this a
-  // driver could otherwise mark pickup/dropoff for any real student in
-  // the system, not just the ones actually on their route.
-  const { data: assignment } = await admin
-    .from("transport_assignments")
-    .select("id")
-    .eq("student_id", input.studentId)
-    .eq("route_id", input.routeId)
-    .is("unassigned_at", null)
-    .maybeSingle();
-  if (!assignment) {
-    throw new Error("That student isn't currently assigned to this route.");
-  }
+    // Without this, a bogus studentId only ever surfaces as a raw
+    // Postgres foreign-key-violation message from the upsert below
+    // (transport_pickup_logs.student_id references student_profiles) --
+    // not a data-integrity risk since the FK already blocks it, but an
+    // ugly error rather than a clean one. More importantly, this also
+    // catches a *valid* student id that just isn't assigned to *this*
+    // route: assertCanUpdateTrip only authorizes the driver against the
+    // route itself, not the student-route pairing, so without this a
+    // driver could otherwise mark pickup/dropoff for any real student in
+    // the system, not just the ones actually on their route.
+    const { data: assignment } = await admin
+      .from("transport_assignments")
+      .select("id")
+      .eq("student_id", input.studentId)
+      .eq("route_id", input.routeId)
+      .is("unassigned_at", null)
+      .maybeSingle();
+    if (!assignment) {
+      throw new Error("That student isn't currently assigned to this route.");
+    }
 
-  const now = new Date().toISOString();
-  const { error } =
-    input.event === "picked_up"
-      ? await admin.from("transport_pickup_logs").upsert(
-          {
-            student_id: input.studentId,
-            route_id: input.routeId,
-            trip_date: input.tripDate,
-            direction: input.direction,
-            picked_up_at: now,
-            marked_by: actorId,
-            updated_at: now,
-          },
-          { onConflict: "student_id,route_id,trip_date,direction" }
-        )
-      : await admin.from("transport_pickup_logs").upsert(
-          {
-            student_id: input.studentId,
-            route_id: input.routeId,
-            trip_date: input.tripDate,
-            direction: input.direction,
-            dropped_off_at: now,
-            marked_by: actorId,
-            updated_at: now,
-          },
-          { onConflict: "student_id,route_id,trip_date,direction" }
-        );
-  if (error) throwDbError(error);
+    const now = new Date().toISOString();
+    const { error } =
+      input.event === "picked_up"
+        ? await admin.from("transport_pickup_logs").upsert(
+            {
+              student_id: input.studentId,
+              route_id: input.routeId,
+              trip_date: input.tripDate,
+              direction: input.direction,
+              picked_up_at: now,
+              marked_by: actorId,
+              updated_at: now,
+            },
+            { onConflict: "student_id,route_id,trip_date,direction" }
+          )
+        : await admin.from("transport_pickup_logs").upsert(
+            {
+              student_id: input.studentId,
+              route_id: input.routeId,
+              trip_date: input.tripDate,
+              direction: input.direction,
+              dropped_off_at: now,
+              marked_by: actorId,
+              updated_at: now,
+            },
+            { onConflict: "student_id,route_id,trip_date,direction" }
+          );
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/driver");
-  revalidatePath("/dashboard/admin/transport");
+    revalidatePath("/dashboard/driver");
+    revalidatePath("/dashboard/admin/transport");
+  });
 }
 
 /**
@@ -426,24 +453,26 @@ export async function recordTransportLocation(input: {
   lat: number;
   lng: number;
 }) {
-  const { actorId } = await assertCanUpdateTrip(input.routeId);
-  if (
-    !Number.isFinite(input.lat) ||
-    !Number.isFinite(input.lng) ||
-    Math.abs(input.lat) > 90 ||
-    Math.abs(input.lng) > 180
-  ) {
-    throw new Error("Invalid coordinates.");
-  }
+  return runAction(async () => {
+    const { actorId } = await assertCanUpdateTrip(input.routeId);
+    if (
+      !Number.isFinite(input.lat) ||
+      !Number.isFinite(input.lng) ||
+      Math.abs(input.lat) > 90 ||
+      Math.abs(input.lng) > 180
+    ) {
+      throw new Error("Invalid coordinates.");
+    }
 
-  const admin = createAdminClient();
-  const { error } = await admin.from("transport_locations").insert({
-    route_id: input.routeId,
-    trip_date: input.tripDate,
-    direction: input.direction,
-    lat: input.lat,
-    lng: input.lng,
-    recorded_by: actorId,
+    const admin = createAdminClient();
+    const { error } = await admin.from("transport_locations").insert({
+      route_id: input.routeId,
+      trip_date: input.tripDate,
+      direction: input.direction,
+      lat: input.lat,
+      lng: input.lng,
+      recorded_by: actorId,
+    });
+    if (error) throwDbError(error);
   });
-  if (error) throwDbError(error);
 }

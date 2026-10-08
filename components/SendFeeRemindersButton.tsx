@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { sendFeeReminders } from "@/lib/actions/fees";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function SendFeeRemindersButton() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export function SendFeeRemindersButton() {
     setMessage(null);
     startTransition(async () => {
       try {
-        const result = await sendFeeReminders();
+        const result = await unwrapAction(sendFeeReminders());
         setMessage(
           result.remindersSent > 0
             ? `Sent ${result.remindersSent} reminder(s) (of ${result.invoicesConsidered} outstanding invoice(s) checked).`

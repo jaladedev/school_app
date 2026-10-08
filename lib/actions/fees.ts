@@ -11,6 +11,7 @@ import { throwDbError } from "@/lib/errors/db";
 import { sendGuardianReceiptCopy } from "@/lib/feeReceiptEmail";
 import { logger } from "@/lib/logger";
 import { STUDENT_PAYMENT_DISABLED_MESSAGE } from "@/lib/feeMessages";
+import { runAction } from "@/lib/actionResult";
 
 /**
  * Admin or the bursar. The DB already grants staff_role: "bursar" write
@@ -45,73 +46,77 @@ export async function createFeeStructure(input: {
   amountKobo: number;
   dueDate?: string;
 }) {
-  const { id } = await assertCanManageFees("Only an admin or the bursar can manage fees.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    const { id } = await assertCanManageFees("Only an admin or the bursar can manage fees.");
+    const admin = createAdminClient();
 
-  const { error } = await admin.from("fee_structures").insert({
-    education_level: input.educationLevel,
-    level_number: input.levelNumber,
-    term: input.term,
-    academic_year: input.academicYear,
-    title: input.title,
-    amount_kobo: input.amountKobo,
-    due_date: input.dueDate || null,
-    created_by: id,
+    const { error } = await admin.from("fee_structures").insert({
+      education_level: input.educationLevel,
+      level_number: input.levelNumber,
+      term: input.term,
+      academic_year: input.academicYear,
+      title: input.title,
+      amount_kobo: input.amountKobo,
+      due_date: input.dueDate || null,
+      created_by: id,
+    });
+
+    if (error) throwDbError(error);
+
+    revalidatePath("/dashboard/admin/fees");
   });
-
-  if (error) throwDbError(error);
-
-  revalidatePath("/dashboard/admin/fees");
 }
 
 export async function generateInvoicesForClass(feeStructureId: string, classId: string) {
-  await assertCanManageFees("Only an admin or the bursar can manage fees.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    await assertCanManageFees("Only an admin or the bursar can manage fees.");
+    const admin = createAdminClient();
 
-  const { data: feeStructure } = await admin
-    .from("fee_structures")
-    .select("*")
-    .eq("id", feeStructureId)
-    .single();
+    const { data: feeStructure } = await admin
+      .from("fee_structures")
+      .select("*")
+      .eq("id", feeStructureId)
+      .single();
 
-  if (!feeStructure) throw new Error("Fee structure not found.");
+    if (!feeStructure) throw new Error("Fee structure not found.");
 
-  const { data: students } = await admin
-    .from("student_profiles")
-    .select("id")
-    .eq("class_id", classId);
+    const { data: students } = await admin
+      .from("student_profiles")
+      .select("id")
+      .eq("class_id", classId);
 
-  if (!students?.length) {
-    return { created: 0 };
-  }
+    if (!students?.length) {
+      return { created: 0 };
+    }
 
-  const { data: existingInvoices } = await admin
-    .from("invoices")
-    .select("student_id")
-    .eq("fee_structure_id", feeStructureId);
+    const { data: existingInvoices } = await admin
+      .from("invoices")
+      .select("student_id")
+      .eq("fee_structure_id", feeStructureId);
 
-  const existingIds = new Set((existingInvoices ?? []).map((i) => i.student_id));
-  const toCreate = students.filter((s) => !existingIds.has(s.id));
+    const existingIds = new Set((existingInvoices ?? []).map((i) => i.student_id));
+    const toCreate = students.filter((s) => !existingIds.has(s.id));
 
-  if (!toCreate.length) {
-    return { created: 0 };
-  }
+    if (!toCreate.length) {
+      return { created: 0 };
+    }
 
-  const { error } = await admin.from("invoices").insert(
-    toCreate.map((s) => ({
-      student_id: s.id,
-      fee_structure_id: feeStructureId,
-      term: feeStructure.term,
-      academic_year: feeStructure.academic_year,
-      total_amount_kobo: feeStructure.amount_kobo,
-      status: "unpaid" as const,
-    }))
-  );
+    const { error } = await admin.from("invoices").insert(
+      toCreate.map((s) => ({
+        student_id: s.id,
+        fee_structure_id: feeStructureId,
+        term: feeStructure.term,
+        academic_year: feeStructure.academic_year,
+        total_amount_kobo: feeStructure.amount_kobo,
+        status: "unpaid" as const,
+      }))
+    );
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/admin/fees");
-  return { created: toCreate.length };
+    revalidatePath("/dashboard/admin/fees");
+    return { created: toCreate.length };
+  });
 }
 
 export async function recordPayment(input: {
@@ -120,80 +125,86 @@ export async function recordPayment(input: {
   method: PaymentMethod;
   reference?: string;
 }) {
-  const { id } = await assertCanManageFees("Only an admin or the bursar can manage fees.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    const { id } = await assertCanManageFees("Only an admin or the bursar can manage fees.");
+    const admin = createAdminClient();
 
-  if (input.amountKobo <= 0) {
-    throw new Error("Payment amount must be greater than zero.");
-  }
+    if (input.amountKobo <= 0) {
+      throw new Error("Payment amount must be greater than zero.");
+    }
 
-  const { data: invoice } = await admin
-    .from("invoices")
-    .select("voided_at, total_amount_kobo, discount_kobo, amount_paid_kobo")
-    .eq("id", input.invoiceId)
-    .single();
-  if (!invoice) throw new Error("Invoice not found.");
-  if (invoice.voided_at) throw new Error("This invoice has been voided and can't accept payments.");
+    const { data: invoice } = await admin
+      .from("invoices")
+      .select("voided_at, total_amount_kobo, discount_kobo, amount_paid_kobo")
+      .eq("id", input.invoiceId)
+      .single();
+    if (!invoice) throw new Error("Invoice not found.");
+    if (invoice.voided_at)
+      throw new Error("This invoice has been voided and can't accept payments.");
 
-  const balanceKobo = invoice.total_amount_kobo - invoice.discount_kobo - invoice.amount_paid_kobo;
-  if (input.amountKobo > balanceKobo) {
-    throw new Error(
-      `This payment (₦${(input.amountKobo / 100).toLocaleString("en-NG")}) is more than the ₦${(balanceKobo / 100).toLocaleString("en-NG")} still owed on this invoice.`
-    );
-  }
+    const balanceKobo =
+      invoice.total_amount_kobo - invoice.discount_kobo - invoice.amount_paid_kobo;
+    if (input.amountKobo > balanceKobo) {
+      throw new Error(
+        `This payment (₦${(input.amountKobo / 100).toLocaleString("en-NG")}) is more than the ₦${(balanceKobo / 100).toLocaleString("en-NG")} still owed on this invoice.`
+      );
+    }
 
-  const { data: result, error } = await admin.rpc("record_invoice_payment", {
-    p_invoice_id: input.invoiceId,
-    p_amount_kobo: input.amountKobo,
-    p_method: input.method,
-    p_reference: input.reference?.trim() || null,
-    p_verified_by: id,
-    p_enforce_balance: true,
+    const { data: result, error } = await admin.rpc("record_invoice_payment", {
+      p_invoice_id: input.invoiceId,
+      p_amount_kobo: input.amountKobo,
+      p_method: input.method,
+      p_reference: input.reference?.trim() || null,
+      p_verified_by: id,
+      p_enforce_balance: true,
+    });
+
+    if (error) throwDbError(error);
+    if (result?.[0]?.already_recorded) {
+      throw new Error("A payment with this reference has already been recorded.");
+    }
+
+    revalidatePath("/dashboard/admin/fees");
+    revalidatePath("/dashboard/student/fees");
   });
-
-  if (error) throwDbError(error);
-  if (result?.[0]?.already_recorded) {
-    throw new Error("A payment with this reference has already been recorded.");
-  }
-
-  revalidatePath("/dashboard/admin/fees");
-  revalidatePath("/dashboard/student/fees");
 }
 
 export async function applyDiscount(invoiceId: string, discountKobo: number) {
-  await assertCanManageFees("Only an admin or the bursar can manage fees.");
+  return runAction(async () => {
+    await assertCanManageFees("Only an admin or the bursar can manage fees.");
 
-  if (!Number.isInteger(discountKobo) || discountKobo < 0) {
-    throw new Error("Discount amount must be zero or a positive amount.");
-  }
+    if (!Number.isInteger(discountKobo) || discountKobo < 0) {
+      throw new Error("Discount amount must be zero or a positive amount.");
+    }
 
-  const admin = createAdminClient();
+    const admin = createAdminClient();
 
-  const { data: invoice } = await admin.from("invoices").select("*").eq("id", invoiceId).single();
+    const { data: invoice } = await admin.from("invoices").select("*").eq("id", invoiceId).single();
 
-  if (!invoice) throw new Error("Invoice not found.");
-  if (invoice.voided_at) throw new Error("This invoice has been voided and can't be discounted.");
-  // Mirrors the DB's invoices_discount_not_exceeding_total CHECK constraint
-  // with a message a bursar can actually act on, instead of surfacing the
-  // raw constraint-violation error from Postgres.
-  if (discountKobo > invoice.total_amount_kobo) {
-    throw new Error("Discount can't be more than the invoice's total amount.");
-  }
+    if (!invoice) throw new Error("Invoice not found.");
+    if (invoice.voided_at) throw new Error("This invoice has been voided and can't be discounted.");
+    // Mirrors the DB's invoices_discount_not_exceeding_total CHECK constraint
+    // with a message a bursar can actually act on, instead of surfacing the
+    // raw constraint-violation error from Postgres.
+    if (discountKobo > invoice.total_amount_kobo) {
+      throw new Error("Discount can't be more than the invoice's total amount.");
+    }
 
-  const newStatus = computeInvoiceStatus(
-    invoice.total_amount_kobo,
-    discountKobo,
-    invoice.amount_paid_kobo
-  );
+    const newStatus = computeInvoiceStatus(
+      invoice.total_amount_kobo,
+      discountKobo,
+      invoice.amount_paid_kobo
+    );
 
-  const { error } = await admin
-    .from("invoices")
-    .update({ discount_kobo: discountKobo, status: newStatus })
-    .eq("id", invoiceId);
+    const { error } = await admin
+      .from("invoices")
+      .update({ discount_kobo: discountKobo, status: newStatus })
+      .eq("id", invoiceId);
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/admin/fees");
+    revalidatePath("/dashboard/admin/fees");
+  });
 }
 
 /**
@@ -207,45 +218,47 @@ export async function applyDiscount(invoiceId: string, discountKobo: number) {
  * already collected needs a real refund/reversal flow, not a void.
  */
 export async function voidInvoice(invoiceId: string, reason: string) {
-  const { id } = await assertCanManageFees("Only an admin or the bursar can void an invoice.");
-  const admin = createAdminClient();
+  return runAction(async () => {
+    const { id } = await assertCanManageFees("Only an admin or the bursar can void an invoice.");
+    const admin = createAdminClient();
 
-  const trimmedReason = reason.trim();
-  if (!trimmedReason) {
-    throw new Error("A reason is required to void an invoice.");
-  }
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
+      throw new Error("A reason is required to void an invoice.");
+    }
 
-  const { data: invoice } = await admin
-    .from("invoices")
-    .select("voided_at, amount_paid_kobo")
-    .eq("id", invoiceId)
-    .single();
+    const { data: invoice } = await admin
+      .from("invoices")
+      .select("voided_at, amount_paid_kobo")
+      .eq("id", invoiceId)
+      .single();
 
-  if (!invoice) throw new Error("Invoice not found.");
-  if (invoice.voided_at) throw new Error("This invoice has already been voided.");
-  if (invoice.amount_paid_kobo > 0) {
-    throw new Error(
-      "This invoice already has a payment recorded — reverse or refund the payment before voiding."
-    );
-  }
+    if (!invoice) throw new Error("Invoice not found.");
+    if (invoice.voided_at) throw new Error("This invoice has already been voided.");
+    if (invoice.amount_paid_kobo > 0) {
+      throw new Error(
+        "This invoice already has a payment recorded — reverse or refund the payment before voiding."
+      );
+    }
 
-  const { error } = await admin
-    .from("invoices")
-    .update({
-      voided_at: new Date().toISOString(),
-      voided_by: id,
-      void_reason: trimmedReason,
-    })
-    .eq("id", invoiceId)
-    .is("voided_at", null);
+    const { error } = await admin
+      .from("invoices")
+      .update({
+        voided_at: new Date().toISOString(),
+        voided_by: id,
+        void_reason: trimmedReason,
+      })
+      .eq("id", invoiceId)
+      .is("voided_at", null);
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/admin/fees/invoices");
-  revalidatePath("/dashboard/student/fees");
-  revalidatePath("/dashboard/parent/fees");
-  revalidatePath("/dashboard/parent");
-  revalidatePath("/dashboard/library/loans");
+    revalidatePath("/dashboard/admin/fees/invoices");
+    revalidatePath("/dashboard/student/fees");
+    revalidatePath("/dashboard/parent/fees");
+    revalidatePath("/dashboard/parent");
+    revalidatePath("/dashboard/library/loans");
+  });
 }
 
 // ---------- Paystack (student-initiated, server-verified) ----------
@@ -328,117 +341,122 @@ export async function checkOnlinePaymentAllowed(invoiceId: string): Promise<void
 // payment. This is the same trust model a webhook would use, just
 // triggered by the client instead of by Paystack calling back to you.
 export async function verifyPaystackPayment(input: { reference: string; invoiceId: string }) {
-  // getAuthenticatedUser() (authGuards.ts) handles the transient-network-
-  // vs-actually-signed-out distinction that used to be duplicated here
-  // inline -- worth calling out that it matters especially at this call
-  // site, since a false "not signed in" here would wrongly reject a real
-  // payment-verification attempt from a legitimately signed-in
-  // student/parent during a network blip, mid-payment.
-  const user = await getAuthenticatedUser();
+  return runAction(async () => {
+    // getAuthenticatedUser() (authGuards.ts) handles the transient-network-
+    // vs-actually-signed-out distinction that used to be duplicated here
+    // inline -- worth calling out that it matters especially at this call
+    // site, since a false "not signed in" here would wrongly reject a real
+    // payment-verification attempt from a legitimately signed-in
+    // student/parent during a network blip, mid-payment.
+    const user = await getAuthenticatedUser();
 
-  const admin = createAdminClient();
+    const admin = createAdminClient();
 
-  const { data: invoice } = await admin
-    .from("invoices")
-    .select("*")
-    .eq("id", input.invoiceId)
-    .single();
+    const { data: invoice } = await admin
+      .from("invoices")
+      .select("*")
+      .eq("id", input.invoiceId)
+      .single();
 
-  if (!invoice) throw new Error("Invoice not found.");
-  if (invoice.voided_at) throw new Error("This invoice has been voided and can't accept payments.");
+    if (!invoice) throw new Error("Invoice not found.");
+    if (invoice.voided_at)
+      throw new Error("This invoice has been voided and can't accept payments.");
 
-  const payer = await resolveInvoicePayer(admin, user.id, invoice.student_id);
+    const payer = await resolveInvoicePayer(admin, user.id, invoice.student_id);
 
-  // Idempotency pre-check: advisory only, purely to skip an unnecessary
-  // Paystack verify call + network round-trip for a reference we already
-  // hold. This is NOT what makes duplicate submission safe -- it has a
-  // TOCTOU race with a concurrent request. record_invoice_payment() is the
-  // actual source of truth: it returns already_recorded=true (not an
-  // error) for a duplicate reference, so nothing here is ever allowed to
-  // credit the invoice a second time even if this check misses the race.
-  const { data: existingPayment } = await admin
-    .from("payments")
-    .select("id")
-    .eq("reference", input.reference)
-    .maybeSingle();
+    // Idempotency pre-check: advisory only, purely to skip an unnecessary
+    // Paystack verify call + network round-trip for a reference we already
+    // hold. This is NOT what makes duplicate submission safe -- it has a
+    // TOCTOU race with a concurrent request. record_invoice_payment() is the
+    // actual source of truth: it returns already_recorded=true (not an
+    // error) for a duplicate reference, so nothing here is ever allowed to
+    // credit the invoice a second time even if this check misses the race.
+    const { data: existingPayment } = await admin
+      .from("payments")
+      .select("id")
+      .eq("reference", input.reference)
+      .maybeSingle();
 
-  if (existingPayment) {
-    return { alreadyRecorded: true };
-  }
-
-  const secretKey = serverEnv.PAYSTACK_SECRET_KEY;
-
-  const verifyResponse = await fetch(
-    `https://api.paystack.co/transaction/verify/${encodeURIComponent(input.reference)}`,
-    {
-      headers: { Authorization: `Bearer ${secretKey}` },
+    if (existingPayment) {
+      return { alreadyRecorded: true };
     }
-  );
 
-  const verifyData = await verifyResponse.json();
+    const secretKey = serverEnv.PAYSTACK_SECRET_KEY;
 
-  if (!verifyResponse.ok || verifyData?.data?.status !== "success") {
-    throw new Error("Payment could not be verified with Paystack.");
-  }
+    const verifyResponse = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(input.reference)}`,
+      {
+        headers: { Authorization: `Bearer ${secretKey}` },
+      }
+    );
 
-  // Paystack amounts are already in kobo for NGN transactions, matching
-  // this schema's convention — no conversion needed either direction.
-  const paidAmountKobo: number = verifyData.data.amount;
-  const { data: result, error } = await admin.rpc("record_invoice_payment", {
-    p_invoice_id: input.invoiceId,
-    p_amount_kobo: paidAmountKobo,
-    p_method: "card",
-    p_reference: input.reference,
-    p_verified_by: null,
-    p_enforce_balance: true,
+    const verifyData = await verifyResponse.json();
+
+    if (!verifyResponse.ok || verifyData?.data?.status !== "success") {
+      throw new Error("Payment could not be verified with Paystack.");
+    }
+
+    // Paystack amounts are already in kobo for NGN transactions, matching
+    // this schema's convention — no conversion needed either direction.
+    const paidAmountKobo: number = verifyData.data.amount;
+    const { data: result, error } = await admin.rpc("record_invoice_payment", {
+      p_invoice_id: input.invoiceId,
+      p_amount_kobo: paidAmountKobo,
+      p_method: "card",
+      p_reference: input.reference,
+      p_verified_by: null,
+      p_enforce_balance: true,
+    });
+
+    if (error) throwDbError(error);
+
+    const alreadyRecorded = result?.[0]?.already_recorded ?? false;
+
+    // A student's own Paystack receipt goes to the student's address, which a
+    // parent may never see -- copy the guardians. Awaited (serverless would
+    // drop a floating promise) but never allowed to fail the payment.
+    if (payer === "student" && !alreadyRecorded) {
+      try {
+        await sendGuardianReceiptCopy({
+          admin,
+          studentId: invoice.student_id,
+          invoiceId: input.invoiceId,
+          amountKobo: paidAmountKobo,
+        });
+      } catch (err) {
+        logger.warn("verifyPaystackPayment: guardian receipt copy failed", { error: err });
+      }
+    }
+
+    revalidatePath("/dashboard/student/fees");
+    revalidatePath("/dashboard/parent/fees");
+    revalidatePath("/dashboard/admin/fees/invoices");
+
+    return { alreadyRecorded, amountKobo: paidAmountKobo };
   });
-
-  if (error) throwDbError(error);
-
-  const alreadyRecorded = result?.[0]?.already_recorded ?? false;
-
-  // A student's own Paystack receipt goes to the student's address, which a
-  // parent may never see -- copy the guardians. Awaited (serverless would
-  // drop a floating promise) but never allowed to fail the payment.
-  if (payer === "student" && !alreadyRecorded) {
-    try {
-      await sendGuardianReceiptCopy({
-        admin,
-        studentId: invoice.student_id,
-        invoiceId: input.invoiceId,
-        amountKobo: paidAmountKobo,
-      });
-    } catch (err) {
-      logger.warn("verifyPaystackPayment: guardian receipt copy failed", { error: err });
-    }
-  }
-
-  revalidatePath("/dashboard/student/fees");
-  revalidatePath("/dashboard/parent/fees");
-  revalidatePath("/dashboard/admin/fees/invoices");
-
-  return { alreadyRecorded, amountKobo: paidAmountKobo };
 }
 
 /** Admin/bursar: message every guardian (or the student, if unlinked) of a
  *  still-owing invoice not already reminded in the last p_minDaysBetween days. */
 export async function sendFeeReminders(minDaysBetween = 7) {
-  await assertCanManageFees("Only an admin or the bursar can send fee reminders.");
+  return runAction(async () => {
+    await assertCanManageFees("Only an admin or the bursar can send fee reminders.");
 
-  // Use the request-scoped client (not the admin client) so auth.uid()
-  // inside send_fee_reminders() resolves to the caller — the RPC uses it
-  // as the message sender_id.
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("send_fee_reminders", {
-    p_min_days_between: minDaysBetween,
+    // Use the request-scoped client (not the admin client) so auth.uid()
+    // inside send_fee_reminders() resolves to the caller — the RPC uses it
+    // as the message sender_id.
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("send_fee_reminders", {
+      p_min_days_between: minDaysBetween,
+    });
+
+    if (error) throwDbError(error);
+
+    revalidatePath("/dashboard/admin/fees/invoices");
+
+    return {
+      remindersSent: data?.[0]?.reminders_sent ?? 0,
+      invoicesConsidered: data?.[0]?.invoices_considered ?? 0,
+    };
   });
-
-  if (error) throwDbError(error);
-
-  revalidatePath("/dashboard/admin/fees/invoices");
-
-  return {
-    remindersSent: data?.[0]?.reminders_sent ?? 0,
-    invoicesConsidered: data?.[0]?.invoices_considered ?? 0,
-  };
 }

@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setReportCardApproval } from "@/lib/actions/reportCard";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function ApproveReportCardButton({
   studentId,
@@ -22,12 +23,14 @@ export function ApproveReportCardButton({
   function handleToggle() {
     startTransition(async () => {
       try {
-        await setReportCardApproval({
-          studentId,
-          term,
-          academicYear,
-          approved: !isApproved,
-        });
+        await unwrapAction(
+          setReportCardApproval({
+            studentId,
+            term,
+            academicYear,
+            approved: !isApproved,
+          })
+        );
         emitToast(isApproved ? "Report card unapproved." : "Report card approved and released.");
         router.refresh();
       } catch (err: any) {

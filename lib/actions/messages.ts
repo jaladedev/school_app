@@ -5,6 +5,7 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/audit";
 import { throwDbError } from "@/lib/errors/db";
+import { runAction } from "@/lib/actionResult";
 
 /**
  * Returns just the display name/role for a message-thread partner.
@@ -47,53 +48,55 @@ export async function getMessagePartners(
 }
 
 export async function sendMessage(recipientId: string, content: string) {
-  const profile = await getCurrentProfile();
-  if (!profile) {
-    throw new Error("You must be signed in to send messages.");
-  }
+  return runAction(async () => {
+    const profile = await getCurrentProfile();
+    if (!profile) {
+      throw new Error("You must be signed in to send messages.");
+    }
 
-  if (!content.trim()) {
-    throw new Error("Message can't be empty.");
-  }
+    if (!content.trim()) {
+      throw new Error("Message can't be empty.");
+    }
 
-  const supabase = createClient();
+    const supabase = createClient();
 
-  // Same RLS gap as getMessagePartner above: a student/parent sending to
-  // a teacher has no row-level access to that teacher's profiles row via
-  // the session client, so this existence/active check needs the admin
-  // client too -- it only ever reads id/is_active, never anything more
-  // sensitive, so it's exposing nothing beyond "does this id exist and
-  // is it active", which messages_insert_sender already implies anyone
-  // may need to know before sending.
-  const admin = createAdminClient();
-  const { data: recipient, error: recipientError } = await admin
-    .from("profiles")
-    .select("id, is_active")
-    .eq("id", recipientId)
-    .maybeSingle();
+    // Same RLS gap as getMessagePartner above: a student/parent sending to
+    // a teacher has no row-level access to that teacher's profiles row via
+    // the session client, so this existence/active check needs the admin
+    // client too -- it only ever reads id/is_active, never anything more
+    // sensitive, so it's exposing nothing beyond "does this id exist and
+    // is it active", which messages_insert_sender already implies anyone
+    // may need to know before sending.
+    const admin = createAdminClient();
+    const { data: recipient, error: recipientError } = await admin
+      .from("profiles")
+      .select("id, is_active")
+      .eq("id", recipientId)
+      .maybeSingle();
 
-  if (recipientError || !recipient) {
-    throw new Error("Recipient not found.");
-  }
+    if (recipientError || !recipient) {
+      throw new Error("Recipient not found.");
+    }
 
-  if (recipient.id === profile.id) {
-    throw new Error("You can't message yourself.");
-  }
+    if (recipient.id === profile.id) {
+      throw new Error("You can't message yourself.");
+    }
 
-  if (!recipient.is_active) {
-    throw new Error("That account is no longer active.");
-  }
+    if (!recipient.is_active) {
+      throw new Error("That account is no longer active.");
+    }
 
-  const { error } = await supabase.from("messages").insert({
-    sender_id: profile.id,
-    recipient_id: recipientId,
-    content: content.trim(),
+    const { error } = await supabase.from("messages").insert({
+      sender_id: profile.id,
+      recipient_id: recipientId,
+      content: content.trim(),
+    });
+
+    if (error) throwDbError(error);
+
+    revalidatePath(`/dashboard/messages/${recipientId}`);
+    revalidatePath("/dashboard/messages");
   });
-
-  if (error) throwDbError(error);
-
-  revalidatePath(`/dashboard/messages/${recipientId}`);
-  revalidatePath("/dashboard/messages");
 }
 
 export async function markThreadRead(partnerId: string) {
@@ -149,53 +152,55 @@ export async function getUnreadMessagesCount(): Promise<number> {
  * at least there's a trace if a dispute arises later.
  */
 export async function deleteConversation(partnerId: string) {
-  const profile = await getCurrentProfile();
-  if (!profile) {
-    throw new Error("You must be signed in.");
-  }
+  return runAction(async () => {
+    const profile = await getCurrentProfile();
+    if (!profile) {
+      throw new Error("You must be signed in.");
+    }
 
-  const supabase = createClient();
+    const supabase = createClient();
 
-  // Count messages before deleting so the audit entry is useful
-  const { count: messageCount } = await supabase
-    .from("messages")
-    .select("id", { count: "exact", head: true })
-    .or(
-      `and(sender_id.eq.${profile.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${profile.id})`
-    );
+    // Count messages before deleting so the audit entry is useful
+    const { count: messageCount } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .or(
+        `and(sender_id.eq.${profile.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${profile.id})`
+      );
 
-  const { error } = await supabase
-    .from("messages")
-    .delete()
-    .or(
-      `and(sender_id.eq.${profile.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${profile.id})`
-    );
+    const { error } = await supabase
+      .from("messages")
+      .delete()
+      .or(
+        `and(sender_id.eq.${profile.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${profile.id})`
+      );
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
 
-  // Clean up any archive record too, so a future conversation with the
-  // same person doesn't start out pre-archived.
-  await supabase
-    .from("conversation_archives")
-    .delete()
-    .eq("user_id", profile.id)
-    .eq("partner_id", partnerId);
+    // Clean up any archive record too, so a future conversation with the
+    // same person doesn't start out pre-archived.
+    await supabase
+      .from("conversation_archives")
+      .delete()
+      .eq("user_id", profile.id)
+      .eq("partner_id", partnerId);
 
-  // Best-effort audit trail — deletion affects both parties so admins
-  // can investigate if the other participant reports missing messages.
-  await writeAuditLog({
-    entityType: "conversation",
-    entityId: profile.id,
-    action: "conversation_deleted",
-    actorId: profile.id,
-    metadata: {
-      deleted_by: profile.id,
-      partner_id: partnerId,
-      message_count: messageCount ?? 0,
-    },
+    // Best-effort audit trail — deletion affects both parties so admins
+    // can investigate if the other participant reports missing messages.
+    await writeAuditLog({
+      entityType: "conversation",
+      entityId: profile.id,
+      action: "conversation_deleted",
+      actorId: profile.id,
+      metadata: {
+        deleted_by: profile.id,
+        partner_id: partnerId,
+        message_count: messageCount ?? 0,
+      },
+    });
+
+    revalidatePath("/dashboard/messages");
   });
-
-  revalidatePath("/dashboard/messages");
 }
 
 /**
@@ -204,37 +209,41 @@ export async function deleteConversation(partnerId: string) {
  * keep flowing and can still be read by opening the thread directly.
  */
 export async function archiveConversation(partnerId: string) {
-  const profile = await getCurrentProfile();
-  if (!profile) {
-    throw new Error("You must be signed in.");
-  }
+  return runAction(async () => {
+    const profile = await getCurrentProfile();
+    if (!profile) {
+      throw new Error("You must be signed in.");
+    }
 
-  const supabase = createClient();
+    const supabase = createClient();
 
-  const { error } = await supabase
-    .from("conversation_archives")
-    .upsert({ user_id: profile.id, partner_id: partnerId });
+    const { error } = await supabase
+      .from("conversation_archives")
+      .upsert({ user_id: profile.id, partner_id: partnerId });
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/messages");
+    revalidatePath("/dashboard/messages");
+  });
 }
 
 export async function unarchiveConversation(partnerId: string) {
-  const profile = await getCurrentProfile();
-  if (!profile) {
-    throw new Error("You must be signed in.");
-  }
+  return runAction(async () => {
+    const profile = await getCurrentProfile();
+    if (!profile) {
+      throw new Error("You must be signed in.");
+    }
 
-  const supabase = createClient();
+    const supabase = createClient();
 
-  const { error } = await supabase
-    .from("conversation_archives")
-    .delete()
-    .eq("user_id", profile.id)
-    .eq("partner_id", partnerId);
+    const { error } = await supabase
+      .from("conversation_archives")
+      .delete()
+      .eq("user_id", profile.id)
+      .eq("partner_id", partnerId);
 
-  if (error) throwDbError(error);
+    if (error) throwDbError(error);
 
-  revalidatePath("/dashboard/messages");
+    revalidatePath("/dashboard/messages");
+  });
 }

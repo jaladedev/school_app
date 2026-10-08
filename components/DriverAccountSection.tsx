@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createDriverAccount, linkDriverToVehicle } from "@/lib/actions/driverAccounts";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function DriverAccountSection({
   vehicleId,
@@ -31,12 +32,14 @@ export function DriverAccountSection({
 
     startTransition(async () => {
       try {
-        const result = await createDriverAccount({
-          fullName,
-          email,
-          phone: phone || undefined,
-          vehicleId,
-        });
+        const result = await unwrapAction(
+          createDriverAccount({
+            fullName,
+            email,
+            phone: phone || undefined,
+            vehicleId,
+          })
+        );
         setTempPassword(result.tempPassword);
         emitToast("Driver account created.");
         router.refresh();
@@ -49,7 +52,7 @@ export function DriverAccountSection({
   function handleLink() {
     startTransition(async () => {
       try {
-        await linkDriverToVehicle(vehicleId, selectedDriverId);
+        await unwrapAction(linkDriverToVehicle(vehicleId, selectedDriverId));
         emitToast("Driver linked.");
         setMode("idle");
         router.refresh();
@@ -62,7 +65,7 @@ export function DriverAccountSection({
   function handleUnlink() {
     startTransition(async () => {
       try {
-        await linkDriverToVehicle(vehicleId, null);
+        await unwrapAction(linkDriverToVehicle(vehicleId, null));
         emitToast("Driver unlinked.");
         router.refresh();
       } catch (err) {

@@ -6,6 +6,7 @@ import { deleteTopicResource } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
 import type { TopicResource } from "@/types/database";
 import type { NoteEditorHandle } from "@/components/NoteEditor";
+import { unwrapAction } from "@/lib/actionResult";
 
 const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
   image: "Image",
@@ -69,7 +70,7 @@ export function ResourceSidebar({
   function handleDelete(resourceId: string) {
     startTransition(async () => {
       try {
-        await deleteTopicResource(resourceId);
+        await unwrapAction(deleteTopicResource(resourceId));
         emitToast("Resource removed.");
         router.refresh();
       } catch (err: any) {

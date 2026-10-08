@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { reassignRouteVehicle } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function ReassignVehicleForm({
   routeId,
@@ -22,7 +23,7 @@ export function ReassignVehicleForm({
     e.preventDefault();
     startTransition(async () => {
       try {
-        await reassignRouteVehicle(routeId, vehicleId || null);
+        await unwrapAction(reassignRouteVehicle(routeId, vehicleId || null));
         emitToast("Vehicle updated.");
         router.refresh();
       } catch (err) {

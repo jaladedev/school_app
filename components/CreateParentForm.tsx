@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createParentAccount, type ParentChildLink } from "@/lib/actions/admin";
+import { unwrapAction } from "@/lib/actionResult";
 
 type StudentResult = { id: string; full_name: string; class_name: string | null };
 
@@ -79,16 +80,18 @@ export function CreateParentForm() {
 
     startTransition(async () => {
       try {
-        await createParentAccount({
-          fullName,
-          email,
-          temporaryPassword,
-          children: linkedChildren.map(({ studentId, relationship, isPrimary }) => ({
-            studentId,
-            relationship,
-            isPrimary,
-          })),
-        });
+        await unwrapAction(
+          createParentAccount({
+            fullName,
+            email,
+            temporaryPassword,
+            children: linkedChildren.map(({ studentId, relationship, isPrimary }) => ({
+              studentId,
+              relationship,
+              isPrimary,
+            })),
+          })
+        );
         setCreated(email);
         setFullName("");
         setEmail("");

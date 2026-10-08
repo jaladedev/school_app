@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { setStudentOnlinePayment } from "@/lib/actions/settings";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 /**
  * Instant-save switch (no "Save settings" needed): flips optimistically and
@@ -17,7 +18,7 @@ export function StudentPaymentToggle({ initialEnabled }: { initialEnabled: boole
     setEnabled(next);
     startTransition(async () => {
       try {
-        await setStudentOnlinePayment(next);
+        await unwrapAction(setStudentOnlinePayment(next));
         emitToast(next ? "Students can now pay online." : "Students can no longer pay online.");
       } catch (err: any) {
         setEnabled(!next);

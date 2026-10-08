@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { markStudentPickup } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
 import type { TripDirection } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 type RiderStatus = {
   studentId: string;
@@ -38,7 +39,7 @@ export function StudentPickupChecklist({
   function mark(studentId: string) {
     startTransition(async () => {
       try {
-        await markStudentPickup({ studentId, routeId, tripDate, direction, event });
+        await unwrapAction(markStudentPickup({ studentId, routeId, tripDate, direction, event }));
         router.refresh();
       } catch (err) {
         emitToast(err instanceof Error ? err.message : "Something went wrong.", "error");

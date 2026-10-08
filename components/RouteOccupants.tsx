@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { unassignStudentFromRoute } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 type Occupant = {
   id: string;
@@ -19,7 +20,7 @@ export function RouteOccupants({ occupants }: { occupants: Occupant[] }) {
   function unassign(assignmentId: string) {
     startTransition(async () => {
       try {
-        await unassignStudentFromRoute(assignmentId);
+        await unwrapAction(unassignStudentFromRoute(assignmentId));
         emitToast("Student unassigned.");
         router.refresh();
       } catch (err) {

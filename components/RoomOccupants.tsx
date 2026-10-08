@@ -10,6 +10,7 @@ import {
   recordHostelVisitorCheckOut,
 } from "@/lib/actions/hostel";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 type Occupant = { id: string; studentId: string; fullName: string; admissionNo: string | null };
 type OpenLeave = {
@@ -51,7 +52,7 @@ export function RoomOccupants({
   function unassign(assignmentId: string) {
     startTransition(async () => {
       try {
-        await unassignStudentFromRoom(assignmentId, roomId);
+        await unwrapAction(unassignStudentFromRoom(assignmentId, roomId));
         emitToast("Student unassigned.");
         router.refresh();
       } catch (err) {
@@ -63,11 +64,13 @@ export function RoomOccupants({
   function submitLeave(studentId: string) {
     startTransition(async () => {
       try {
-        await logHostelLeave({
-          studentId,
-          reason: reason || undefined,
-          expectedReturnAt: expectedReturn || undefined,
-        });
+        await unwrapAction(
+          logHostelLeave({
+            studentId,
+            reason: reason || undefined,
+            expectedReturnAt: expectedReturn || undefined,
+          })
+        );
         emitToast("Leave logged.");
         setLeaveFormFor(null);
         setReason("");
@@ -82,7 +85,7 @@ export function RoomOccupants({
   function markReturned(leaveLogId: string, studentId: string) {
     startTransition(async () => {
       try {
-        await recordHostelReturn(leaveLogId, studentId);
+        await unwrapAction(recordHostelReturn(leaveLogId, studentId));
         emitToast("Return recorded.");
         router.refresh();
       } catch (err) {
@@ -94,12 +97,14 @@ export function RoomOccupants({
   function submitVisitor(studentId: string) {
     startTransition(async () => {
       try {
-        await logHostelVisitorCheckIn({
-          studentId,
-          visitorName,
-          visitorPhone: visitorPhone || undefined,
-          purpose: visitorPurpose || undefined,
-        });
+        await unwrapAction(
+          logHostelVisitorCheckIn({
+            studentId,
+            visitorName,
+            visitorPhone: visitorPhone || undefined,
+            purpose: visitorPurpose || undefined,
+          })
+        );
         emitToast("Visitor checked in.");
         setVisitorFormFor(null);
         setVisitorName("");
@@ -115,7 +120,7 @@ export function RoomOccupants({
   function checkOutVisitor(visitorLogId: string, studentId: string) {
     startTransition(async () => {
       try {
-        await recordHostelVisitorCheckOut(visitorLogId, studentId);
+        await unwrapAction(recordHostelVisitorCheckOut(visitorLogId, studentId));
         emitToast("Visitor checked out.");
         router.refresh();
       } catch (err) {

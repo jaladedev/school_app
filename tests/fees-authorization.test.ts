@@ -42,6 +42,7 @@ import {
   sendFeeReminders,
   verifyPaystackPayment,
 } from "@/lib/actions/fees";
+import { unwrapAction } from "@/lib/actionResult";
 
 function mockAuthenticatedAs(userId: string) {
   getUserWithRetry.mockResolvedValue({
@@ -68,17 +69,18 @@ const actions: Array<{
 }> = [
   {
     name: "recordPayment",
-    call: () => recordPayment({ invoiceId: "inv-1", amountKobo: 1000, method: "cash" }),
+    call: () =>
+      unwrapAction(recordPayment({ invoiceId: "inv-1", amountKobo: 1000, method: "cash" })),
     errorMessage: "Only an admin or the bursar can manage fees.",
   },
   {
     name: "voidInvoice",
-    call: () => voidInvoice("inv-1", "duplicate invoice"),
+    call: () => unwrapAction(voidInvoice("inv-1", "duplicate invoice")),
     errorMessage: "Only an admin or the bursar can void an invoice.",
   },
   {
     name: "sendFeeReminders",
-    call: () => sendFeeReminders(),
+    call: () => unwrapAction(sendFeeReminders()),
     errorMessage: "Only an admin or the bursar can send fee reminders.",
   },
 ];
@@ -131,7 +133,9 @@ describe("authorization matrix (fees)", () => {
 
     // Confirms the bursar path clears assertCanManageFees entirely --
     // it fails afterward on "Invoice not found", never on authorization.
-    await expect(voidInvoice("inv-missing", "test")).rejects.toThrow("Invoice not found.");
+    await expect(unwrapAction(voidInvoice("inv-missing", "test"))).rejects.toThrow(
+      "Invoice not found."
+    );
   });
 });
 
@@ -149,7 +153,7 @@ describe("verifyPaystackPayment: deactivated-account edge", () => {
     ];
 
     await expect(
-      verifyPaystackPayment({ reference: "ref-999", invoiceId: "inv-1" })
+      unwrapAction(verifyPaystackPayment({ reference: "ref-999", invoiceId: "inv-1" }))
     ).rejects.toThrow("You can't pay an invoice that isn't yours.");
   });
 });

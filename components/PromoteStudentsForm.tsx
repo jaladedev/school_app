@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { promoteStudents, type PromotionOutcome } from "@/lib/actions/admin";
+import { unwrapAction } from "@/lib/actionResult";
 
 type ClassOption = { id: string; name: string; arm: string | null };
 type StudentOption = { id: string; full_name: string };
@@ -47,11 +48,13 @@ export function PromoteStudentsForm({
 
     startTransition(async () => {
       try {
-        const res = await promoteStudents({
-          studentIds: selectedStudentIds,
-          targetClassId: outcome === "graduate" ? null : targetClassId,
-          outcome,
-        });
+        const res = await unwrapAction(
+          promoteStudents({
+            studentIds: selectedStudentIds,
+            targetClassId: outcome === "graduate" ? null : targetClassId,
+            outcome,
+          })
+        );
         setResult({ succeeded: res.succeeded, failed: res.failed });
         setSelectedStudentIds([]);
         router.refresh();

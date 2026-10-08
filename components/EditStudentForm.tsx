@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateStudentAccount } from "@/lib/actions/admin";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function EditStudentForm({
   studentId,
@@ -40,15 +41,17 @@ export function EditStudentForm({
 
     startTransition(async () => {
       try {
-        await updateStudentAccount({
-          studentId,
-          fullName,
-          admissionNo: admissionNo || undefined,
-          guardianName: guardianName || undefined,
-          guardianPhone: guardianPhone || undefined,
-          classId: classId !== currentClassId ? classId : undefined,
-          gender,
-        });
+        await unwrapAction(
+          updateStudentAccount({
+            studentId,
+            fullName,
+            admissionNo: admissionNo || undefined,
+            guardianName: guardianName || undefined,
+            guardianPhone: guardianPhone || undefined,
+            classId: classId !== currentClassId ? classId : undefined,
+            gender,
+          })
+        );
         emitToast("Student updated.");
         router.refresh();
       } catch (err: any) {

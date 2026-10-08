@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { issueTestimonial } from "@/lib/actions/testimonials";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function IssueTestimonialForm({
   studentId,
@@ -28,11 +29,13 @@ export function IssueTestimonialForm({
 
     startTransition(async () => {
       try {
-        await issueTestimonial({
-          studentId,
-          conductRemark,
-          leavingAcademicYear: leavingYear,
-        });
+        await unwrapAction(
+          issueTestimonial({
+            studentId,
+            conductRemark,
+            leavingAcademicYear: leavingYear,
+          })
+        );
         emitToast("Testimonial issued.");
         router.refresh();
       } catch (err) {

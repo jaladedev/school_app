@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { returnLibraryLoan } from "@/lib/actions/library";
 import { formatKobo } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function ReturnLoanButton({ loanId }: { loanId: string }) {
   const router = useRouter();
@@ -15,7 +16,7 @@ export function ReturnLoanButton({ loanId }: { loanId: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        const outcome = await returnLibraryLoan(loanId);
+        const outcome = await unwrapAction(returnLibraryLoan(loanId));
         setResult(outcome);
         // The row is about to disappear from the active-loans list once
         // this refreshes (it's no longer "active"), so give the fine

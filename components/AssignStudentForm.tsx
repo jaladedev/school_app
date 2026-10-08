@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { StudentTypeahead, type StudentOption } from "@/components/StudentTypeahead";
 import { assignStudentToRoom, joinHostelWaitlist } from "@/lib/actions/hostel";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function AssignStudentForm({
   roomId,
@@ -37,7 +38,9 @@ export function AssignStudentForm({
 
     startTransition(async () => {
       try {
-        await assignStudentToRoom({ studentId, roomId, academicYear: academicYear.trim() });
+        await unwrapAction(
+          assignStudentToRoom({ studentId, roomId, academicYear: academicYear.trim() })
+        );
         emitToast("Student assigned.");
         setStudentId("");
         router.refresh();
@@ -52,7 +55,7 @@ export function AssignStudentForm({
   function handleJoinWaitlist() {
     startTransition(async () => {
       try {
-        await joinHostelWaitlist(studentId, hostelId);
+        await unwrapAction(joinHostelWaitlist(studentId, hostelId));
         emitToast("Added to the waitlist.");
         setError(null);
         setRoomFull(false);

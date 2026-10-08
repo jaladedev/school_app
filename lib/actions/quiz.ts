@@ -258,17 +258,19 @@ export async function updateQuizSchedule(
 // other RLS-filtered read in this app — no extra ownership check needed
 // here.
 export async function getQuizPreviewQuestions(quizId: string) {
-  await assertRole(["admin", "teacher"], "Only an admin or teacher can preview a quiz.");
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("quiz_questions")
-    .select(
-      "id, question_text, question_type, points, sequence_order, quiz_options(id, option_text, match_prompt, is_correct, sequence_order)"
-    )
-    .eq("quiz_id", quizId)
-    .order("sequence_order", { ascending: true });
-  if (error) throwDbError(error);
-  return data;
+  return runAction(async () => {
+    await assertRole(["admin", "teacher"], "Only an admin or teacher can preview a quiz.");
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("quiz_questions")
+      .select(
+        "id, question_text, question_type, points, sequence_order, quiz_options(id, option_text, match_prompt, is_correct, sequence_order)"
+      )
+      .eq("quiz_id", quizId)
+      .order("sequence_order", { ascending: true });
+    if (error) throwDbError(error);
+    return data;
+  });
 }
 
 export type QuestionAnalytics = {
@@ -508,7 +510,10 @@ async function updatePublished(quizId: string, isPublished: boolean) {
 }
 
 /** Returns failures as values -- thrown messages are redacted in production (see lib/actionResult.ts). */
-export async function setQuizPublished(quizId: string, isPublished: boolean): Promise<ActionResult> {
+export async function setQuizPublished(
+  quizId: string,
+  isPublished: boolean
+): Promise<ActionResult> {
   return runAction(() => updatePublished(quizId, isPublished));
 }
 
@@ -521,23 +526,25 @@ export async function gradeQuizEssayAnswers(
   attemptId: string,
   scores: Record<string, number>
 ) {
-  await assertRole(["admin", "teacher"], "Only an admin or teacher can do this.");
+  return runAction(async () => {
+    await assertRole(["admin", "teacher"], "Only an admin or teacher can do this.");
 
-  // Runs as the caller's own session (not the admin client) — the RPC is
-  // SECURITY DEFINER and checks auth.uid() against is_admin()/
-  // subjects_taught internally, same pattern the student-facing RPCs in
-  // quizAttempt.ts already use. It also bounds-checks each score against
-  // that question's max points (2026_08_07b) and writes its own
-  // audit_log row ('quiz_attempt' / 'quiz_essay_graded') -- don't add a
-  // second writeAuditLog call here like a previous pass did; that just
-  // produced two entries for the same grading action, one from the RPC
-  // and one from here.
-  const supabase = createClient();
-  const { error } = await supabase.rpc("grade_quiz_essay_answers", {
-    p_attempt_id: attemptId,
-    p_scores: scores,
+    // Runs as the caller's own session (not the admin client) — the RPC is
+    // SECURITY DEFINER and checks auth.uid() against is_admin()/
+    // subjects_taught internally, same pattern the student-facing RPCs in
+    // quizAttempt.ts already use. It also bounds-checks each score against
+    // that question's max points (2026_08_07b) and writes its own
+    // audit_log row ('quiz_attempt' / 'quiz_essay_graded') -- don't add a
+    // second writeAuditLog call here like a previous pass did; that just
+    // produced two entries for the same grading action, one from the RPC
+    // and one from here.
+    const supabase = createClient();
+    const { error } = await supabase.rpc("grade_quiz_essay_answers", {
+      p_attempt_id: attemptId,
+      p_scores: scores,
+    });
+    if (error) throwDbError(error);
+
+    revalidatePath(`/dashboard/teacher/quizzes/${quizId}`);
   });
-  if (error) throwDbError(error);
-
-  revalidatePath(`/dashboard/teacher/quizzes/${quizId}`);
 }

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteTopicNoteVersion } from "@/lib/actions/teacher";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function DeleteVersionButton({
   topicId,
@@ -48,7 +49,7 @@ export function DeleteVersionButton({
         onClick={() =>
           startTransition(async () => {
             try {
-              await deleteTopicNoteVersion(topicId, versionNoteId);
+              await unwrapAction(deleteTopicNoteVersion(topicId, versionNoteId));
               emitToast(`Version ${versionNumber} deleted.`);
               setConfirming(false);
               router.refresh();

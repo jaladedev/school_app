@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { submitHomework } from "@/lib/actions/homeworkSubmissions";
 import { emitToast } from "@/lib/toast";
 import type { HomeworkSubmissionStatus } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function HomeworkSubmissionUpload({
   lessonId,
@@ -30,7 +31,7 @@ export function HomeworkSubmissionUpload({
     setError(null);
     startTransition(async () => {
       try {
-        await submitHomework(lessonId, formData);
+        await unwrapAction(submitHomework(lessonId, formData));
         emitToast(existing ? "Homework resubmitted." : "Homework submitted.");
         router.refresh();
       } catch (err: any) {

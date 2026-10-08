@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { reviewHomeworkSubmission } from "@/lib/actions/homeworkSubmissions";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function HomeworkSubmissionReview({
   submissionId,
@@ -29,7 +30,7 @@ export function HomeworkSubmissionReview({
     setError(null);
     startTransition(async () => {
       try {
-        await reviewHomeworkSubmission(submissionId, value);
+        await unwrapAction(reviewHomeworkSubmission(submissionId, value));
         emitToast("Marked reviewed.");
         router.refresh();
       } catch (err: any) {

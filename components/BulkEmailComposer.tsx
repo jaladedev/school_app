@@ -9,6 +9,7 @@ import {
   type BulkEmailAudienceRole,
 } from "@/lib/actions/bulkEmail";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { unwrapAction } from "@/lib/actionResult";
 
 const ROLE_OPTIONS: { value: BulkEmailAudienceRole; label: string }[] = [
   { value: "student", label: "Students" },
@@ -96,7 +97,7 @@ export function BulkEmailComposer({
     setSendError(null);
     startSending(async () => {
       try {
-        const result = await sendBulkEmailToAudience({ audience, subject, body });
+        const result = await unwrapAction(sendBulkEmailToAudience({ audience, subject, body }));
         setSendResult({ sent: result.sent, failed: result.failed });
         setConfirming(false);
       } catch (err: any) {

@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { createStudentAccount } from "@/lib/actions/admin";
 import { createStudentSchema, fieldErrorsFrom } from "@/lib/validation";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function CreateStudentForm({
   classes,
@@ -59,7 +60,7 @@ export function CreateStudentForm({
 
     startTransition(async () => {
       try {
-        await createStudentAccount(input);
+        await unwrapAction(createStudentAccount(input));
         setCreated(email);
         setFullName("");
         setEmail("");

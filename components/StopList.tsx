@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateStop, moveStop } from "@/lib/actions/transport";
 import { emitToast } from "@/lib/toast";
+import { unwrapAction } from "@/lib/actionResult";
 
 type Stop = { id: string; name: string; sequence_order: number; approx_time: string | null };
 
@@ -23,7 +24,7 @@ export function StopList({ stops }: { stops: Stop[] }) {
   function saveEdit(stopId: string) {
     startTransition(async () => {
       try {
-        await updateStop({ stopId, name, approxTime: approxTime || undefined });
+        await unwrapAction(updateStop({ stopId, name, approxTime: approxTime || undefined }));
         emitToast("Stop updated.");
         setEditingId(null);
         router.refresh();
@@ -36,7 +37,7 @@ export function StopList({ stops }: { stops: Stop[] }) {
   function move(stopId: string, direction: "up" | "down") {
     startTransition(async () => {
       try {
-        await moveStop(stopId, direction);
+        await unwrapAction(moveStop(stopId, direction));
         router.refresh();
       } catch (err) {
         emitToast(err instanceof Error ? err.message : "Something went wrong.", "error");

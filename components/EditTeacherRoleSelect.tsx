@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateTeacherStaffRole } from "@/lib/actions/admin";
 import type { StaffRole } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 const LABELS: Record<StaffRole, string> = {
   teacher: "Teacher",
@@ -30,7 +31,7 @@ export function EditTeacherRoleSelect({
     setRole(nextRole);
     startTransition(async () => {
       try {
-        await updateTeacherStaffRole(teacherId, nextRole);
+        await unwrapAction(updateTeacherStaffRole(teacherId, nextRole));
         router.refresh();
       } catch {
         setRole(currentRole);

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { generateInvoicesForClass } from "@/lib/actions/fees";
+import { unwrapAction } from "@/lib/actionResult";
 
 export function GenerateInvoicesButton({
   feeStructureId,
@@ -23,7 +24,7 @@ export function GenerateInvoicesButton({
     setMessage(null);
     startTransition(async () => {
       try {
-        const result = await generateInvoicesForClass(feeStructureId, classId);
+        const result = await unwrapAction(generateInvoicesForClass(feeStructureId, classId));
         setMessage(
           result.created > 0
             ? `Created ${result.created} invoice(s).`

@@ -51,6 +51,7 @@ import {
   DeleteTableIcon,
 } from "@/components/TableIcons";
 import type { TopicResource } from "@/types/database";
+import { unwrapAction } from "@/lib/actionResult";
 
 const RESOURCE_TYPE_LABEL: Record<TopicResource["resource_type"], string> = {
   image: "Image",
@@ -191,7 +192,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       return { id, createdHere: false };
     }
     const creation = (async () => {
-      const note = await saveTopicNote(topicId, content, status);
+      const note = await unwrapAction(saveTopicNote(topicId, content, status));
       if (!note?.id) throw new Error("Could not create the note.");
       return note.id;
     })();
@@ -365,7 +366,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;
 
   const saveDraft = async (content: string) => {
-    await saveTopicNote(topicId, content, "draft");
+    await unwrapAction(saveTopicNote(topicId, content, "draft"));
     setLastSavedContent(content);
     setIsDirty(false);
   };
@@ -525,12 +526,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           noteId = result.id;
           if (!result.createdHere) {
             if (status === "published") {
-              const note = await saveTopicNote(topicId, content, status);
+              const note = await unwrapAction(saveTopicNote(topicId, content, status));
               if (note?.id) noteId = note.id;
             }
           }
         } else {
-          const note = await saveTopicNote(topicId, content, status);
+          const note = await unwrapAction(saveTopicNote(topicId, content, status));
           noteId = note?.id ?? currentNoteId!;
         }
         setCurrentNoteId(noteId);
@@ -570,7 +571,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     setIsSavingVideoEmbed(true);
     try {
       const savedNoteId = await ensureNoteId();
-      const resource = await createVideoEmbedResource(topicId, savedNoteId, videoUrl, videoTitle);
+      const resource = await unwrapAction(
+        createVideoEmbedResource(topicId, savedNoteId, videoUrl, videoTitle)
+      );
       setLocalResources((previous) => [...previous, resource]);
       insertResourceMarker(resource);
       setVideoUrl("");
@@ -588,7 +591,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     setIsSavingLinkPreview(true);
     try {
       const savedNoteId = await ensureNoteId();
-      const resource = await createLinkResource(topicId, savedNoteId, url);
+      const resource = await unwrapAction(createLinkResource(topicId, savedNoteId, url));
       setLocalResources((previous) => [...previous, resource]);
       insertResourceMarker(resource);
       setLinkPreviewUrl("");
