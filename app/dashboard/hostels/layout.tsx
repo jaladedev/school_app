@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { FeatureGate } from "@/components/FeatureGate";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 
 /**
@@ -15,7 +16,7 @@ export default async function HostelsLayout({ children }: { children: React.Reac
   }
 
   if (profile.role === "admin") {
-    return <>{children}</>;
+    return <FeatureGate feature="hostel">{children}</FeatureGate>;
   }
 
   if (profile.role === "teacher") {
@@ -27,7 +28,7 @@ export default async function HostelsLayout({ children }: { children: React.Reac
       .single();
 
     if (teacher?.staff_role === "house_parent") {
-      return <>{children}</>;
+      return <FeatureGate feature="hostel">{children}</FeatureGate>;
     }
   }
 

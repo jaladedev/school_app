@@ -14,7 +14,8 @@ import { runAction } from "@/lib/actionResult";
 async function assertCanManageTransport(): Promise<{ actorId: string }> {
   const { id } = await assertRole(
     ["admin", "teacher"],
-    "Only an admin or the transport officer can do this."
+    "Only an admin or the transport officer can do this.",
+    { feature: "transport" }
   );
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
@@ -41,7 +42,8 @@ async function assertCanManageTransport(): Promise<{ actorId: string }> {
 async function assertCanUpdateTrip(routeId: string): Promise<{ actorId: string }> {
   const { id } = await assertRole(
     ["admin", "teacher"],
-    "Only an admin, the transport officer, or that route's driver can do this."
+    "Only an admin, the transport officer, or that route's driver can do this.",
+    { feature: "transport" }
   );
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
@@ -83,7 +85,7 @@ export async function createVehicle(input: {
   driverPhone?: string;
 }) {
   return runAction(async () => {
-    await assertRole(["admin"], "Only an admin can add vehicles.");
+    await assertRole(["admin"], "Only an admin can add vehicles.", { feature: "transport" });
     if (!input.plateNumber.trim()) throw new Error("Plate number is required.");
     if (!Number.isInteger(input.capacity) || input.capacity < 1) {
       throw new Error("Capacity must be a whole number of at least 1.");
@@ -113,7 +115,9 @@ export async function createVehicle(input: {
  */
 export async function linkVehicleDriver(vehicleId: string, driverProfileId: string | null) {
   return runAction(async () => {
-    await assertRole(["admin"], "Only an admin can link a driver account to a vehicle.");
+    await assertRole(["admin"], "Only an admin can link a driver account to a vehicle.", {
+      feature: "transport",
+    });
     const admin = createAdminClient();
 
     if (driverProfileId) {
@@ -143,7 +147,7 @@ export async function createRoute(input: {
   vehicleId?: string;
 }) {
   return runAction(async () => {
-    await assertRole(["admin"], "Only an admin can create routes.");
+    await assertRole(["admin"], "Only an admin can create routes.", { feature: "transport" });
     if (!input.name.trim()) throw new Error("Name is required.");
 
     const admin = createAdminClient();
@@ -165,7 +169,7 @@ export async function createStop(input: {
   approxTime?: string;
 }) {
   return runAction(async () => {
-    await assertRole(["admin"], "Only an admin can add stops.");
+    await assertRole(["admin"], "Only an admin can add stops.", { feature: "transport" });
     if (!input.name.trim()) throw new Error("Stop name is required.");
 
     const admin = createAdminClient();
@@ -244,7 +248,8 @@ export async function reassignRouteVehicle(routeId: string, vehicleId: string | 
   return runAction(async () => {
     const { id: actorId } = await assertRole(
       ["admin", "teacher"],
-      "Only an admin or the transport officer can do this."
+      "Only an admin or the transport officer can do this.",
+      { feature: "transport" }
     );
     const admin = createAdminClient();
     const { data: profile } = await admin

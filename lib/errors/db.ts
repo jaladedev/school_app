@@ -66,6 +66,17 @@ export function mapDbError(
     return KNOWN_CONSTRAINTS[constraintName];
   }
 
+  // Licensing guards (license_require in the database) raise 42501 with a
+  // message written for the user; pass that through instead of the generic
+  // "no permission" text so a lapsed school learns why.
+  if (
+    error.code === "42501" &&
+    error.message &&
+    /subscription has lapsed|feature is not included/i.test(error.message)
+  ) {
+    return error.message;
+  }
+
   switch (error.code) {
     case "23505": // unique_violation
       return constraintName

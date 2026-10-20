@@ -728,7 +728,9 @@ export async function getTopicNoteDraft(
   topicId: string
 ): Promise<ActionResult<{ content: string; updatedAt: string } | null>> {
   return runAction(async () => {
-    const { id: teacherId } = await assertRole(["teacher"], "Only teachers can author notes.");
+    const { id: teacherId } = await assertRole(["teacher"], "Only teachers can author notes.", {
+      allowWhenExpired: true,
+    });
     const supabase = createClient();
     const { data } = await supabase
       .from("topic_note_drafts")
@@ -768,7 +770,11 @@ export async function clearTopicNoteDraft(topicId: string) {
  */
 export async function getTopicNoteVersionContent(noteId: string): Promise<ActionResult<string>> {
   return runAction(async () => {
-    await assertRole(["admin", "teacher"], "Only teaching staff can compare lesson plan versions.");
+    await assertRole(
+      ["admin", "teacher"],
+      "Only teaching staff can compare lesson plan versions.",
+      { allowWhenExpired: true }
+    );
     const supabase = createClient();
     const { data, error } = await supabase
       .from("topic_notes")

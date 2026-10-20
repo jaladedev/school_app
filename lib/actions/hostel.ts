@@ -17,7 +17,8 @@ import { runAction } from "@/lib/actionResult";
 async function assertCanManageRoom(roomId: string): Promise<{ actorId: string }> {
   const { id } = await assertRole(
     ["admin", "teacher"],
-    "Only an admin or that hostel's house parent can do this."
+    "Only an admin or that hostel's house parent can do this.",
+    { feature: "hostel" }
   );
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
@@ -37,7 +38,8 @@ async function assertCanManageRoom(roomId: string): Promise<{ actorId: string }>
 async function assertCanManageStudentLeave(studentId: string): Promise<{ actorId: string }> {
   const { id } = await assertRole(
     ["admin", "teacher"],
-    "Only an admin or that student's house parent can do this."
+    "Only an admin or that student's house parent can do this.",
+    { feature: "hostel" }
   );
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
@@ -66,7 +68,8 @@ async function assertCanManageStudentLeave(studentId: string): Promise<{ actorId
 async function assertCanManageHostel(hostelId: string): Promise<{ actorId: string }> {
   const { id } = await assertRole(
     ["admin", "teacher"],
-    "Only an admin or that hostel's house parent can do this."
+    "Only an admin or that hostel's house parent can do this.",
+    { feature: "hostel" }
   );
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
@@ -92,7 +95,9 @@ export async function createHostel(input: {
   capacity?: number;
 }) {
   return runAction(async () => {
-    const { id: actorId } = await assertRole(["admin"], "Only an admin can create hostels.");
+    const { id: actorId } = await assertRole(["admin"], "Only an admin can create hostels.", {
+      feature: "hostel",
+    });
     if (!input.name.trim()) throw new Error("Name is required.");
 
     const admin = createAdminClient();
@@ -126,7 +131,9 @@ export async function createHostelRoom(input: {
   capacity: number;
 }) {
   return runAction(async () => {
-    const { id: actorId } = await assertRole(["admin"], "Only an admin can create rooms.");
+    const { id: actorId } = await assertRole(["admin"], "Only an admin can create rooms.", {
+      feature: "hostel",
+    });
     if (!input.roomNumber.trim()) throw new Error("Room number is required.");
     if (!Number.isInteger(input.capacity) || input.capacity < 1) {
       throw new Error("Capacity must be a whole number of at least 1.");

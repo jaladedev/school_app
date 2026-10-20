@@ -6,7 +6,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/audit";
 import { throwDbError } from "@/lib/errors/db";
 import { runAction } from "@/lib/actionResult";
+import { assertFeature, assertLicenseWritable } from "@/lib/actions/licenseGuard";
 import type { InboxData, InboxView, ThreadMessage } from "@/lib/messagePolling";
+
+/**
+ * Messaging is an add-on, and its writes go through the service-role
+ * client or RLS-checked session client; the school must be in good
+ * standing and have the feature before any of them run.
+ */
+async function assertMessagingWritable() {
+  await assertLicenseWritable();
+  await assertFeature("messaging");
+}
 
 /**
  * Returns just the display name/role for a message-thread partner.
@@ -50,6 +61,7 @@ export async function getMessagePartners(
 
 export async function sendMessage(recipientId: string, content: string) {
   return runAction(async () => {
+    await assertMessagingWritable();
     const profile = await getCurrentProfile();
     if (!profile) {
       throw new Error("You must be signed in to send messages.");
@@ -267,6 +279,7 @@ export async function getInboxConversations(view: InboxView): Promise<InboxData 
  */
 export async function deleteConversation(partnerId: string) {
   return runAction(async () => {
+    await assertMessagingWritable();
     const profile = await getCurrentProfile();
     if (!profile) {
       throw new Error("You must be signed in.");
@@ -324,6 +337,7 @@ export async function deleteConversation(partnerId: string) {
  */
 export async function archiveConversation(partnerId: string) {
   return runAction(async () => {
+    await assertMessagingWritable();
     const profile = await getCurrentProfile();
     if (!profile) {
       throw new Error("You must be signed in.");
@@ -343,6 +357,7 @@ export async function archiveConversation(partnerId: string) {
 
 export async function unarchiveConversation(partnerId: string) {
   return runAction(async () => {
+    await assertMessagingWritable();
     const profile = await getCurrentProfile();
     if (!profile) {
       throw new Error("You must be signed in.");

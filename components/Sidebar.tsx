@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import type { UserRole, StaffRole } from "@/types/database";
 import { SignOutButton } from "@/components/SignOutButton";
 import { LiveMessagesBadge } from "@/components/LiveMessagesBadge";
+import { LICENSE_FEATURES, filterNavByFeatures, type LicenseFeature } from "@/lib/features";
 
 const NAV_BY_ROLE: Record<UserRole, { label: string; href: string }[]> = {
   student: [
@@ -112,7 +113,10 @@ const ADMIN_NAV_SECTIONS: { section: string; items: { label: string; href: strin
   },
   {
     section: "Settings",
-    items: [{ label: "Settings", href: "/dashboard/admin/settings" }],
+    items: [
+      { label: "Settings", href: "/dashboard/admin/settings" },
+      { label: "License", href: "/dashboard/admin/license" },
+    ],
   },
 ];
 
@@ -226,12 +230,15 @@ export function Sidebar({
   staffRole,
   userId,
   notificationCounts,
+  enabledFeatures = LICENSE_FEATURES,
 }: {
   role: UserRole;
   fullName: string;
   staffRole?: StaffRole | null;
   userId: string;
   notificationCounts?: NotificationCounts;
+  /** Add-ons the school may use; navigation for the rest is hidden. */
+  enabledFeatures?: readonly LicenseFeature[];
 }) {
   const counts: NotificationCounts = notificationCounts ?? {
     messages: 0,
@@ -240,7 +247,7 @@ export function Sidebar({
   };
   const serviceNav =
     role === "teacher" && staffRole ? SERVICE_NAV_BY_STAFF_ROLE[staffRole] : undefined;
-  const items =
+  const allItems =
     serviceNav ??
     (role === "teacher" && staffRole === "hod"
       ? [
@@ -248,6 +255,14 @@ export function Sidebar({
           { label: "Lesson Plan Review", href: "/dashboard/teacher/lesson-plans" },
         ]
       : NAV_BY_ROLE[role]);
+  // Hide add-ons the school hasn't bought. Because the Messages badge is
+  // rendered inside the Messages nav item, hiding that item also means the
+  // badge never mounts, so a school without messaging polls nothing.
+  const items = filterNavByFeatures(allItems, enabledFeatures);
+  const adminSections = ADMIN_NAV_SECTIONS.map((g) => ({
+    ...g,
+    items: filterNavByFeatures(g.items, enabledFeatures),
+  })).filter((g) => g.items.length > 0);
   const roleLabel = (role === "teacher" && staffRole && STAFF_ROLE_LABEL[staffRole]) || role;
   const pathname = usePathname();
   const activeHref = findActiveHref(pathname, items);
@@ -373,7 +388,7 @@ export function Sidebar({
           </div>
           <nav className="space-y-1">
             {role === "admin" ? (
-              ADMIN_NAV_SECTIONS.map((group) => {
+              adminSections.map((group) => {
                 const isOpen = openSections.has(group.section);
                 return (
                   <div key={group.section} className="mb-1.5">

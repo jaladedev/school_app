@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { FeatureGate } from "@/components/FeatureGate";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 
 export default async function LibraryLayout({ children }: { children: React.ReactNode }) {
@@ -9,7 +10,7 @@ export default async function LibraryLayout({ children }: { children: React.Reac
   }
 
   if (profile.role === "admin") {
-    return <>{children}</>;
+    return <FeatureGate feature="library">{children}</FeatureGate>;
   }
 
   if (profile.role === "teacher") {
@@ -21,7 +22,7 @@ export default async function LibraryLayout({ children }: { children: React.Reac
       .single();
 
     if (teacher?.staff_role === "librarian") {
-      return <>{children}</>;
+      return <FeatureGate feature="library">{children}</FeatureGate>;
     }
   }
 

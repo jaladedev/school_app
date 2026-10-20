@@ -9,7 +9,8 @@ import { runAction, type ActionResult } from "@/lib/actionResult";
 async function assertCanManageHostelFees(hostelId: string): Promise<{ actorId: string }> {
   const { id } = await assertRole(
     ["admin", "teacher"],
-    "Only an admin or that hostel's house parent can do this."
+    "Only an admin or that hostel's house parent can do this.",
+    { feature: "hostel" }
   );
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
@@ -101,7 +102,8 @@ export async function generateHostelInvoices(
     // the hostel-scoped part happens right after we have hostel_id.
     await assertRole(
       ["admin", "teacher"],
-      "Only an admin or that hostel's house parent can do this."
+      "Only an admin or that hostel's house parent can do this.",
+      { feature: "hostel" }
     );
 
     const admin = createAdminClient();

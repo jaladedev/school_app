@@ -41,6 +41,8 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 import { assertRole, getAuthenticatedUser } from "@/lib/actions/authGuards";
 import { TRANSIENT_AUTH_ERROR_MESSAGE } from "@/lib/authErrors";
+import { assertFeature, assertLicenseWritable } from "@/lib/actions/licenseGuard";
+import { LICENSE_EXPIRED_MESSAGE } from "@/lib/license";
 
 function mockAuthenticatedAs(userId: string) {
   getUserWithRetry.mockResolvedValue({
@@ -136,5 +138,71 @@ describe("getAuthenticatedUser", () => {
     });
 
     await expect(getAuthenticatedUser()).rejects.toThrow(TRANSIENT_AUTH_ERROR_MESSAGE);
+  });
+});
+
+describe("assertRole license check", () => {
+  const activeTeacher = { data: { role: "teacher", is_active: true }, error: null };
+
+  it("checks the license by default, so actions are read-only once it has expired", async () => {
+    mockAuthenticatedAs("user-1");
+    adminState.queue = [activeTeacher];
+
+    await assertRole(["teacher"], "Not allowed.");
+
+    expect(assertLicenseWritable).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses the call when the license has expired", async () => {
+    mockAuthenticatedAs("user-1");
+    adminState.queue = [activeTeacher];
+    vi.mocked(assertLicenseWritable).mockRejectedValueOnce(new Error(LICENSE_EXPIRED_MESSAGE));
+
+    await expect(assertRole(["teacher"], "Not allowed.")).rejects.toThrow(LICENSE_EXPIRED_MESSAGE);
+  });
+
+  it("skips the license check for call sites that opt out (reads and fee payment)", async () => {
+    mockAuthenticatedAs("user-1");
+    adminState.queue = [activeTeacher];
+
+    await assertRole(["teacher"], "Not allowed.", { allowWhenExpired: true });
+
+    expect(assertLicenseWritable).not.toHaveBeenCalled();
+  });
+
+  it("also requires the add-on when the call site names a feature", async () => {
+    mockAuthenticatedAs("user-1");
+    adminState.queue = [activeTeacher];
+
+    await assertRole(["teacher"], "Not allowed.", { feature: "transport" });
+
+    expect(assertFeature).toHaveBeenCalledWith("transport");
+  });
+
+  it("does not check any feature for core actions", async () => {
+    mockAuthenticatedAs("user-1");
+    adminState.queue = [activeTeacher];
+
+    await assertRole(["teacher"], "Not allowed.");
+
+    expect(assertFeature).not.toHaveBeenCalled();
+  });
+
+  it("refuses the call when the add-on is not in the plan", async () => {
+    mockAuthenticatedAs("user-1");
+    adminState.queue = [activeTeacher];
+    vi.mocked(assertFeature).mockRejectedValueOnce(new Error("Hostel is not included."));
+
+    await expect(assertRole(["teacher"], "Not allowed.", { feature: "hostel" })).rejects.toThrow(
+      "Hostel is not included."
+    );
+  });
+
+  it("reports a role failure before a license failure", async () => {
+    mockAuthenticatedAs("user-2");
+    adminState.queue = [{ data: { role: "student", is_active: true }, error: null }];
+
+    await expect(assertRole(["teacher"], "Not allowed.")).rejects.toThrow("Not allowed.");
+    expect(assertLicenseWritable).not.toHaveBeenCalled();
   });
 });

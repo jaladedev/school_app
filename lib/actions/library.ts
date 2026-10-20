@@ -12,7 +12,8 @@ import { runAction } from "@/lib/actionResult";
 async function assertCanManageLibrary(): Promise<{ actorId: string }> {
   const { id } = await assertRole(
     ["admin", "teacher"],
-    "Only an admin or librarian can manage the library."
+    "Only an admin or librarian can manage the library.",
+    { feature: "library" }
   );
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();

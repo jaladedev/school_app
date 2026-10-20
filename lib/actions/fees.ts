@@ -294,7 +294,9 @@ async function resolveInvoicePayer(
 
   if (link) return "guardian";
 
-  await assertRole(["admin"], "You can't pay an invoice that isn't yours.");
+  await assertRole(["admin"], "You can't pay an invoice that isn't yours.", {
+    allowWhenExpired: true,
+  });
   return "admin";
 }
 

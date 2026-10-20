@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { FeatureGate } from "@/components/FeatureGate";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 
 export default async function DriverLayout({ children }: { children: React.ReactNode }) {
@@ -9,7 +10,7 @@ export default async function DriverLayout({ children }: { children: React.React
   }
 
   if (profile.role === "admin") {
-    return <>{children}</>;
+    return <FeatureGate feature="transport">{children}</FeatureGate>;
   }
 
   if (profile.role === "teacher") {
@@ -21,7 +22,7 @@ export default async function DriverLayout({ children }: { children: React.React
       .single();
 
     if (teacher?.staff_role === "driver") {
-      return <>{children}</>;
+      return <FeatureGate feature="transport">{children}</FeatureGate>;
     }
   }
 

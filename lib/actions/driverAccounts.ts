@@ -37,7 +37,9 @@ export async function createDriverAccount(input: {
   vehicleId?: string;
 }): Promise<ActionResult<{ tempPassword: string }>> {
   return runAction(async () => {
-    await assertRole(["admin"], "Only an admin can create driver accounts.");
+    await assertRole(["admin"], "Only an admin can create driver accounts.", {
+      feature: "transport",
+    });
     if (!input.fullName.trim()) throw new Error("Name is required.");
     if (!input.email.trim()) throw new Error("Email is required.");
 
@@ -60,7 +62,7 @@ export async function createDriverAccount(input: {
       // role (bursar, librarian, transport_officer, house_parent) follows
       // the same pattern: role: "teacher" here, plus a teacher_profiles row
       // with staff_role set. assertCanUpdateTrip() in transport.ts already
-      // depends on that shape (assertRole(["admin","teacher"]) first, then
+      // depends on that shape (assertRole(["admin","teacher"], { feature: "transport" }) first, then
       // teacher_profiles.staff_role === "driver"), so without the
       // teacher_profiles row below a driver created here couldn't actually
       // do anything a driver needs to do.
@@ -116,7 +118,9 @@ export async function createDriverAccount(input: {
 
 export async function linkDriverToVehicle(vehicleId: string, driverProfileId: string | null) {
   return runAction(async () => {
-    await assertRole(["admin"], "Only an admin can link a driver to a vehicle.");
+    await assertRole(["admin"], "Only an admin can link a driver to a vehicle.", {
+      feature: "transport",
+    });
     const admin = createAdminClient();
 
     const { error } = await admin

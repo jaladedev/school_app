@@ -45,7 +45,8 @@ export async function getReportCardData(
   // practice.
   const requester = await assertRole(
     ["admin", "teacher", "parent", "student"],
-    "You must be signed in to view a report card."
+    "You must be signed in to view a report card.",
+    { allowWhenExpired: true }
   );
 
   // "Signed in, but not entitled to THIS student's report card" is a

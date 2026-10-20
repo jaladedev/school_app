@@ -259,7 +259,9 @@ export async function updateQuizSchedule(
 // here.
 export async function getQuizPreviewQuestions(quizId: string) {
   return runAction(async () => {
-    await assertRole(["admin", "teacher"], "Only an admin or teacher can preview a quiz.");
+    await assertRole(["admin", "teacher"], "Only an admin or teacher can preview a quiz.", {
+      allowWhenExpired: true,
+    });
     const supabase = createClient();
     const { data, error } = await supabase
       .from("quiz_questions")
@@ -304,7 +306,9 @@ export async function getQuizQuestionAnalytics(quizId: string): Promise<{
   totalSubmitted: number;
   questions: QuestionAnalytics[];
 }> {
-  await assertRole(["admin", "teacher"], "Only an admin or teacher can view quiz analytics.");
+  await assertRole(["admin", "teacher"], "Only an admin or teacher can view quiz analytics.", {
+    allowWhenExpired: true,
+  });
   const supabase = createClient();
 
   const { data: questions, error: qError } = await supabase

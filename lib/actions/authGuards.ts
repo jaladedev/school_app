@@ -7,6 +7,8 @@ import type { UserRole } from "@/types/database";
 import { throwDbError } from "@/lib/errors/db";
 import { TRANSIENT_AUTH_ERROR_MESSAGE } from "@/lib/authErrors";
 import { runAction } from "@/lib/actionResult";
+import { assertFeature, assertLicenseWritable } from "@/lib/actions/licenseGuard";
+import type { LicenseFeature } from "@/lib/features";
 
 /**
  * Resolves the JWT-validated current user, distinguishing a transient
@@ -47,10 +49,14 @@ export async function getAuthenticatedUser(): Promise<User> {
  * policies on `profiles` being airtight. Reading the row again here with
  * the admin client removes that dependency, and also catches deactivated
  * accounts, which a plain role check doesn't.
+ *
+ * Also refuses the call when the school's license has expired, unless
+ * options.allowWhenExpired is set (see below).
  */
 export async function assertRole(
   allowedRoles: UserRole[],
-  errorMessage: string
+  errorMessage: string,
+  options: { allowWhenExpired?: boolean; feature?: LicenseFeature } = {}
 ): Promise<{ id: string; role: UserRole }> {
   const user = await getAuthenticatedUser();
 
@@ -69,6 +75,21 @@ export async function assertRole(
 
   if (!profile || !profile.is_active || !allowedRoles.includes(profile.role)) {
     throw new Error(errorMessage);
+  }
+
+  // Default-deny once the school's license has expired (the app is
+  // read-only): every action guarded by assertRole is treated as a write
+  // unless the call site opts out with { allowWhenExpired: true }, which is
+  // only for reads and for fee payment. A new action is therefore locked
+  // out when lapsed unless someone deliberately exempts it.
+  if (!options.allowWhenExpired) {
+    await assertLicenseWritable();
+  }
+
+  // Add-on actions (transport, hostel, library, bulk email, messaging)
+  // also require the school's plan to include the feature.
+  if (options.feature) {
+    await assertFeature(options.feature);
   }
 
   return { id: user.id, role: profile.role };

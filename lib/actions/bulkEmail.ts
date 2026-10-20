@@ -24,7 +24,7 @@ type Recipient = { id: string; email: string; fullName: string };
  * own say-so.
  */
 async function assertCanSendBulkEmail() {
-  return assertRole(["admin"], "Only an admin can send bulk email.");
+  return assertRole(["admin"], "Only an admin can send bulk email.", { feature: "bulk_email" });
 }
 
 async function fetchRecipients(audience: BulkEmailAudience): Promise<Recipient[]> {

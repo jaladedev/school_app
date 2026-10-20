@@ -9,7 +9,8 @@ import { runAction, type ActionResult } from "@/lib/actionResult";
 async function assertCanManageTransportFees(): Promise<{ actorId: string }> {
   const { id } = await assertRole(
     ["admin", "teacher"],
-    "Only an admin, bursar, or transport officer can do this."
+    "Only an admin, bursar, or transport officer can do this.",
+    { feature: "transport" }
   );
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("role").eq("id", id).single();
