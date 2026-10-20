@@ -29,6 +29,23 @@ select pg_temp.assert(
      and pronamespace = 'public'::regnamespace and pg_get_functiondef(oid) like '%license_require(%') = 0,
   'fee payment functions are NOT guarded');
 
+-- A2. Functions saved with Windows (CRLF) line endings still get guarded.
+-- Rewrite one guarded function as unguarded + CRLF, as some live ones are.
+do $$
+declare v_def text;
+begin
+  v_def := pg_get_functiondef('public.return_library_book(uuid)'::regprocedure);
+  v_def := replace(v_def, E'  perform public.license_require(''library'');\n', '');
+  v_def := replace(v_def, E'\n', E'\r\n');
+  execute v_def;
+  if pg_get_functiondef('public.return_library_book(uuid)'::regprocedure) like '%license_require(%' then
+    raise exception 'ASSERT FAILED: test setup did not remove the guard';
+  end if;
+end $$;
+select pg_temp.assert(apply_license_rpc_guards() = 1, 'guard injected into a CRLF function');
+select pg_temp.assert(pg_get_functiondef('public.return_library_book(uuid)'::regprocedure) like '%license_require(''library'')%',
+  'CRLF function now guarded with its feature');
+
 -- B. Idempotent
 select pg_temp.assert(apply_license_rpc_guards() = 0, 'second guard run changes nothing');
 select pg_temp.assert(apply_license_feature_gate() = 21, 'feature gate reapplies cleanly');

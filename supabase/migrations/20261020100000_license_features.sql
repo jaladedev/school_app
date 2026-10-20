@@ -206,10 +206,12 @@ begin
         continue;
       end if;
 
+      -- The line ending is captured and reused because some live functions
+      -- were saved with Windows (CRLF) line endings.
       v_new := regexp_replace(
         v_def,
-        E'(\n)(begin)(\n)',
-        E'\\1\\2\\3  perform public.license_require(' || coalesce(quote_literal(v.feat), '') || E');\n',
+        E'(\n)(begin)(\r?\n)',
+        E'\\1\\2\\3  perform public.license_require(' || coalesce(quote_literal(v.feat), '') || E');\\3',
         1, 1, 'i'
       );
 
