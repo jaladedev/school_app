@@ -95,14 +95,14 @@ npm install
 Create a local environment file with the Supabase and Paystack values used by the app.
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_URL=your-project-url
+SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=your-paystack-public-key
+PAYSTACK_PUBLIC_KEY=your-paystack-public-key
 PAYSTACK_SECRET_KEY=your-paystack-secret-key
 ```
 
-These values come from your Supabase project in the Project Settings → API section and your Paystack dashboard settings. `PAYSTACK_SECRET_KEY` is validated on startup (`lib/env.server.ts`) and must start with `sk_`.
+These values come from your Supabase project in the Project Settings → API section and your Paystack dashboard settings. These are read when the server starts, not at build time, so one Docker image (see `Dockerfile` and `deploy/school.env.example`) can serve any school. The older `NEXT_PUBLIC_*` names for the Supabase and Paystack public values still work locally. `PAYSTACK_SECRET_KEY` is validated on startup (`lib/env.server.ts`) and must start with `sk_`.
 
 Optional — only needed if you're testing bulk email (announcements, fee reminders):
 

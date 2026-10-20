@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { checkOnlinePaymentAllowed, verifyPaystackPayment } from "@/lib/actions/fees";
-import { clientEnv } from "@/lib/env.client";
+import { getClientEnv } from "@/lib/env.client";
 import { unwrapAction } from "@/lib/actionResult";
 
 declare global {
@@ -67,7 +67,7 @@ export function PaystackPayButton({
       return;
     }
 
-    const publicKey = clientEnv.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+    const publicKey = getClientEnv().PAYSTACK_PUBLIC_KEY;
     if (!publicKey) {
       setError("Online payment isn't configured yet — please pay at the school office.");
       setLoading(false);

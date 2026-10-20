@@ -1,8 +1,14 @@
 import { z } from "zod";
 
+// Runtime configuration. These names are read from the container's environment
+// when the server starts, never inlined at build time, so one image can serve
+// any school. The NEXT_PUBLIC_* names are still accepted as a fallback so local
+// development with an existing .env.local keeps working; the production image is
+// built without them, so a container missing SUPABASE_URL fails loudly instead
+// of running against a build-time value.
 const serverEnvSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   PAYSTACK_SECRET_KEY: z
     .string()
@@ -13,8 +19,8 @@ const serverEnvSchema = z.object({
 });
 
 const parsed = serverEnvSchema.safeParse({
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  SUPABASE_URL: process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL,
+  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   PAYSTACK_SECRET_KEY: process.env.PAYSTACK_SECRET_KEY,
 });

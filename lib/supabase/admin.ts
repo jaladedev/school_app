@@ -9,7 +9,7 @@ import type { Database } from "@/types/database";
 // Next.js never inlines it into client code.
 export function createAdminClient() {
   return createSupabaseClient<Database>(
-    serverEnv.NEXT_PUBLIC_SUPABASE_URL,
+    serverEnv.SUPABASE_URL,
     serverEnv.SUPABASE_SERVICE_ROLE_KEY,
     {
       auth: { autoRefreshToken: false, persistSession: false },

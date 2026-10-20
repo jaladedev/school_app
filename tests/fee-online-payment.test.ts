@@ -20,8 +20,8 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 vi.mock("@/lib/env.server", () => ({
   serverEnv: {
-    NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
+    SUPABASE_URL: "https://test.supabase.co",
+    SUPABASE_ANON_KEY: "test-anon-key",
     SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
     PAYSTACK_SECRET_KEY: "sk_test_1234",
   },

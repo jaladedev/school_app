@@ -134,39 +134,35 @@ function handleAuthRedirect(params: {
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } });
 
-  const supabase = createServerClient(
-    edgeEnv.NEXT_PUBLIC_SUPABASE_URL,
-    edgeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      // Next.js patches the global `fetch` to route through its Data Cache
-      // layer. supabase-js's internal auth calls (getUser(), etc.) can fail
-      // against that patched fetch when run inside proxy.ts -- surfacing as
-      // a bare "fetch failed" with no useful cause, even though the exact
-      // same request succeeds from a plain Node script or from the browser.
-      // Passing an explicit fetch here that forces `cache: "no-store"`
-      // opts these specific calls out of Next's caching layer, which is
-      // the documented workaround for this failure mode.
-      global: {
-        fetch: (input: RequestInfo | URL, init?: RequestInit) =>
-          fetch(input, { ...init, cache: "no-store" }),
+  const supabase = createServerClient(edgeEnv.SUPABASE_URL, edgeEnv.SUPABASE_ANON_KEY, {
+    // Next.js patches the global `fetch` to route through its Data Cache
+    // layer. supabase-js's internal auth calls (getUser(), etc.) can fail
+    // against that patched fetch when run inside proxy.ts -- surfacing as
+    // a bare "fetch failed" with no useful cause, even though the exact
+    // same request succeeds from a plain Node script or from the browser.
+    // Passing an explicit fetch here that forces `cache: "no-store"`
+    // opts these specific calls out of Next's caching layer, which is
+    // the documented workaround for this failure mode.
+    global: {
+      fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+        fetch(input, { ...init, cache: "no-store" }),
+    },
+    cookies: {
+      get(name: string) {
+        return request.cookies.get(name)?.value;
       },
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({ name, value, ...options });
-          response = NextResponse.next({ request: { headers: request.headers } });
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({ name, value: "", ...options });
-          response = NextResponse.next({ request: { headers: request.headers } });
-          response.cookies.set({ name, value: "", ...options });
-        },
+      set(name: string, value: string, options: CookieOptions) {
+        request.cookies.set({ name, value, ...options });
+        response = NextResponse.next({ request: { headers: request.headers } });
+        response.cookies.set({ name, value, ...options });
       },
-    }
-  );
+      remove(name: string, options: CookieOptions) {
+        request.cookies.set({ name, value: "", ...options });
+        response = NextResponse.next({ request: { headers: request.headers } });
+        response.cookies.set({ name, value: "", ...options });
+      },
+    },
+  });
 
   // Same reasoning as getCurrentProfile() in lib/supabase/server.ts: a cold
   // connection right after the dev server starts (or after any idle

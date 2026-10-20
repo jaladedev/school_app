@@ -77,30 +77,24 @@ export async function loggingFetch(
 export function createClient() {
   const cookieStorePromise = cookies();
 
-  return createServerClient<Database>(
-    serverEnv.NEXT_PUBLIC_SUPABASE_URL,
-    serverEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      global: { fetch: loggingFetch },
-      cookies: {
-        async getAll() {
-          const cookieStore = await cookieStorePromise;
-          return cookieStore.getAll();
-        },
-        async setAll(cookiesToSet) {
-          try {
-            const cookieStore = await cookieStorePromise;
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Called from a Server Component — safe to ignore when
-            // middleware is refreshing sessions.
-          }
-        },
+  return createServerClient<Database>(serverEnv.SUPABASE_URL, serverEnv.SUPABASE_ANON_KEY, {
+    global: { fetch: loggingFetch },
+    cookies: {
+      async getAll() {
+        const cookieStore = await cookieStorePromise;
+        return cookieStore.getAll();
       },
-    }
-  );
+      async setAll(cookiesToSet) {
+        try {
+          const cookieStore = await cookieStorePromise;
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+        } catch {
+          // Called from a Server Component — safe to ignore when
+          // middleware is refreshing sessions.
+        }
+      },
+    },
+  });
 }
 
 // Shared by every server-side call site that needs the current user (this

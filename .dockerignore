@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.github
+.vscode
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+Dockerfile
+.dockerignore
+tests
+README.md
+all.md
+todo.md
+markdown-editor-todo.md
+supabase/.temp
