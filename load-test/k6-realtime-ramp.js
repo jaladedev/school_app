@@ -3,9 +3,10 @@
 // Messaging no longer uses Realtime (it polls), so this models parents watching a bus.
 //
 //   k6 run -e SUPABASE_URL=https://<ref>.supabase.co -e SUPABASE_ANON_KEY=<anon> \
-//          -e ROUTE_ID=<route uuid> [-e TRIP_DATE=2026-10-20] [-e DIRECTION=pickup]
+//          -e ROUTE_ID=<route uuid> [-e TRIP_DATE=2026-10-20] [-e DIRECTION=morning]
 //          [-e MAX_VUS=250] [-e HOLD_SECONDS=900] k6-realtime-ramp.js
-// Check DIRECTION's allowed values against the transport_trip_status table.
+// DIRECTION is 'morning' or 'afternoon' (the transport_trip_status check constraint and
+// the TripDirection type).
 // Needs tokens.json from get-tokens.mjs in the same folder.
 import ws from "k6/ws";
 import { check } from "k6";
@@ -20,7 +21,8 @@ const MAX_VUS = Number(__ENV.MAX_VUS || 250);
 const HOLD_SECONDS = Number(__ENV.HOLD_SECONDS || 900);
 const ROUTE_ID = __ENV.ROUTE_ID;
 const TRIP_DATE = __ENV.TRIP_DATE || new Date().toISOString().slice(0, 10);
-const DIRECTION = __ENV.DIRECTION || "pickup";
+const DIRECTION = __ENV.DIRECTION || "morning";
+if (DIRECTION !== "morning" && DIRECTION !== "afternoon") throw new Error("DIRECTION must be morning or afternoon");
 if (!ROUTE_ID) throw new Error("Set ROUTE_ID");
 
 const joinsOk = new Counter("rt_joins_ok");
@@ -53,7 +55,7 @@ export default function () {
   const wsUrl = `${SUPABASE_URL.replace("https://", "wss://")}/realtime/v1/websocket?apikey=${ANON}&vsn=1.0.0`;
   const startedAt = Date.now();
   let joined = false;
-  let failureCounted = false;
+  let failedCounted = false;
 
   const res = ws.connect(wsUrl, {}, (socket) => {
     socket.on("open", () => {
@@ -91,7 +93,7 @@ export default function () {
           joinTime.add(Date.now() - startedAt);
         } else {
           joinsFailed.add(1);
-          failureCounted = true;
+          failedCounted = true;
           console.error(`join failed VU ${__VU}: ${data.slice(0, 200)}`);
           socket.close();
         }
@@ -107,7 +109,7 @@ export default function () {
     socketsRefused.add(1);
   }
   check(res, { "websocket upgraded": (r) => r && r.status === 101 });
-  // Count a failure once per attempt: refused sockets and joins that never got a reply
-  // land here; explicit join rejections were already counted in the message handler.
-  if (!joined && !failureCounted) joinsFailed.add(1);
+  // Count a failure here only if the message handler did not already count it
+  // (a refused socket, or a join that never got a reply).
+  if (!joined && !failedCounted) joinsFailed.add(1);
 }

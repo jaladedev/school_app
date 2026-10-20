@@ -1,7 +1,7 @@
 // Tests 2 and 3: server-rendered page loads as logged-in students.
 //
 //   k6 run -e BASE_URL=https://staging.example.com -e SUPABASE_URL=https://<ref>.supabase.co \
-//          -e TOPIC_ID=<published topic id> -e SCENARIO=day|burst [-e USERS=150] [-e POLL_PATH=/dashboard/student/messages] k6-pages.js
+//          -e TOPIC_ID=<published topic id> -e SCENARIO=day|burst [-e USERS=150] [-e ARRIVAL_SECONDS=30] [-e POLL_PATH=/dashboard/student/messages] k6-pages.js
 // Needs tokens.json from get-tokens.mjs in the same folder.
 //
 // Assumes @supabase/ssr stores the session in a cookie named sb-<ref>-auth-token as
@@ -24,17 +24,20 @@ const SCENARIO = __ENV.SCENARIO || "day";
 // page load on this path every 30 s of virtual time (a slight overestimate).
 const POLL_PATH = __ENV.POLL_PATH || "/dashboard/student/messages";
 const POLL_EVERY_MS = 30000;
+const ARRIVAL_SECONDS = Number(__ENV.ARRIVAL_SECONDS || 30);
 let lastPoll = 0;
 const REF = SUPABASE_URL.replace("https://", "").split(".")[0];
 const COOKIE_NAME = `sb-${REF}-auth-token`;
 
 const scenarios = {
-  // One arrival per user, spread randomly over 30 s (class start), then done.
+  // A class-start burst: USERS people each arrive once, spread randomly over
+  // the first ARRIVAL_SECONDS (default 30), load the dashboard and the
+  // timetable, then stop. Not a sustained loop.
   burst: {
     executor: "per-vu-iterations",
     vus: USERS,
     iterations: 1,
-    maxDuration: "3m",
+    maxDuration: "5m",
   },
   day: {
     executor: "ramping-vus",
@@ -84,9 +87,10 @@ export default function () {
   const headers = { Cookie: cookieHeader(session) };
 
   if (SCENARIO === "burst") {
-    sleep(Math.random() * 30);
+    sleep(Math.random() * ARRIVAL_SECONDS);
     load("/dashboard", headers, "dashboard");
-    sleep(5);
+    sleep(2 + Math.random() * 3);
+    load("/dashboard/student/timetable", headers, "timetable");
     return;
   }
 
