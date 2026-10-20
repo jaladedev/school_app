@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Replays every repo migration on a scratch Postgres database, then runs the
-# SQL tests for licensing. Needs a throwaway Postgres you can create
+# SQL tests (licensing, and the quiz-attempt answer-key leak check). Needs a throwaway Postgres you can create
 # databases in (never point it at a real project).
 #
 #   PSQL="psql -h localhost -p 5432 -U postgres" tests/sql/run.sh
@@ -22,3 +22,5 @@ $PSQL -q -d postgres -c "drop database if exists ${DB}_unit" -c "create database
 $PSQL -q -v ON_ERROR_STOP=1 -d ${DB}_unit -f tests/sql/license.test.sql | grep -E "PASSED|ERROR" || true
 
 $PSQL -q -v ON_ERROR_STOP=1 -d $DB -f tests/sql/license-features.test.sql | grep -E "PASSED|ERROR" || true
+
+$PSQL -q -v ON_ERROR_STOP=1 -d $DB -f tests/sql/quiz-attempt-leak.test.sql | grep -E "PASSED|ERROR" || true
