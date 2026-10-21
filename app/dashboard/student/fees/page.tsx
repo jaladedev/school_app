@@ -3,6 +3,8 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { formatKobo, type InvoiceStatus, type PaymentMethod } from "@/types/database";
 import { getInvoiceStatusLabel } from "@/lib/invoiceStatus";
 import { PaystackPayButton } from "@/components/PaystackPayButton";
+import { BankTransferPanel } from "@/components/BankTransferPanel";
+import { loadPaymentOptions } from "@/lib/paymentOptions";
 import { InstallmentScheduleView } from "@/components/InstallmentScheduleView";
 import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/EmptyState";
@@ -55,6 +57,11 @@ export default async function StudentFeesPage() {
     .single();
   // Missing row/column = enabled, matching the server-side check.
   const canPayOnline = school?.student_online_payment_enabled !== false;
+
+  const paymentOptions = await loadPaymentOptions(
+    supabase,
+    (invoices ?? []).map((i) => i.id)
+  );
 
   const { data: payments } = await supabase
     .from("payments")
@@ -124,9 +131,19 @@ export default async function StudentFeesPage() {
                   amountPaidKobo={inv.amount_paid_kobo}
                 />
               )}
-              {balance > 0 && canPayOnline && (
-                <div className="mt-3">
-                  <PaystackPayButton invoiceId={inv.id} email={email} amountKobo={balance} />
+              {balance > 0 && canPayOnline && (paymentOptions.showCard || paymentOptions.bank) && (
+                <div className="mt-3 space-y-2">
+                  {paymentOptions.showCard && (
+                    <PaystackPayButton invoiceId={inv.id} email={email} amountKobo={balance} />
+                  )}
+                  {paymentOptions.bank && (
+                    <BankTransferPanel
+                      invoiceId={inv.id}
+                      balanceKobo={balance}
+                      bank={paymentOptions.bank}
+                      latestClaim={paymentOptions.latestClaimByInvoice[inv.id] ?? null}
+                    />
+                  )}
                 </div>
               )}
             </div>

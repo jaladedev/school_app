@@ -388,6 +388,11 @@ export type SchoolSettings = {
   current_term_start_date: string | null;
   library_fine_kobo_per_day: number;
   student_online_payment_enabled: boolean;
+  payment_methods: "paystack" | "transfer" | "both";
+  bank_name: string | null;
+  bank_account_name: string | null;
+  bank_account_number: string | null;
+  payment_notify_chat_id: string | null;
   grade_scale: GradeScaleEntry[];
   updated_at: string;
 };
@@ -453,6 +458,24 @@ export type Payment = {
   reference: string | null;
   verified_by: string | null;
   paid_at: string;
+};
+
+export type PaymentClaim = {
+  id: string;
+  invoice_id: string;
+  student_id: string;
+  claimed_by: string;
+  amount_kobo: number;
+  sent_on: string;
+  sender_name: string;
+  reference: string;
+  status: "pending" | "confirmed" | "rejected";
+  confirmed_amount_kobo: number | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  reject_reason: string | null;
+  payment_id: string | null;
+  created_at: string;
 };
 
 export type AuditLogEntry = {
@@ -1475,6 +1498,48 @@ export type Database = {
             columns: ["verified_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      payment_claims: {
+        Row: PaymentClaim;
+        Insert: Partial<PaymentClaim>;
+        Update: Partial<PaymentClaim>;
+        Relationships: [
+          {
+            foreignKeyName: "payment_claims_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_claims_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "student_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_claims_claimed_by_fkey";
+            columns: ["claimed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_claims_decided_by_fkey";
+            columns: ["decided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_claims_payment_id_fkey";
+            columns: ["payment_id"];
+            isOneToOne: false;
+            referencedRelation: "payments";
             referencedColumns: ["id"];
           },
         ];

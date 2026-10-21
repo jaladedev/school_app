@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { saveSchoolSettings } from "@/lib/actions/settings";
 import { emitToast } from "@/lib/toast";
 import { StudentPaymentToggle } from "@/components/StudentPaymentToggle";
+import { PaymentSettingsForm } from "@/components/PaymentSettingsForm";
 import type { GradeScaleEntry, SchoolSettings } from "@/types/database";
 import { unwrapAction } from "@/lib/actionResult";
 
@@ -197,6 +198,8 @@ export function SchoolSettingsForm({ settings }: { settings: SchoolSettings }) {
       </div>
 
       <StudentPaymentToggle initialEnabled={settings.student_online_payment_enabled ?? true} />
+
+      <PaymentSettingsForm initial={settings} />
 
       <div className="rounded-xl border border-rule bg-white p-4">
         <h2 className="mb-3 font-display text-lg font-semibold text-ink">Grade scale</h2>

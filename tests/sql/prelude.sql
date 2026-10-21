@@ -11,6 +11,9 @@ do $$ begin create role anon nologin; exception when duplicate_object then null;
 do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
 do $$ begin create role service_role nologin bypassrls; exception when duplicate_object then null; end $$;
 grant usage on schema public, auth, storage, extensions to anon, authenticated, service_role;
+-- Supabase grants new public tables to anon/authenticated/service_role by default;
+-- mirror it so a migration that forgets to revoke is caught.
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
 create function auth.role() returns text language sql stable as $$ select 'authenticated' $$;
 create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;

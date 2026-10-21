@@ -8,6 +8,7 @@ import type { EducationLevel, PaymentMethod } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
 import { computeInvoiceStatus } from "@/lib/invoiceStatus";
 import { throwDbError } from "@/lib/errors/db";
+import { recordInvoicePayment } from "@/lib/feePayments";
 import { sendGuardianReceiptCopy } from "@/lib/feeReceiptEmail";
 import { logger } from "@/lib/logger";
 import { STUDENT_PAYMENT_DISABLED_MESSAGE } from "@/lib/feeMessages";
@@ -21,8 +22,11 @@ import { runAction } from "@/lib/actionResult";
  * here used the admin client and was previously hard-locked to admin
  * only.
  */
-export async function assertCanManageFees(errorMessage: string): Promise<{ id: string }> {
-  const { id, role } = await assertRole(["admin", "teacher"], errorMessage);
+export async function assertCanManageFees(
+  errorMessage: string,
+  options: { allowWhenExpired?: boolean } = {}
+): Promise<{ id: string }> {
+  const { id, role } = await assertRole(["admin", "teacher"], errorMessage, options);
   if (role === "admin") return { id };
 
   const admin = createAdminClient();
@@ -129,38 +133,14 @@ export async function recordPayment(input: {
     const { id } = await assertCanManageFees("Only an admin or the bursar can manage fees.");
     const admin = createAdminClient();
 
-    if (input.amountKobo <= 0) {
-      throw new Error("Payment amount must be greater than zero.");
-    }
-
-    const { data: invoice } = await admin
-      .from("invoices")
-      .select("voided_at, total_amount_kobo, discount_kobo, amount_paid_kobo")
-      .eq("id", input.invoiceId)
-      .single();
-    if (!invoice) throw new Error("Invoice not found.");
-    if (invoice.voided_at)
-      throw new Error("This invoice has been voided and can't accept payments.");
-
-    const balanceKobo =
-      invoice.total_amount_kobo - invoice.discount_kobo - invoice.amount_paid_kobo;
-    if (input.amountKobo > balanceKobo) {
-      throw new Error(
-        `This payment (₦${(input.amountKobo / 100).toLocaleString("en-NG")}) is more than the ₦${(balanceKobo / 100).toLocaleString("en-NG")} still owed on this invoice.`
-      );
-    }
-
-    const { data: result, error } = await admin.rpc("record_invoice_payment", {
-      p_invoice_id: input.invoiceId,
-      p_amount_kobo: input.amountKobo,
-      p_method: input.method,
-      p_reference: input.reference?.trim() || null,
-      p_verified_by: id,
-      p_enforce_balance: true,
+    const { alreadyRecorded } = await recordInvoicePayment(admin, {
+      invoiceId: input.invoiceId,
+      amountKobo: input.amountKobo,
+      method: input.method,
+      reference: input.reference,
+      verifiedBy: id,
     });
-
-    if (error) throwDbError(error);
-    if (result?.[0]?.already_recorded) {
+    if (alreadyRecorded) {
       throw new Error("A payment with this reference has already been recorded.");
     }
 

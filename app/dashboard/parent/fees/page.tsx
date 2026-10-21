@@ -6,6 +6,8 @@ import { ChildSwitcher } from "@/components/ChildSwitcher";
 import { EmptyState } from "@/components/EmptyState";
 import { InstallmentScheduleView } from "@/components/InstallmentScheduleView";
 import { PaystackPayButton } from "@/components/PaystackPayButton";
+import { BankTransferPanel } from "@/components/BankTransferPanel";
+import { loadPaymentOptions } from "@/lib/paymentOptions";
 import { formatKobo, type InvoiceStatus, type PaymentMethod } from "@/types/database";
 import { getInvoiceStatusLabel } from "@/lib/invoiceStatus";
 
@@ -59,6 +61,11 @@ export default async function ParentFeesPage({
     .is("voided_at", null)
     .order("created_at", { ascending: false })
     .order("sequence_order", { foreignTable: "invoice_installments", ascending: true });
+
+  const paymentOptions = await loadPaymentOptions(
+    supabase,
+    (invoices ?? []).map((i) => i.id)
+  );
 
   const { data: payments } = await supabase
     .from("payments")
@@ -129,9 +136,19 @@ export default async function ParentFeesPage({
                   amountPaidKobo={inv.amount_paid_kobo}
                 />
               )}
-              {balance > 0 && (
-                <div className="mt-3">
-                  <PaystackPayButton invoiceId={inv.id} email={email} amountKobo={balance} />
+              {balance > 0 && (paymentOptions.showCard || paymentOptions.bank) && (
+                <div className="mt-3 space-y-2">
+                  {paymentOptions.showCard && (
+                    <PaystackPayButton invoiceId={inv.id} email={email} amountKobo={balance} />
+                  )}
+                  {paymentOptions.bank && (
+                    <BankTransferPanel
+                      invoiceId={inv.id}
+                      balanceKobo={balance}
+                      bank={paymentOptions.bank}
+                      latestClaim={paymentOptions.latestClaimByInvoice[inv.id] ?? null}
+                    />
+                  )}
                 </div>
               )}
             </div>

@@ -92,7 +92,10 @@ const ADMIN_NAV_SECTIONS: { section: string; items: { label: string; href: strin
   },
   {
     section: "Fees",
-    items: [{ label: "Fees", href: "/dashboard/admin/fees" }],
+    items: [
+      { label: "Fees", href: "/dashboard/admin/fees" },
+      { label: "Payment claims", href: "/dashboard/bursar/payment-claims" },
+    ],
   },
   {
     section: "Facilities",
@@ -137,6 +140,7 @@ const BURSAR_NAV: { label: string; href: string }[] = [
   { label: "Bursary", href: "/dashboard/bursar" },
   { label: "Fee structures", href: "/dashboard/bursar/structures" },
   { label: "Invoices & payments", href: "/dashboard/bursar/invoices" },
+  { label: "Payment claims", href: "/dashboard/bursar/payment-claims" },
   { label: "Payment history", href: "/dashboard/bursar/payments" },
   { label: "Messages", href: "/dashboard/messages" },
   { label: "Announcements", href: "/dashboard/announcements" },

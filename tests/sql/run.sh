@@ -21,6 +21,10 @@ done
 $PSQL -q -d postgres -c "drop database if exists ${DB}_unit" -c "create database ${DB}_unit"
 $PSQL -q -v ON_ERROR_STOP=1 -d ${DB}_unit -f tests/sql/license.test.sql | grep -E "PASSED|ERROR" || true
 
+# Runs before the tests below: they grant table privileges to authenticated
+# on this same database, which would hide a missing revoke here.
+$PSQL -q -v ON_ERROR_STOP=1 -d $DB -f tests/sql/payment-claims.test.sql | grep -E "PASSED|ERROR" || true
+
 $PSQL -q -v ON_ERROR_STOP=1 -d $DB -f tests/sql/license-features.test.sql | grep -E "PASSED|ERROR" || true
 
 $PSQL -q -v ON_ERROR_STOP=1 -d $DB -f tests/sql/quiz-attempt-leak.test.sql | grep -E "PASSED|ERROR" || true
