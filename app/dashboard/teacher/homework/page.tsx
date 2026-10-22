@@ -1,6 +1,6 @@
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { HOMEWORK_SUBMISSION_BUCKET } from "@/lib/storageBuckets";
+import { createSignedUrls } from "@/lib/storage";
 import { HomeworkStatusToggle } from "@/components/HomeworkStatusToggle";
 import { HomeworkSubmissionReview } from "@/components/HomeworkSubmissionReview";
 import { GiveHomeworkForm } from "@/components/GiveHomeworkForm";
@@ -105,19 +105,12 @@ export default async function TeacherHomeworkPage() {
   const reviewedCount = (lessons ?? []).filter((l) => l.homework_status === "reviewed").length;
   const overdueCount = (lessons ?? []).filter((l) => isUrgentlyOverdue(l)).length;
 
-  const admin = createAdminClient();
-  const signedUrlByPath = new Map<string, string>();
   const allPaths = (lessons ?? []).flatMap(
     (l) => l.homework_submissions?.map((s) => s.file_url) ?? []
   );
-  if (allPaths.length) {
-    const { data: signed } = await admin.storage
-      .from(HOMEWORK_SUBMISSION_BUCKET)
-      .createSignedUrls(allPaths, 60 * 60);
-    signed?.forEach((s) => {
-      if (s.signedUrl && s.path) signedUrlByPath.set(s.path, s.signedUrl);
-    });
-  }
+  const signedUrlByPath = allPaths.length
+    ? await createSignedUrls(HOMEWORK_SUBMISSION_BUCKET, allPaths, 60 * 60)
+    : new Map<string, string>();
 
   return (
     <div className="max-w-2xl">

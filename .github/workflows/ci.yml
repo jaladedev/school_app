@@ -27,6 +27,10 @@ jobs:
       # talk to real Paystack — CI only needs the build to compile.
       PAYSTACK_PUBLIC_KEY: pk_test_ci-placeholder-0000000000000
       PAYSTACK_SECRET_KEY: sk_test_ci-placeholder-0000000000000000
+      R2_ENDPOINT: https://ci-placeholder.r2.cloudflarestorage.com
+      R2_BUCKET: ci-placeholder-bucket
+      R2_ACCESS_KEY_ID: ci-placeholder-access-key
+      R2_SECRET_ACCESS_KEY: ci-placeholder-secret-key
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

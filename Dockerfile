@@ -24,7 +24,11 @@ ENV SUPABASE_URL=https://build.invalid \
     SUPABASE_ANON_KEY=build-placeholder \
     SUPABASE_SERVICE_ROLE_KEY=build-placeholder \
     PAYSTACK_PUBLIC_KEY=pk_test_build_placeholder \
-    PAYSTACK_SECRET_KEY=sk_test_build_placeholder
+    PAYSTACK_SECRET_KEY=sk_test_build_placeholder \
+    R2_ENDPOINT=https://build.invalid \
+    R2_BUCKET=build-placeholder \
+    R2_ACCESS_KEY_ID=build-placeholder \
+    R2_SECRET_ACCESS_KEY=build-placeholder
 RUN npm run build
 
 FROM node:22-alpine AS runner

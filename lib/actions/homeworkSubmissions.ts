@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { HOMEWORK_SUBMISSION_BUCKET } from "@/lib/storageBuckets";
+import { removeObjects, uploadObject } from "@/lib/storage";
 import { throwDbError } from "@/lib/errors/db";
 import { runAction } from "@/lib/actionResult";
 
@@ -46,13 +47,6 @@ export async function submitHomework(lessonId: string, formData: FormData) {
     }
 
     const admin = createAdminClient();
-    const { error: bucketError } = await admin.storage.createBucket(HOMEWORK_SUBMISSION_BUCKET, {
-      public: false,
-      fileSizeLimit: `${MAX_SUBMISSION_BYTES}`,
-      allowedMimeTypes: [...ALLOWED_SUBMISSION_TYPES],
-    });
-    if (bucketError && !/already exists/i.test(bucketError.message)) throwDbError(bucketError);
-
     // If a pending (not-yet-reviewed) submission already exists, remove its
     // old file before replacing — resubmission is allowed up until review.
     const { data: existing } = await admin
@@ -73,10 +67,7 @@ export async function submitHomework(lessonId: string, formData: FormData) {
         ?.replace(/[^a-z0-9]/gi, "") || "file";
     const objectPath = `${lessonId}/${studentId}/${crypto.randomUUID()}.${extension}`;
 
-    const { error: uploadError } = await admin.storage
-      .from(HOMEWORK_SUBMISSION_BUCKET)
-      .upload(objectPath, file, { contentType: file.type });
-    if (uploadError) throwDbError(uploadError);
+    await uploadObject(HOMEWORK_SUBMISSION_BUCKET, objectPath, file);
 
     if (existing) {
       const { error: updateError } = await admin
@@ -88,11 +79,11 @@ export async function submitHomework(lessonId: string, formData: FormData) {
         })
         .eq("id", existing.id);
       if (updateError) {
-        await admin.storage.from(HOMEWORK_SUBMISSION_BUCKET).remove([objectPath]);
+        await removeObjects(HOMEWORK_SUBMISSION_BUCKET, [objectPath]);
         throwDbError(updateError);
       }
       // Best-effort cleanup of the previous file; not fatal if it fails.
-      await admin.storage.from(HOMEWORK_SUBMISSION_BUCKET).remove([existing.file_url]);
+      await removeObjects(HOMEWORK_SUBMISSION_BUCKET, [existing.file_url]);
     } else {
       const { error: insertError } = await admin.from("homework_submissions").insert({
         lesson_id: lessonId,
@@ -101,7 +92,7 @@ export async function submitHomework(lessonId: string, formData: FormData) {
         file_name: file.name,
       });
       if (insertError) {
-        await admin.storage.from(HOMEWORK_SUBMISSION_BUCKET).remove([objectPath]);
+        await removeObjects(HOMEWORK_SUBMISSION_BUCKET, [objectPath]);
         throwDbError(insertError);
       }
     }

@@ -16,6 +16,12 @@ const serverEnvSchema = z.object({
     .refine((k) => k.startsWith("sk_"), {
       message: "PAYSTACK_SECRET_KEY should start with 'sk_'.",
     }),
+  // This school's Cloudflare R2 bucket for uploaded files (lib/storage.ts).
+  // R2_ENDPOINT is the account endpoint, without the bucket name.
+  R2_ENDPOINT: z.string().url(),
+  R2_BUCKET: z.string().min(1),
+  R2_ACCESS_KEY_ID: z.string().min(1),
+  R2_SECRET_ACCESS_KEY: z.string().min(1),
 });
 
 const parsed = serverEnvSchema.safeParse({
@@ -23,6 +29,10 @@ const parsed = serverEnvSchema.safeParse({
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   PAYSTACK_SECRET_KEY: process.env.PAYSTACK_SECRET_KEY,
+  R2_ENDPOINT: process.env.R2_ENDPOINT,
+  R2_BUCKET: process.env.R2_BUCKET,
+  R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
+  R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
 });
 
 if (!parsed.success) {

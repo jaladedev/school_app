@@ -9,14 +9,30 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const version = process.env.IMAGE_TAG || "dev";
-  try {
-    await import("@/lib/env.server");
-    await import("@/lib/env.edge");
-    const { readPublicConfigFromEnv } = await import("@/lib/env.client");
-    readPublicConfigFromEnv();
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Invalid environment configuration.";
-    return NextResponse.json({ ok: false, version, error: message }, { status: 503 });
+  // Check every configuration module (not just the first to fail) so one
+  // failed deploy lists all the missing values at once.
+  const checks = [
+    async () => {
+      await import("@/lib/env.server");
+    },
+    async () => {
+      await import("@/lib/env.edge");
+    },
+    async () => {
+      const { readPublicConfigFromEnv } = await import("@/lib/env.client");
+      readPublicConfigFromEnv();
+    },
+  ];
+  const problems: string[] = [];
+  for (const check of checks) {
+    try {
+      await check();
+    } catch (err) {
+      problems.push(err instanceof Error ? err.message : "Invalid environment configuration.");
+    }
+  }
+  if (problems.length > 0) {
+    return NextResponse.json({ ok: false, version, error: problems.join("\n") }, { status: 503 });
   }
   return NextResponse.json({ ok: true, version });
 }

@@ -3,8 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { EditStudentForm } from "@/components/EditStudentForm";
 import { StudentPhotoUpload } from "@/components/StudentPhotoUpload";
 import { formatLevel } from "@/types/database";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { STUDENT_PHOTO_BUCKET } from "@/lib/storageBuckets";
+import { createSignedUrl } from "@/lib/storage";
 
 export default async function StudentInfoPage({
   params,
@@ -33,11 +33,9 @@ export default async function StudentInfoPage({
   const profile = student?.profiles;
   const cls = student?.classes;
   const photoPath = profile?.avatar_url;
-  const { data: signedPhoto } = photoPath
-    ? await createAdminClient()
-        .storage.from(STUDENT_PHOTO_BUCKET)
-        .createSignedUrl(photoPath, 60 * 60)
-    : { data: null };
+  const signedPhotoUrl = photoPath
+    ? await createSignedUrl(STUDENT_PHOTO_BUCKET, photoPath, 60 * 60)
+    : null;
 
   return (
     <div>
@@ -74,7 +72,7 @@ export default async function StudentInfoPage({
           <StudentPhotoUpload
             studentId={resolvedParams.studentId}
             fullName={profile?.full_name ?? "Student"}
-            photoUrl={signedPhoto?.signedUrl ?? null}
+            photoUrl={signedPhotoUrl}
           />
           <EditStudentForm
             studentId={resolvedParams.studentId}

@@ -1,24 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { IdCardBatch, type IdCardData } from "@/components/IdCardBatch";
 import { formatLevel, STAFF_ROLE_LABELS, type StaffRole } from "@/types/database";
 import { STUDENT_PHOTO_BUCKET } from "@/lib/storageBuckets";
+import { createSignedUrls } from "@/lib/storage";
 
 async function signStudentPhotos(paths: (string | null)[]): Promise<Map<string, string>> {
-  const admin = createAdminClient();
-  const distinctPaths = [...new Set(paths.filter((p): p is string => !!p))];
-  const urlByPath = new Map<string, string>();
-
-  await Promise.all(
-    distinctPaths.map(async (path) => {
-      const { data } = await admin.storage
-        .from(STUDENT_PHOTO_BUCKET)
-        .createSignedUrl(path, 60 * 60);
-      if (data?.signedUrl) urlByPath.set(path, data.signedUrl);
-    })
+  return createSignedUrls(
+    STUDENT_PHOTO_BUCKET,
+    paths.filter((p): p is string => !!p),
+    60 * 60
   );
-
-  return urlByPath;
 }
 
 export default async function IdCardsPrintPage({

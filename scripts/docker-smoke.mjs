@@ -81,6 +81,10 @@ function baseEnv(school, mock) {
     SUPABASE_SERVICE_ROLE_KEY: `service-${school}`,
     PAYSTACK_PUBLIC_KEY: `pk_test_${school}`,
     PAYSTACK_SECRET_KEY: `sk_test_${school}`,
+    R2_ENDPOINT: `https://${school}.r2.example.test`,
+    R2_BUCKET: `bucket-${school}`,
+    R2_ACCESS_KEY_ID: `r2-key-${school}`,
+    R2_SECRET_ACCESS_KEY: `r2-secret-${school}`,
   };
 }
 
@@ -238,13 +242,19 @@ async function main() {
     if (!LOCAL) await checkDockerHealthcheck(a);
 
     // Incomplete environment: the container must say so instead of serving.
-    const { PAYSTACK_PUBLIC_KEY: _omit, ...incomplete } = baseEnv("c", mockA);
+    const {
+      PAYSTACK_PUBLIC_KEY: _omit,
+      R2_SECRET_ACCESS_KEY: _omitR2,
+      ...incomplete
+    } = baseEnv("c", mockA);
     const c = await startApp("c-incomplete", incomplete);
     const res = await waitForHealth(c);
     const text = await res.text();
     check(
-      "incomplete env: /api/health is 503 and names PAYSTACK_PUBLIC_KEY",
-      res.status === 503 && text.includes("PAYSTACK_PUBLIC_KEY"),
+      "incomplete env: /api/health is 503 and names the missing keys",
+      res.status === 503 &&
+        text.includes("PAYSTACK_PUBLIC_KEY") &&
+        text.includes("R2_SECRET_ACCESS_KEY"),
       `status ${res.status}, body ${text.slice(0, 300)}`
     );
   } catch (err) {

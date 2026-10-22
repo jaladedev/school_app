@@ -8,6 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { videoEmbedUrl } from "@/lib/video-embed";
 import { fetchLinkMetadata } from "@/lib/linkPreview";
 import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
+import { createSignedUrl, removeObjects, uploadObject } from "@/lib/storage";
 import type {
   AssessmentType,
   AttendanceStatus,
@@ -966,7 +967,7 @@ export async function deleteTopicNoteVersion(topicId: string, versionNoteId: str
       if (toHardDelete.length > 0) {
         const filePaths = toHardDelete.map((r) => r.file_url).filter((p): p is string => !!p);
         if (filePaths.length) {
-          await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove(filePaths);
+          await removeObjects(TOPIC_RESOURCE_BUCKET, filePaths);
         }
         const { error: cleanupError } = await admin
           .from("topic_resources")
@@ -1031,12 +1032,6 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
     await assertTeacherOwnsTopic(supabase, teacherId, topicId);
 
     const admin = createAdminClient();
-    const { error: bucketError } = await admin.storage.createBucket(TOPIC_RESOURCE_BUCKET, {
-      public: false,
-      fileSizeLimit: `${MAX_TOPIC_RESOURCE_BYTES}`,
-      allowedMimeTypes: [...RESOURCE_TYPES.keys()],
-    });
-    if (bucketError && !/already exists/i.test(bucketError.message)) throwDbError(bucketError);
 
     const extension =
       file.name
@@ -1044,12 +1039,7 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
         .pop()
         ?.replace(/[^a-z0-9]/gi, "") || "file";
     const objectPath = `${topicId}/${crypto.randomUUID()}.${extension}`;
-    const { error: uploadError } = await admin.storage
-      .from(TOPIC_RESOURCE_BUCKET)
-      .upload(objectPath, file, {
-        contentType: file.type,
-      });
-    if (uploadError) throwDbError(uploadError);
+    await uploadObject(TOPIC_RESOURCE_BUCKET, objectPath, file);
 
     const { data: latestResource } = await admin
       .from("topic_resources")
@@ -1072,7 +1062,7 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
       .select()
       .single();
     if (insertError) {
-      await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([objectPath]);
+      await removeObjects(TOPIC_RESOURCE_BUCKET, [objectPath]);
       throwDbError(insertError);
     }
 
@@ -1086,10 +1076,8 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
     // so an unsigned path here shows as a broken image the instant the
     // upload finishes. Sign it before handing it back, same as every
     // read path (student topic page, id-card printing) already does.
-    const { data: signed } = await admin.storage
-      .from(TOPIC_RESOURCE_BUCKET)
-      .createSignedUrl(objectPath, 6 * 60 * 60);
-    return { ...inserted, file_url: signed?.signedUrl ?? inserted.file_url };
+    const signedUrl = await createSignedUrl(TOPIC_RESOURCE_BUCKET, objectPath, 6 * 60 * 60);
+    return { ...inserted, file_url: signedUrl ?? inserted.file_url };
   });
 }
 
@@ -1376,10 +1364,7 @@ export async function updateTopicResource(resourceId: string, formData: FormData
           .pop()
           ?.replace(/[^a-z0-9]/gi, "") || "file";
       newObjectPath = `${existing.topic_id}/${crypto.randomUUID()}.${extension}`;
-      const { error: uploadError } = await admin.storage
-        .from(TOPIC_RESOURCE_BUCKET)
-        .upload(newObjectPath, file, { contentType: file.type });
-      if (uploadError) throwDbError(uploadError);
+      await uploadObject(TOPIC_RESOURCE_BUCKET, newObjectPath, file);
 
       update.resource_type = resourceType;
       update.file_url = newObjectPath;
@@ -1404,7 +1389,7 @@ export async function updateTopicResource(resourceId: string, formData: FormData
     if (error) {
       // Roll back the just-uploaded replacement file if the row update
       // failed, same cleanup-on-failure pattern uploadTopicResource uses.
-      if (newObjectPath) await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([newObjectPath]);
+      if (newObjectPath) await removeObjects(TOPIC_RESOURCE_BUCKET, [newObjectPath]);
       throwDbError(error);
     }
 
@@ -1412,7 +1397,7 @@ export async function updateTopicResource(resourceId: string, formData: FormData
     // at the new one -- removing it earlier would leave a broken resource
     // if the update itself failed.
     if (newObjectPath && existing.file_url) {
-      await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([existing.file_url]);
+      await removeObjects(TOPIC_RESOURCE_BUCKET, [existing.file_url]);
     }
 
     revalidatePath(`/dashboard/teacher/notes/${existing.topic_id}`);
@@ -1423,10 +1408,8 @@ export async function updateTopicResource(resourceId: string, formData: FormData
     // view immediately, so a replaced file needs a fetchable URL, not the
     // raw private-bucket object path.
     if (newObjectPath) {
-      const { data: signed } = await admin.storage
-        .from(TOPIC_RESOURCE_BUCKET)
-        .createSignedUrl(newObjectPath, 6 * 60 * 60);
-      return { ...resource, file_url: signed?.signedUrl ?? resource.file_url };
+      const signedUrl = await createSignedUrl(TOPIC_RESOURCE_BUCKET, newObjectPath, 6 * 60 * 60);
+      return { ...resource, file_url: signedUrl ?? resource.file_url };
     }
 
     return resource;
@@ -1457,7 +1440,7 @@ export async function deleteTopicResource(resourceId: string) {
     // null) — only image/pdf/audio/video have an actual storage object to
     // clean up.
     if (resource.file_url) {
-      await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([resource.file_url]);
+      await removeObjects(TOPIC_RESOURCE_BUCKET, [resource.file_url]);
     }
 
     const { error: deleteError } = await admin

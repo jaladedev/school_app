@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole } from "@/lib/actions/authGuards";
 import { writeAuditLog } from "@/lib/audit";
 import { STUDENT_PHOTO_BUCKET } from "@/lib/storageBuckets";
+import { removeObjects, uploadObject } from "@/lib/storage";
 import type { StaffRole } from "@/types/database";
 import { throwDbError } from "@/lib/errors/db";
 import { runAction, type ActionResult } from "@/lib/actionResult";
@@ -613,18 +614,6 @@ export async function updateStudentAccount(input: {
 const MAX_STUDENT_PHOTO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_STUDENT_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-async function ensureStudentPhotoBucket(admin: ReturnType<typeof createAdminClient>) {
-  const { error } = await admin.storage.createBucket(STUDENT_PHOTO_BUCKET, {
-    public: false,
-    fileSizeLimit: `${MAX_STUDENT_PHOTO_BYTES}`,
-    allowedMimeTypes: [...ALLOWED_STUDENT_PHOTO_TYPES],
-  });
-
-  if (error && !/already exists/i.test(error.message)) {
-    throw new Error(`Could not prepare student photo storage: ${error.message}`);
-  }
-}
-
 export async function uploadStudentPhoto(studentId: string, formData: FormData) {
   return runAction(async () => {
     await assertRole(["admin"], "Only an admin can upload student photos.");
@@ -637,8 +626,6 @@ export async function uploadStudentPhoto(studentId: string, formData: FormData) 
     if (photo.size > MAX_STUDENT_PHOTO_BYTES) throw new Error("The photo must be 5 MB or smaller.");
 
     const admin = createAdminClient();
-    await ensureStudentPhotoBucket(admin);
-
     const { data: profile, error: profileReadError } = await admin
       .from("profiles")
       .select("avatar_url")
@@ -649,14 +636,7 @@ export async function uploadStudentPhoto(studentId: string, formData: FormData) 
 
     const extension = photo.type === "image/jpeg" ? "jpg" : photo.type.split("/")[1];
     const objectPath = `${studentId}/profile.${extension}`;
-    const { error: uploadError } = await admin.storage
-      .from(STUDENT_PHOTO_BUCKET)
-      .upload(objectPath, photo, {
-        contentType: photo.type,
-        upsert: true,
-      });
-
-    if (uploadError) throwDbError(uploadError);
+    await uploadObject(STUDENT_PHOTO_BUCKET, objectPath, photo);
 
     const { error: updateError } = await admin
       .from("profiles")
@@ -664,12 +644,12 @@ export async function uploadStudentPhoto(studentId: string, formData: FormData) 
       .eq("id", studentId);
 
     if (updateError) {
-      await admin.storage.from(STUDENT_PHOTO_BUCKET).remove([objectPath]);
+      await removeObjects(STUDENT_PHOTO_BUCKET, [objectPath]);
       throwDbError(updateError);
     }
 
     if (profile.avatar_url && profile.avatar_url !== objectPath) {
-      await admin.storage.from(STUDENT_PHOTO_BUCKET).remove([profile.avatar_url]);
+      await removeObjects(STUDENT_PHOTO_BUCKET, [profile.avatar_url]);
     }
 
     revalidatePath(`/dashboard/admin/students/${studentId}`);

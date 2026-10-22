@@ -14,6 +14,14 @@ const nextConfig = {
         protocol: "https",
         hostname: "*.supabase.co",
       },
+      // Signed links to files in a school's R2 bucket. The account id is part
+      // of the host and differs per school, and one image serves every school,
+      // so the host cannot be listed at build time. "**." also covers
+      // jurisdiction hosts such as <id>.eu.r2.cloudflarestorage.com.
+      {
+        protocol: "https",
+        hostname: "**.r2.cloudflarestorage.com",
+      },
     ],
   },
 };
