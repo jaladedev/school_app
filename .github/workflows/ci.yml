@@ -49,5 +49,97 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Unit tests
+        run: npm test
+
       - name: Production build
         run: npm run build
+
+  sql-tests:
+    name: SQL tests (migrations and licensing)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgres
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Replays every migration on a throwaway database, then runs the SQL
+      # suites. The script exits non-zero if any suite fails.
+      - name: Run SQL tests
+        run: PSQL="psql -h localhost -U postgres" bash tests/sql/run.sh
+
+  docker-smoke:
+    name: Container image smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # The image is built without any school's credentials. IMAGE_TAG is the
+      # commit, which is what /api/health reports as the app version.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: school-app:smoke
+          build-args: IMAGE_TAG=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run smoke test
+        run: node scripts/docker-smoke.mjs --image school-app:smoke --tag ${{ github.sha }}
+
+  publish-image:
+    name: Publish image
+    # Built once per commit on main, only after the other jobs pass. Nothing
+    # deploys from this: the control plane deploys a chosen tag per school.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [quality, sql-tests, docker-smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          build-args: IMAGE_TAG=${{ github.sha }}
+          cache-from: type=gha
