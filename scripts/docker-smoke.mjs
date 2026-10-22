@@ -12,6 +12,9 @@
  *   4. A container with a missing key returns 503 from /api/health and names
  *      the key (so a bad deploy fails its health check and rolls back).
  *   5. (Docker only) the HEALTHCHECK in the Dockerfile reports healthy.
+ *   6. Read-only support sessions: middleware logs every page request (even
+ *      ones claiming to be prefetches), ends an expired session and clears
+ *      its cookies, and leaves ordinary admins alone.
  *
  * Usage:
  *   node scripts/docker-smoke.mjs --image school-app:smoke --tag <git sha>
@@ -59,19 +62,42 @@ function freePort() {
 async function startMock() {
   const port = await freePort();
   const seen = [];
+  // Set mock.authUser to make /auth/v1/user succeed as that user.
+  const mock = { port, seen, authUser: null };
   const server = http.createServer((req, res) => {
-    seen.push({ method: req.method, url: req.url, apikey: req.headers["apikey"] });
-    res.setHeader("content-type", "application/json");
-    if (req.url?.startsWith("/auth/v1/")) {
-      res.statusCode = 401;
-      res.end(JSON.stringify({ code: 401, msg: "invalid JWT" }));
-      return;
-    }
-    res.statusCode = 404;
-    res.end("{}");
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      seen.push({
+        method: req.method,
+        url: req.url,
+        apikey: req.headers["apikey"],
+        body: Buffer.concat(chunks).toString(),
+      });
+      res.setHeader("content-type", "application/json");
+      if (req.url?.startsWith("/auth/v1/user") && mock.authUser) {
+        res.statusCode = 200;
+        res.end(JSON.stringify(mock.authUser));
+      } else if (req.url?.startsWith("/auth/v1/logout")) {
+        res.statusCode = 204;
+        res.end();
+      } else if (req.url?.startsWith("/auth/v1/")) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ code: 401, msg: "invalid JWT" }));
+      } else if (req.url?.startsWith("/rest/v1/profiles")) {
+        res.end(JSON.stringify({ is_active: true, must_change_password: false }));
+      } else if (req.url?.startsWith("/rest/v1/rpc/log_impersonation_event")) {
+        res.statusCode = 204;
+        res.end();
+      } else {
+        res.statusCode = 404;
+        res.end("{}");
+      }
+    });
   });
   await new Promise((r) => server.listen(port, "0.0.0.0", r));
-  return { port, seen, close: () => new Promise((r) => server.close(r)) };
+  mock.close = () => new Promise((r) => server.close(r));
+  return mock;
 }
 
 function baseEnv(school, mock) {
@@ -85,6 +111,8 @@ function baseEnv(school, mock) {
     R2_BUCKET: `bucket-${school}`,
     R2_ACCESS_KEY_ID: `r2-key-${school}`,
     R2_SECRET_ACCESS_KEY: `r2-secret-${school}`,
+    SCHOOL_SLUG: `school-${school}`,
+    IMPERSONATION_SIGNING_SECRET: `impersonation-secret-for-school-${school}-0000`,
   };
 }
 
@@ -207,6 +235,115 @@ async function checkSchool(app, mock, env, other) {
   check(`${label}: the other school's Supabase saw nothing`, other.seen.length === 0);
 }
 
+function authUserJson(appMetadata) {
+  return {
+    id: "00000000-0000-0000-0000-000000000abc",
+    aud: "authenticated",
+    role: "authenticated",
+    email: "platform-support@support.invalid",
+    app_metadata: appMetadata,
+    user_metadata: {},
+    created_at: "2026-10-22T00:00:00Z",
+  };
+}
+
+const rpcCalls = (mock) =>
+  mock.seen.filter((r) => r.url?.startsWith("/rest/v1/rpc/log_impersonation_event"));
+
+async function checkReadOnlyMiddleware(app, mock, env) {
+  const label = "read-only support session";
+  const cookie = fakeSessionCookie(env.SUPABASE_URL);
+  const get = (path, headers = {}) =>
+    fetch(`${app.base}${path}`, { redirect: "manual", headers: { cookie, ...headers } });
+  const inTenMinutes = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+  // Active support session: each page view is logged, with the path.
+  mock.authUser = authUserJson({
+    read_only: true,
+    read_only_until: inTenMinutes,
+    impersonated_by: "s@x.test",
+  });
+  mock.seen.length = 0;
+  const view = await get("/dashboard/admin/students?x=1");
+  const calls = rpcCalls(mock);
+  check(
+    `${label}: a page view is logged with its path`,
+    view.status !== 307 &&
+      calls.length === 1 &&
+      calls[0].body.includes('"p_event":"view"') &&
+      calls[0].body.includes("/dashboard/admin/students?x=1"),
+    `status ${view.status}, calls ${JSON.stringify(calls)}`
+  );
+
+  // Next.js removes the router's own signals (headers and the _rsc parameter)
+  // before middleware runs, so a prefetch cannot be told apart from a
+  // navigation. Nothing is skipped: a request that looks like a router
+  // prefetch is logged too, so a support person cannot hide a view by
+  // sending those signals.
+  mock.seen.length = 0;
+  await get("/dashboard/admin/students?_rsc=abc12", { rsc: "1", "next-router-prefetch": "1" });
+  const routerCalls = rpcCalls(mock);
+  check(
+    `${label}: a request that claims to be a prefetch is still logged`,
+    routerCalls.length === 1 && routerCalls[0].body.includes('"p_event":"view"'),
+    JSON.stringify(routerCalls)
+  );
+
+  // Expired support session: signed out, sent to /login, cookies cleared.
+  mock.authUser = authUserJson({ read_only: true, read_only_until: tenMinutesAgo });
+  mock.seen.length = 0;
+  const expired = await get("/dashboard");
+  const location = expired.headers.get("location") ?? "";
+  const setCookies = expired.headers.getSetCookie?.() ?? [];
+  check(
+    `${label}: an expired session is sent to /login with a reason`,
+    expired.status >= 300 &&
+      expired.status < 400 &&
+      location.includes("/login") &&
+      location.includes("reason=support-session-ended"),
+    `status ${expired.status}, location ${location}`
+  );
+  check(
+    `${label}: an expired session's cookies are cleared`,
+    setCookies.some(
+      (c) => c.startsWith(cookie.split("=")[0] + "=") && /max-age=0|expires=/i.test(c)
+    ),
+    `set-cookie: ${JSON.stringify(setCookies)}`
+  );
+  check(
+    `${label}: the end of the session is logged`,
+    rpcCalls(mock).some((r) => r.body.includes('"p_event":"ended"')),
+    JSON.stringify(rpcCalls(mock))
+  );
+  const loginPage = await get("/login");
+  check(
+    `${label}: an expired session on /login does not redirect in a loop`,
+    loginPage.status === 200,
+    `status ${loginPage.status}, location ${loginPage.headers.get("location")}`
+  );
+
+  // A read-only user with no end time is treated as expired (fail closed).
+  mock.authUser = authUserJson({ read_only: true });
+  const noEnd = await get("/dashboard");
+  check(
+    `${label}: a read-only user with no end time is treated as expired`,
+    noEnd.status >= 300 && (noEnd.headers.get("location") ?? "").includes("support-session-ended"),
+    `status ${noEnd.status}`
+  );
+
+  // An ordinary admin is never logged as impersonation.
+  mock.authUser = authUserJson({ provider: "email" });
+  mock.seen.length = 0;
+  await get("/dashboard");
+  check(
+    `${label}: ordinary admins are not logged as impersonation`,
+    rpcCalls(mock).length === 0,
+    JSON.stringify(rpcCalls(mock))
+  );
+  mock.authUser = null;
+}
+
 async function checkDockerHealthcheck(app) {
   const deadline = Date.now() + 120_000;
   let status = "";
@@ -239,6 +376,7 @@ async function main() {
     const b = await startApp("b", envB);
     await checkSchool(a, mockA, envA, mockB);
     await checkSchool(b, mockB, envB, mockA);
+    await checkReadOnlyMiddleware(a, mockA, envA);
     if (!LOCAL) await checkDockerHealthcheck(a);
 
     // Incomplete environment: the container must say so instead of serving.

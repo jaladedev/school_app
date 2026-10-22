@@ -104,9 +104,11 @@ R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
 R2_BUCKET=your-dev-bucket
 R2_ACCESS_KEY_ID=your-r2-access-key-id
 R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
+SCHOOL_SLUG=your-school
+IMPERSONATION_SIGNING_SECRET=generate-a-long-random-string-at-least-32-chars
 ```
 
-These values come from your Supabase project in the Project Settings → API section, your Paystack dashboard settings, and the Cloudflare R2 dashboard. Uploaded files (homework submissions, topic resources, student photos) are stored in the R2 bucket through `lib/storage.ts`, not in Supabase Storage; `R2_ENDPOINT` is the account endpoint without the bucket name. To move files from an existing Supabase project, see `deploy/r2-migration.md`. These are read when the server starts, not at build time, so one Docker image (see `Dockerfile` and `deploy/school.env.example`) can serve any school. The older `NEXT_PUBLIC_*` names for the Supabase and Paystack public values still work locally. `PAYSTACK_SECRET_KEY` is validated on startup (`lib/env.server.ts`) and must start with `sk_`; the four `R2_*` values must also be present.
+These values come from your Supabase project in the Project Settings → API section, your Paystack dashboard settings, and the Cloudflare R2 dashboard. Uploaded files (homework submissions, topic resources, student photos) are stored in the R2 bucket through `lib/storage.ts`, not in Supabase Storage; `R2_ENDPOINT` is the account endpoint without the bucket name. To move files from an existing Supabase project, see `deploy/r2-migration.md`. These are read when the server starts, not at build time, so one Docker image (see `Dockerfile` and `deploy/school.env.example`) can serve any school. The older `NEXT_PUBLIC_*` names for the Supabase and Paystack public values still work locally. `PAYSTACK_SECRET_KEY` is validated on startup (`lib/env.server.ts`) and must start with `sk_`; the four `R2_*` values, `SCHOOL_SLUG` and `IMPERSONATION_SIGNING_SECRET` (at least 32 characters, signs read-only support links) must also be present.
 
 Optional — only needed if you're testing bulk email (announcements, fee reminders):
 

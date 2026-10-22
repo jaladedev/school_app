@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole, getAuthenticatedUser } from "@/lib/actions/authGuards";
+import { assertNotReadOnly } from "@/lib/readOnlySession";
 import { assertCanManageFees } from "@/lib/actions/fees";
 import { recordInvoicePayment } from "@/lib/feePayments";
 import { writeAuditLog } from "@/lib/audit";
@@ -47,6 +48,8 @@ export async function submitPaymentClaim(input: {
 }) {
   return runAction(async () => {
     const user = await getAuthenticatedUser();
+    // Writes with the service role: refuse a read-only support session.
+    assertNotReadOnly(user);
     const admin = createAdminClient();
 
     const { data: invoice } = await admin

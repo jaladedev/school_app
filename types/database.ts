@@ -1607,6 +1607,12 @@ export type Database = {
           },
         ];
       };
+      impersonation_links_used: {
+        Row: { jti: string; used_at: string };
+        Insert: { jti: string; used_at?: string };
+        Update: { jti?: string; used_at?: string };
+        Relationships: [];
+      };
       hostels: {
         Row: Hostel;
         Insert: Partial<Hostel>;
@@ -1994,6 +2000,10 @@ export type Database = {
           class_count: number;
           subject_count: number;
         }[];
+      };
+      log_impersonation_event: {
+        Args: { p_event: string; p_path?: string };
+        Returns: undefined;
       };
       license_status: {
         Args: Record<string, never>;

@@ -40,6 +40,7 @@ run_suite "${DB}_unit" tests/sql/license.test.sql
 # Runs before the tests below: they grant table privileges to authenticated
 # on this same database, which would hide a missing revoke here.
 run_suite "$DB" tests/sql/payment-claims.test.sql
+run_suite "$DB" tests/sql/read-only-session.test.sql
 
 run_suite "$DB" tests/sql/license-features.test.sql
 

@@ -16,7 +16,7 @@ grant usage on schema public, auth, storage, extensions to anon, authenticated, 
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
 create function auth.role() returns text language sql stable as $$ select 'authenticated' $$;
-create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;
+create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('test.jwt', true), '')::jsonb, '{}'::jsonb) $$;
 create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb, raw_app_meta_data jsonb);
 create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
 create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid, metadata jsonb, owner_id text, version text, created_at timestamptz default now(), updated_at timestamptz default now());

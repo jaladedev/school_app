@@ -9,6 +9,7 @@ import { TRANSIENT_AUTH_ERROR_MESSAGE } from "@/lib/authErrors";
 import { runAction } from "@/lib/actionResult";
 import { assertFeature, assertLicenseWritable } from "@/lib/actions/licenseGuard";
 import type { LicenseFeature } from "@/lib/features";
+import { READ_ONLY_MESSAGE, isReadOnlyUser } from "@/lib/readOnlySession";
 
 /**
  * Resolves the JWT-validated current user, distinguishing a transient
@@ -51,12 +52,17 @@ export async function getAuthenticatedUser(): Promise<User> {
  * accounts, which a plain role check doesn't.
  *
  * Also refuses the call when the school's license has expired, unless
- * options.allowWhenExpired is set (see below).
+ * options.allowWhenExpired is set (see below), and always refuses it in a
+ * read-only support session unless options.allowWhenReadOnly is set (below).
  */
 export async function assertRole(
   allowedRoles: UserRole[],
   errorMessage: string,
-  options: { allowWhenExpired?: boolean; feature?: LicenseFeature } = {}
+  options: {
+    allowWhenExpired?: boolean;
+    allowWhenReadOnly?: boolean;
+    feature?: LicenseFeature;
+  } = {}
 ): Promise<{ id: string; role: UserRole }> {
   const user = await getAuthenticatedUser();
 
@@ -75,6 +81,17 @@ export async function assertRole(
 
   if (!profile || !profile.is_active || !allowedRoles.includes(profile.role)) {
     throw new Error(errorMessage);
+  }
+
+  // Default-deny in a read-only support session (platform support looking at
+  // the school as an admin): every action guarded by assertRole is a write
+  // unless the call site opts out with { allowWhenReadOnly: true }, which is
+  // only for pure reads. This is the app-layer half of the database's
+  // read-only gate, which cannot see writes made with the service-role key.
+  // Note this is separate from allowWhenExpired: fee payment stays allowed
+  // for a lapsed school but must never be possible for a support session.
+  if (isReadOnlyUser(user) && !options.allowWhenReadOnly) {
+    throw new Error(READ_ONLY_MESSAGE);
   }
 
   // Default-deny once the school's license has expired (the app is

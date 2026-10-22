@@ -3,6 +3,7 @@ import { isAuthRetryableFetchError, type User } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { edgeEnv } from "@/lib/env.edge";
 import { logger } from "@/lib/logger";
+import { isReadOnlySessionExpired, isReadOnlyUser } from "@/lib/readOnlySession";
 
 type SupabaseMiddlewareClient = ReturnType<typeof createServerClient>;
 
@@ -87,6 +88,63 @@ async function handlePasswordChange(
     .eq("id", user.id)
     .single();
   return profile?.must_change_password ?? false;
+}
+
+// Expires read-only support sessions and logs every page they view. Both rely
+// on app_metadata in the verified user (users cannot edit it), never on a
+// cookie, so a support person cannot opt out of the log or the time limit.
+// Returns a response to send instead of the page, or null to carry on.
+async function handleReadOnlySession(
+  supabase: SupabaseMiddlewareClient,
+  user: User,
+  request: NextRequest,
+  routes: { isDashboardRoute: boolean; isLoginRoute: boolean }
+): Promise<NextResponse | null> {
+  const path = request.nextUrl.pathname + request.nextUrl.search;
+
+  if (isReadOnlySessionExpired(user)) {
+    await supabase.rpc("log_impersonation_event", { p_event: "ended", p_path: path });
+    await supabase.auth.signOut();
+    // Clear every Supabase cookie explicitly: the cookie adapter above keeps
+    // only the last change on its response, so signOut() alone can leave
+    // part of a chunked session behind.
+    const clear = (target: NextResponse) => {
+      for (const cookie of request.cookies.getAll()) {
+        if (cookie.name.startsWith("sb-")) {
+          target.cookies.set({ name: cookie.name, value: "", maxAge: 0, path: "/" });
+        }
+      }
+      return target;
+    };
+    // On /login there is nothing to redirect to, and redirecting would loop.
+    if (routes.isLoginRoute)
+      return clear(NextResponse.next({ request: { headers: request.headers } }));
+    const redirectUrl = new URL("/login", request.url);
+    redirectUrl.searchParams.set("reason", "support-session-ended");
+    return clear(NextResponse.redirect(redirectUrl));
+  }
+
+  // Log every request to a dashboard page. Next.js removes the router's own
+  // signals (the rsc and next-router-prefetch headers, and the _rsc query
+  // parameter) before middleware runs, so a prefetch cannot be told apart
+  // from a real navigation here. Trusting a client-sent "this is only a
+  // prefetch" signal would also let a support person hide what they looked
+  // at, so nothing is skipped. The trade-off is that an entry can mean "opened
+  // or prefetched": it records what the session could see, and the school
+  // should read it that way.
+  if (routes.isDashboardRoute && request.method === "GET") {
+    const { error } = await supabase.rpc("log_impersonation_event", {
+      p_event: "view",
+      p_path: path,
+    });
+    if (error) {
+      // Not logging a view is worse than a slow page, but not worth a dead
+      // session either: record that the audit write failed and carry on.
+      logger.error("proxy: could not log an impersonated page view", { path, error });
+    }
+  }
+
+  return null;
 }
 
 // Route-level redirects once we know who the user is and whether they
@@ -211,6 +269,14 @@ export async function middleware(request: NextRequest) {
       error: getUserError,
     });
     return response;
+  }
+
+  if (user && isReadOnlyUser(user)) {
+    const readOnlyResponse = await handleReadOnlySession(supabase, user, request, {
+      isDashboardRoute,
+      isLoginRoute,
+    });
+    if (readOnlyResponse) return readOnlyResponse;
   }
 
   let mustChangePassword = false;

@@ -261,6 +261,7 @@ export async function getQuizPreviewQuestions(quizId: string) {
   return runAction(async () => {
     await assertRole(["admin", "teacher"], "Only an admin or teacher can preview a quiz.", {
       allowWhenExpired: true,
+      allowWhenReadOnly: true,
     });
     const supabase = createClient();
     const { data, error } = await supabase
@@ -308,6 +309,7 @@ export async function getQuizQuestionAnalytics(quizId: string): Promise<{
 }> {
   await assertRole(["admin", "teacher"], "Only an admin or teacher can view quiz analytics.", {
     allowWhenExpired: true,
+    allowWhenReadOnly: true,
   });
   const supabase = createClient();
 

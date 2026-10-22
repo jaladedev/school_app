@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { DashboardBreadcrumbs } from "@/components/DashboardBreadcrumbs";
 import { ErrorState } from "@/components/ErrorState";
 import { LicenseBanner } from "@/components/LicenseBanner";
+import { ReadOnlySessionBanner } from "@/components/ReadOnlySessionBanner";
 import { licenseBanner, studentCapBanner } from "@/lib/license";
 import { getLicenseInfo, getLicenseSummary, getEnabledFeatures } from "@/lib/licenseInfo";
 
@@ -62,6 +63,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         }}
       />
       <main className="flex-1 px-4 py-6 sm:px-8 sm:py-8">
+        <ReadOnlySessionBanner />
         <LicenseBanner
           banner={banner}
           manageHref={profile.role === "admin" ? "/dashboard/admin/license" : undefined}

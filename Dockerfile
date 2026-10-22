@@ -28,7 +28,9 @@ ENV SUPABASE_URL=https://build.invalid \
     R2_ENDPOINT=https://build.invalid \
     R2_BUCKET=build-placeholder \
     R2_ACCESS_KEY_ID=build-placeholder \
-    R2_SECRET_ACCESS_KEY=build-placeholder
+    R2_SECRET_ACCESS_KEY=build-placeholder \
+    SCHOOL_SLUG=build-placeholder \
+    IMPERSONATION_SIGNING_SECRET=build-placeholder-impersonation-secret-000000
 RUN npm run build
 
 FROM node:22-alpine AS runner

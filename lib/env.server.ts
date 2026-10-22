@@ -22,6 +22,16 @@ const serverEnvSchema = z.object({
   R2_BUCKET: z.string().min(1),
   R2_ACCESS_KEY_ID: z.string().min(1),
   R2_SECRET_ACCESS_KEY: z.string().min(1),
+  // This school's short id (letters, digits, hyphens). A read-only support link
+  // is only accepted if it was issued for this exact slug.
+  SCHOOL_SLUG: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]*$/, "SCHOOL_SLUG: lowercase letters, digits and hyphens."),
+  // Signs read-only support links (lib/impersonation.ts). Unique per school,
+  // known only to this school's env file and the control plane.
+  IMPERSONATION_SIGNING_SECRET: z
+    .string()
+    .min(32, "IMPERSONATION_SIGNING_SECRET should be at least 32 characters."),
 });
 
 const parsed = serverEnvSchema.safeParse({
@@ -33,6 +43,8 @@ const parsed = serverEnvSchema.safeParse({
   R2_BUCKET: process.env.R2_BUCKET,
   R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
   R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
+  SCHOOL_SLUG: process.env.SCHOOL_SLUG,
+  IMPERSONATION_SIGNING_SECRET: process.env.IMPERSONATION_SIGNING_SECRET,
 });
 
 if (!parsed.success) {

@@ -37,6 +37,7 @@ export type RolloverPreview = {
 export async function getRolloverPreview(): Promise<RolloverPreview> {
   await assertRole(["admin"], "Only an admin can view the academic year rollover wizard.", {
     allowWhenExpired: true,
+    allowWhenReadOnly: true,
   });
   const admin = createAdminClient();
 

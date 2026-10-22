@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertRole, getAuthenticatedUser } from "@/lib/actions/authGuards";
+import { assertNotReadOnly } from "@/lib/readOnlySession";
 import type { EducationLevel, PaymentMethod } from "@/types/database";
 import { serverEnv } from "@/lib/env.server";
 import { computeInvoiceStatus } from "@/lib/invoiceStatus";
@@ -24,7 +25,7 @@ import { runAction } from "@/lib/actionResult";
  */
 export async function assertCanManageFees(
   errorMessage: string,
-  options: { allowWhenExpired?: boolean } = {}
+  options: { allowWhenExpired?: boolean; allowWhenReadOnly?: boolean } = {}
 ): Promise<{ id: string }> {
   const { id, role } = await assertRole(["admin", "teacher"], errorMessage, options);
   if (role === "admin") return { id };
@@ -276,6 +277,7 @@ async function resolveInvoicePayer(
 
   await assertRole(["admin"], "You can't pay an invoice that isn't yours.", {
     allowWhenExpired: true,
+    allowWhenReadOnly: true,
   });
   return "admin";
 }
@@ -331,6 +333,9 @@ export async function verifyPaystackPayment(input: { reference: string; invoiceI
     // payment-verification attempt from a legitimately signed-in
     // student/parent during a network blip, mid-payment.
     const user = await getAuthenticatedUser();
+    // Records a payment with the service role, so a read-only support
+    // session must be refused here (it does not go through assertRole).
+    assertNotReadOnly(user);
 
     const admin = createAdminClient();
 

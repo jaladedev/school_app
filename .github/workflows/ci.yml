@@ -31,6 +31,8 @@ jobs:
       R2_BUCKET: ci-placeholder-bucket
       R2_ACCESS_KEY_ID: ci-placeholder-access-key
       R2_SECRET_ACCESS_KEY: ci-placeholder-secret-key
+      SCHOOL_SLUG: ci-placeholder
+      IMPERSONATION_SIGNING_SECRET: ci-placeholder-impersonation-secret-0000
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

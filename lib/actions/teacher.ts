@@ -731,6 +731,7 @@ export async function getTopicNoteDraft(
   return runAction(async () => {
     const { id: teacherId } = await assertRole(["teacher"], "Only teachers can author notes.", {
       allowWhenExpired: true,
+      allowWhenReadOnly: true,
     });
     const supabase = createClient();
     const { data } = await supabase
@@ -774,7 +775,7 @@ export async function getTopicNoteVersionContent(noteId: string): Promise<Action
     await assertRole(
       ["admin", "teacher"],
       "Only teaching staff can compare lesson plan versions.",
-      { allowWhenExpired: true }
+      { allowWhenExpired: true, allowWhenReadOnly: true }
     );
     const supabase = createClient();
     const { data, error } = await supabase
