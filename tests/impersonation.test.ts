@@ -154,3 +154,36 @@ describe("verifyImpersonationToken", () => {
     });
   });
 });
+
+// The same literal token is asserted in the control plane's
+// tests/impersonation-contract.test.ts. If either side changes the link
+// format, its copy of this test fails.
+describe("link format shared with the control plane", () => {
+  const SECRET = "contract-vector-secret-0123456789abcdef";
+  const VECTOR =
+    "eyJ2IjoxLCJzY2giOiJncmVlbmZpZWxkIiwiYnkiOiJzdXBwb3J0QGV4YW1wbGUuY29tIiwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwiaWF0IjoxNzkyNzQ5NjAwLCJleHAiOjE3OTI3NDk5MDB9.NKQOOxMe-ECa300N7sEz7y1ST6GfyG22kBQNcwnFyQk";
+  const now = new Date("2026-10-23T10:00:00Z");
+
+  it("signs the agreed token byte for byte", () => {
+    expect(
+      signImpersonationToken({
+        secret: SECRET,
+        school: "greenfield",
+        by: "support@example.com",
+        ttlSeconds: 300,
+        now,
+        jti: "00000000-0000-4000-8000-000000000001",
+      })
+    ).toBe(VECTOR);
+  });
+
+  it("verifies the agreed token for its school only", () => {
+    expect(verifyImpersonationToken(VECTOR, { secret: SECRET, school: "greenfield", now }).ok).toBe(
+      true
+    );
+    expect(verifyImpersonationToken(VECTOR, { secret: SECRET, school: "other", now })).toEqual({
+      ok: false,
+      reason: "wrong_school",
+    });
+  });
+});
