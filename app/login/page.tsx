@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordInput } from "@/components/PasswordInput";
+import { loginReasonMessage } from "@/lib/loginReason";
 
-export default function LoginPage() {
+function LoginForm() {
   const supabase = createClient();
+  const notice = loginReasonMessage(useSearchParams().get("reason"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -80,6 +83,12 @@ export default function LoginPage() {
             />
           </div>
 
+          {notice && !error && (
+            <p role="status" className="text-sm text-ink-soft">
+              {notice}
+            </p>
+          )}
+
           {error && (
             <p role="alert" className="text-sm text-clay">
               {error}
@@ -96,5 +105,15 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+// useSearchParams() needs a Suspense boundary so the page can still be
+// prerendered.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

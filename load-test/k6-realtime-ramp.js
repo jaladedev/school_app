@@ -22,7 +22,8 @@ const HOLD_SECONDS = Number(__ENV.HOLD_SECONDS || 900);
 const ROUTE_ID = __ENV.ROUTE_ID;
 const TRIP_DATE = __ENV.TRIP_DATE || new Date().toISOString().slice(0, 10);
 const DIRECTION = __ENV.DIRECTION || "morning";
-if (DIRECTION !== "morning" && DIRECTION !== "afternoon") throw new Error("DIRECTION must be morning or afternoon");
+if (DIRECTION !== "morning" && DIRECTION !== "afternoon")
+  throw new Error("DIRECTION must be morning or afternoon");
 if (!ROUTE_ID) throw new Error("Set ROUTE_ID");
 
 const joinsOk = new Counter("rt_joins_ok");
@@ -69,7 +70,12 @@ export default function () {
               broadcast: { ack: false, self: false },
               presence: { key: "" },
               postgres_changes: [
-                { event: "*", schema: "public", table: "transport_trip_status", filter: `route_id=eq.${ROUTE_ID}` },
+                {
+                  event: "*",
+                  schema: "public",
+                  table: "transport_trip_status",
+                  filter: `route_id=eq.${ROUTE_ID}`,
+                },
               ],
             },
             access_token: s.access_token,
@@ -78,7 +84,9 @@ export default function () {
       );
       // Phoenix heartbeat keeps the socket alive.
       socket.setInterval(() => {
-        socket.send(JSON.stringify({ topic: "phoenix", event: "heartbeat", payload: {}, ref: "hb" }));
+        socket.send(
+          JSON.stringify({ topic: "phoenix", event: "heartbeat", payload: {}, ref: "hb" })
+        );
       }, 25000);
       // Hold the connection open like an idle browser tab.
       socket.setTimeout(() => socket.close(), HOLD_SECONDS * 1000);
