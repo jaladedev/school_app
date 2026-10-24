@@ -160,6 +160,24 @@ export default async function TeacherHome() {
     if (subj?.name) classMap.get(key)!.subjects.add(subj.name);
   }
 
+  // A class teacher must see their own class here even before the admin has
+  // put them on the timetable for it -- otherwise a newly created class (for
+  // example the next year's Primary 5) is invisible until timetable entries
+  // exist. Classes already found above keep their subject list.
+  const { data: classTeacherOf } = await supabase
+    .from("classes")
+    .select("id, name, arm")
+    .eq("class_teacher_id", profile.id)
+    .eq("is_archived", false);
+
+  const classTeacherIds = new Set<string>();
+  for (const c of classTeacherOf ?? []) {
+    classTeacherIds.add(c.id);
+    if (!classMap.has(c.id)) {
+      classMap.set(c.id, { name: c.name, arm: c.arm, subjects: new Set() });
+    }
+  }
+
   return (
     <div>
       <h1 className="mb-1 font-display text-2xl font-semibold text-ink">
@@ -205,7 +223,12 @@ export default async function TeacherHome() {
             <p className="font-display text-lg font-semibold text-ink">
               {cls.name} {cls.arm}
             </p>
-            <p className="mt-1 text-sm text-ink-soft">{[...cls.subjects].join(", ")}</p>
+            <p className="mt-1 text-sm text-ink-soft">
+              {[...cls.subjects].join(", ") || "Not on the timetable yet"}
+            </p>
+            {classTeacherIds.has(classId) && (
+              <p className="mt-1 text-xs font-medium text-leaf">Class teacher</p>
+            )}
             <div className="mt-3 flex gap-3 text-sm">
               <Link href="/dashboard/teacher/notes" className="text-leaf hover:underline">
                 Notes
