@@ -230,7 +230,10 @@ export default async function TeacherHome() {
               <p className="mt-1 text-xs font-medium text-leaf">Class teacher</p>
             )}
             <div className="mt-3 flex gap-3 text-sm">
-              <Link href="/dashboard/teacher/notes" className="text-leaf hover:underline">
+              <Link
+                href={`/dashboard/teacher/notes?class=${classId}`}
+                className="text-leaf hover:underline"
+              >
                 Notes
               </Link>
               <Link href="/dashboard/teacher/grades" className="text-leaf hover:underline">

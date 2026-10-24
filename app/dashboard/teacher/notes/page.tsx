@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient, getCurrentProfile } from "@/lib/supabase/server";
-import { formatLevel } from "@/types/database";
+import { formatLevel, type EducationLevel } from "@/types/database";
 import { redirect } from "next/navigation";
 import { Pagination, DEFAULT_PAGE_SIZE, parsePage, pageRange } from "@/components/Pagination";
 import { LessonPlanReviewButtons } from "@/components/LessonPlanReviewButtons";
@@ -8,7 +8,7 @@ import { LessonPlanReviewButtons } from "@/components/LessonPlanReviewButtons";
 export default async function TeacherNotesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; class?: string; subject?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
 
@@ -38,16 +38,84 @@ export default async function TeacherNotesPage({
   const currentTerm = settings?.current_term ?? 1;
   const currentAcademicYear = settings?.current_academic_year ?? "";
 
-  const { data: topics, count } = await supabase
-    .from("curriculum_topics")
-    .select("*, subjects(name)", { count: "exact" })
-    .in("subject_id", subjectIds.length ? subjectIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("term", currentTerm)
-    .eq("academic_year", currentAcademicYear)
+  // Classes this teacher works with: the ones they are class teacher of plus
+  // the ones on their timetable. Notes are shown one class at a time (a
+  // class maps to an education level + level number, which is how curriculum
+  // topics are keyed), optionally narrowed to a single subject.
+  type ClassOption = {
+    id: string;
+    name: string;
+    arm: string | null;
+    education_level: EducationLevel;
+    level_number: number;
+  };
+  const classOptions = new Map<string, ClassOption>();
+
+  const { data: classTeacherOf } = await supabase
+    .from("classes")
+    .select("id, name, arm, education_level, level_number")
+    .eq("class_teacher_id", profile.id)
+    .eq("is_archived", false);
+  for (const c of classTeacherOf ?? []) classOptions.set(c.id, c);
+
+  const { data: timetableClasses } = await supabase
+    .from("timetable_entries")
+    .select("classes(id, name, arm, education_level, level_number, is_archived)")
+    .eq("teacher_id", profile.id);
+  for (const e of timetableClasses ?? []) {
+    const c = e.classes;
+    if (c && !c.is_archived && !classOptions.has(c.id)) classOptions.set(c.id, c);
+  }
+
+  const classList = [...classOptions.values()].sort(
+    (a, b) => a.level_number - b.level_number || a.name.localeCompare(b.name)
+  );
+  const selectedClass =
+    classList.find((c) => c.id === resolvedSearchParams.class) ?? classList[0] ?? null;
+
+  const classLabel = (c: ClassOption) => `${c.name} ${c.arm ?? ""}`.trim();
+
+  const baseTopicQuery = () => {
+    let q = supabase
+      .from("curriculum_topics")
+      .select("*, subjects(name)", { count: "exact" })
+      .in("subject_id", subjectIds.length ? subjectIds : ["00000000-0000-0000-0000-000000000000"])
+      .eq("term", currentTerm)
+      .eq("academic_year", currentAcademicYear);
+    if (selectedClass) {
+      q = q
+        .eq("education_level", selectedClass.education_level)
+        .eq("level_number", selectedClass.level_number);
+    }
+    return q;
+  };
+
+  // Subjects that actually have topics for this class, for the subject chips.
+  const { data: subjectRows } = await baseTopicQuery().limit(1000);
+  const subjectOptions = new Map<string, string>();
+  for (const row of subjectRows ?? []) {
+    if (row.subjects?.name) subjectOptions.set(row.subject_id, row.subjects.name);
+  }
+  const subjectList = [...subjectOptions.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const selectedSubjectId = subjectOptions.has(resolvedSearchParams.subject ?? "")
+    ? (resolvedSearchParams.subject as string)
+    : null;
+
+  let topicQuery = baseTopicQuery();
+  if (selectedSubjectId) topicQuery = topicQuery.eq("subject_id", selectedSubjectId);
+  const { data: topics, count } = await topicQuery
     .order("name", { foreignTable: "subjects", ascending: true })
     .order("level_number", { ascending: true })
     .order("week_number", { ascending: true })
     .range(from, to);
+
+  const filterHref = (cls: string | null, subject: string | null) => {
+    const params = new URLSearchParams();
+    if (cls) params.set("class", cls);
+    if (subject) params.set("subject", subject);
+    const qs = params.toString();
+    return `/dashboard/teacher/notes${qs ? `?${qs}` : ""}`;
+  };
 
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / DEFAULT_PAGE_SIZE));
 
@@ -91,6 +159,59 @@ export default async function TeacherNotesPage({
         Author or edit notes for topics in the subjects you teach — Term {currentTerm}
         {currentAcademicYear ? ` · ${currentAcademicYear}` : ""}.
       </p>
+
+      {classList.length > 0 && (
+        <div className="mb-6 space-y-3">
+          <div className="flex flex-wrap gap-2" aria-label="Class">
+            {classList.map((c) => {
+              const active = c.id === selectedClass?.id;
+              return (
+                <Link
+                  key={c.id}
+                  href={filterHref(c.id, null)}
+                  aria-current={active ? "page" : undefined}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                    active
+                      ? "border-leaf bg-leaf-soft font-medium text-leaf"
+                      : "border-rule bg-white text-ink hover:border-leaf"
+                  }`}
+                >
+                  {classLabel(c)}
+                </Link>
+              );
+            })}
+          </div>
+          {subjectList.length > 0 && (
+            <div className="flex flex-wrap gap-2" aria-label="Subject">
+              <Link
+                href={filterHref(selectedClass?.id ?? null, null)}
+                aria-current={!selectedSubjectId ? "page" : undefined}
+                className={`rounded-full border px-3 py-1 text-xs transition ${
+                  !selectedSubjectId
+                    ? "border-leaf bg-leaf-soft font-medium text-leaf"
+                    : "border-rule bg-white text-ink-soft hover:border-leaf"
+                }`}
+              >
+                All subjects
+              </Link>
+              {subjectList.map(([id, name]) => (
+                <Link
+                  key={id}
+                  href={filterHref(selectedClass?.id ?? null, id)}
+                  aria-current={id === selectedSubjectId ? "page" : undefined}
+                  className={`rounded-full border px-3 py-1 text-xs transition ${
+                    id === selectedSubjectId
+                      ? "border-leaf bg-leaf-soft font-medium text-leaf"
+                      : "border-rule bg-white text-ink-soft hover:border-leaf"
+                  }`}
+                >
+                  {name}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {isHod && (
         <section className="mb-6 rounded-xl border border-rule bg-white p-4">
@@ -189,7 +310,15 @@ export default async function TeacherNotesPage({
         )}
       </div>
 
-      <Pagination basePath="/dashboard/teacher/notes" page={page} totalPages={totalPages} />
+      <Pagination
+        basePath="/dashboard/teacher/notes"
+        page={page}
+        totalPages={totalPages}
+        searchParams={{
+          class: selectedClass?.id,
+          subject: selectedSubjectId ?? undefined,
+        }}
+      />
     </div>
   );
 }
