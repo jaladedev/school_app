@@ -1,0 +1,64 @@
+import { execFileSync } from "node:child_process";
+import { describe, expect, it } from "vitest";
+import {
+  CLAIM_MAX_SKEW_SECONDS,
+  claimMessage,
+  isKeyEncoding,
+  signClaim,
+  timestampFresh,
+  verifyClaim,
+} from "@/lib/controlPlaneClaim";
+
+// The same literal signature is asserted in the control plane's
+// tests/claim-signature.test.ts. If either side changes the format, its copy of
+// this test fails.
+const SEED = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc";
+const PUB = "6kpsY-KcUgq-9VB7Ey7F-ZVHdq6-vnuSQh7qaRRG0iw";
+const SIG =
+  "IKdfMsNp4xUYdei9bLWGxBh2Ij1TwKxpylkfVRbKW_FjJPlSj1k8MHxIuLCoYJrOCeeUWjTGDbOpqVulNH8XBQ";
+const BODY = '{"amount_kobo":15000000,"client_ref":"claim-0001"}';
+const TS = 1792749600;
+
+describe("payment claim signing (shared with the control plane)", () => {
+  it("signs the agreed message to the agreed signature, byte for byte", () => {
+    expect(claimMessage({ slug: "greenfield", timestamp: TS, body: BODY })).toBe(
+      "claim-v1\ngreenfield\n1792749600\n930cc92a2702c75f1096431e6996ed9fb8fe528d743a1143f434a19c299f2df8"
+    );
+    expect(signClaim({ privateKey: SEED, slug: "greenfield", timestamp: TS, body: BODY })).toBe(
+      SIG
+    );
+  });
+
+  it("verifies under the matching public key, and not after any change", () => {
+    const good = {
+      publicKeys: [PUB],
+      slug: "greenfield",
+      timestamp: TS,
+      body: BODY,
+      signature: SIG,
+    };
+    expect(verifyClaim(good)).toBe(true);
+    expect(verifyClaim({ ...good, slug: "other" })).toBe(false);
+    expect(verifyClaim({ ...good, timestamp: TS + 1 })).toBe(false);
+    expect(verifyClaim({ ...good, body: BODY + " " })).toBe(false);
+  });
+
+  it("only accepts a timestamp inside the window", () => {
+    const now = new Date(TS * 1000);
+    expect(timestampFresh(TS + CLAIM_MAX_SKEW_SECONDS, now)).toBe(true);
+    expect(timestampFresh(TS + CLAIM_MAX_SKEW_SECONDS + 1, now)).toBe(false);
+  });
+
+  it("the key generator makes a pair that signs and verifies", () => {
+    const out = execFileSync("node", ["scripts/generate-claim-key.mjs"], { encoding: "utf8" });
+    const privateKey = /CLAIM_SIGNING_KEY=(\S+)/.exec(out)?.[1] ?? "";
+    const publicKey = out.trim().split("\n").pop() ?? "";
+    expect(isKeyEncoding(privateKey) && isKeyEncoding(publicKey)).toBe(true);
+    const signature = signClaim({ privateKey, slug: "a", timestamp: 1, body: "x" });
+    expect(
+      verifyClaim({ publicKeys: [publicKey], slug: "a", timestamp: 1, body: "x", signature })
+    ).toBe(true);
+    // the private key is only ever printed on the one labelled line
+    expect(out.split(privateKey).length - 1).toBe(1);
+  });
+});
