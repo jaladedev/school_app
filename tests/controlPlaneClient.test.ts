@@ -3,6 +3,8 @@ import { generateClaimKeyPair, verifyClaim } from "@/lib/controlPlaneClaim";
 import {
   ControlPlaneError,
   fetchOpenInvoices,
+  fetchReceiptPdf,
+  fetchReceipts,
   signedPost,
   startCardCheckout,
   submitClaim,
@@ -317,5 +319,93 @@ describe("startCardCheckout", () => {
         /not responding/
       );
     }
+  });
+});
+
+describe("fetchReceipts", () => {
+  const reply = {
+    ok: true,
+    receipts: [
+      {
+        reference: "SUB-0A1B2C3D",
+        session: "2026/2027",
+        total_kobo: 15_000_000,
+        status: "paid",
+        paid_at: "2026-10-25",
+        method: "paystack",
+      },
+    ],
+  };
+  it("reads the paid invoices, signing for the receipts purpose", async () => {
+    const f = vi.fn(async () => json(reply));
+    const r = await fetchReceipts(cfg, { fetchImpl: asFetch(f), now: NOW });
+    expect(r[0]).toMatchObject({ reference: "SUB-0A1B2C3D", status: "paid", method: "paystack" });
+    const [url, init] = lastCall(f);
+    expect(url.pathname).toBe("/api/receipts");
+    expect(
+      verifyClaim({
+        publicKeys: [keys.publicKey],
+        slug: "greenfield",
+        timestamp: Number(init.headers["x-claim-timestamp"]),
+        body: init.body as string,
+        signature: init.headers["x-claim-signature"],
+        purpose: "receipts-v1",
+      })
+    ).toBe(true);
+  });
+  it("refuses a reply of the wrong shape", async () => {
+    const f = vi.fn(async () =>
+      json({ ok: true, receipts: [{ reference: "x", status: "pending" }] })
+    );
+    await expect(fetchReceipts(cfg, { fetchImpl: asFetch(f) })).rejects.toThrow(/not responding/);
+  });
+});
+
+describe("fetchReceiptPdf", () => {
+  const pdfBytes = new TextEncoder().encode("%PDF-1.4\nbody");
+  const pdf = (over: { type?: string; bytes?: Uint8Array; length?: string } = {}) =>
+    new Response((over.bytes ?? pdfBytes) as BodyInit, {
+      status: 200,
+      headers: {
+        "content-type": over.type ?? "application/pdf",
+        ...(over.length ? { "content-length": over.length } : {}),
+      },
+    });
+
+  it("returns the PDF bytes for the invoice asked for, signed for the receipts purpose", async () => {
+    const f = vi.fn(async () => pdf());
+    const bytes = await fetchReceiptPdf(cfg, "SUB-0A1B2C3D", { fetchImpl: asFetch(f) });
+    expect(Array.from(bytes)).toEqual(Array.from(pdfBytes));
+    const [url, init] = lastCall(f);
+    expect(url.pathname).toBe("/api/receipts/pdf");
+    expect(JSON.parse(init.body as string)).toEqual({ reference: "SUB-0A1B2C3D" });
+  });
+  it("refuses anything that is not a PDF: wrong type, wrong first bytes, or too large", async () => {
+    for (const make of [
+      () => pdf({ type: "text/html" }),
+      () => pdf({ bytes: new TextEncoder().encode("<html>not a pdf</html>") }),
+      () => pdf({ length: String(3 * 1024 * 1024) }),
+      () => pdf({ bytes: new Uint8Array(2 * 1024 * 1024 + 10).fill(37) }),
+    ]) {
+      const f = vi.fn(async () => make());
+      await expect(fetchReceiptPdf(cfg, "SUB-0A1B2C3D", { fetchImpl: asFetch(f) })).rejects.toThrow(
+        /not responding/
+      );
+    }
+  });
+  it("says there is no receipt on a 404, and passes worded refusals through", async () => {
+    const notFound = vi.fn(async () =>
+      json({ ok: false, error: "There is no receipt for that invoice." }, 404)
+    );
+    await expect(
+      fetchReceiptPdf(cfg, "SUB-0A1B2C3D", { fetchImpl: asFetch(notFound) })
+    ).rejects.toMatchObject({
+      message: "There is no receipt for that invoice.",
+      status: 404,
+    });
+    const limited = vi.fn(async () => json({ ok: false, error: "x" }, 429));
+    await expect(
+      fetchReceiptPdf(cfg, "SUB-0A1B2C3D", { fetchImpl: asFetch(limited) })
+    ).rejects.toThrow(/Too many attempts/);
   });
 });

@@ -77,6 +77,15 @@ describe("purposes (shared with the control plane)", () => {
     expect(signClaim({ privateKey: SEED, ...base })).toBe(SIG);
   });
 
+  it("signs the invoices and receipts purposes to the agreed literals", () => {
+    expect(signClaim({ privateKey: SEED, ...base, purpose: "invoices-v1" })).toBe(
+      "2Y3CY43Wyw5fPwMNiznviX80olVxg_5oBT4eiJDxj1St6rDENgZgBcl0a_JRocSGnSpLPFtxOo_lUSnnv-OlBA"
+    );
+    expect(signClaim({ privateKey: SEED, ...base, purpose: "receipts-v1" })).toBe(
+      "dS7NEVA6muQcMufsmYJ7RUVf5Q8Iwu8V3fZ-6qG3baV8UZ7CmGbfBwIl-KJ9Ll1Qc-k2GRrY3PJMGjPRZ4qkDw"
+    );
+  });
+
   it("accepts a signature only for the purpose it was made for", () => {
     const v = (signature: string, purpose?: "claim-v1" | "proof-v1" | "checkout-v1") =>
       verifyClaim({ publicKeys: [PUB], ...base, signature, purpose });

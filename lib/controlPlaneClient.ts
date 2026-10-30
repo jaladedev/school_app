@@ -43,22 +43,22 @@ function assertSafeUrl(url: URL) {
 
 type Options = { fetchImpl?: typeof fetch; now?: Date };
 
-export async function signedPost(
+/** Sends one signed request and returns the raw response. The caller decides how to read it. */
+async function signedRequest(
   cfg: ControlPlaneConfig,
   path: string,
   purpose: SignaturePurpose,
   payload: Record<string, unknown>,
-  opts: Options = {}
-): Promise<Record<string, unknown>> {
+  opts: Options
+): Promise<Response> {
   const url = new URL(path, cfg.baseUrl);
   assertSafeUrl(url);
   const body = JSON.stringify(payload);
   const timestamp = Math.floor((opts.now ?? new Date()).getTime() / 1000);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
-  let res: Response;
   try {
-    res = await (opts.fetchImpl ?? fetch)(url, {
+    return await (opts.fetchImpl ?? fetch)(url, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -81,6 +81,16 @@ export async function signedPost(
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function signedPost(
+  cfg: ControlPlaneConfig,
+  path: string,
+  purpose: SignaturePurpose,
+  payload: Record<string, unknown>,
+  opts: Options = {}
+): Promise<Record<string, unknown>> {
+  const res = await signedRequest(cfg, path, purpose, payload, opts);
   const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
   if (!res.ok || !json || json.ok !== true) {
     throw new ControlPlaneError(friendly(res.status, json?.error), res.status);
@@ -245,4 +255,64 @@ export async function startCardCheckout(
     throw new ControlPlaneError(NOT_RESPONDING, 0);
   }
   return { authorizationUrl: url.toString() };
+}
+
+// ---------------------------------------------------------------------------
+// Receipts
+// ---------------------------------------------------------------------------
+
+const receiptsSchema = z.object({
+  receipts: z.array(
+    z.object({
+      reference: z.string(),
+      session: z.string(),
+      total_kobo: z.number().int(),
+      status: z.enum(["paid", "refunded"]),
+      paid_at: z.string(),
+      method: z.string().nullable(),
+    })
+  ),
+});
+export type PaidInvoiceSummary = z.infer<typeof receiptsSchema>["receipts"][number];
+
+/** The invoices this school has paid, newest first. */
+export async function fetchReceipts(
+  cfg: ControlPlaneConfig,
+  opts: Options = {}
+): Promise<PaidInvoiceSummary[]> {
+  const json = await signedPost(cfg, "/api/receipts", "receipts-v1", {}, opts);
+  const parsed = receiptsSchema.safeParse(json);
+  if (!parsed.success) throw new ControlPlaneError(NOT_RESPONDING, 0);
+  return parsed.data.receipts;
+}
+
+const MAX_RECEIPT_BYTES = 2 * 1024 * 1024;
+
+/** One receipt as PDF bytes. Refuses anything that is not a PDF or is unreasonably large. */
+export async function fetchReceiptPdf(
+  cfg: ControlPlaneConfig,
+  reference: string,
+  opts: Options = {}
+): Promise<Uint8Array> {
+  const res = await signedRequest(cfg, "/api/receipts/pdf", "receipts-v1", { reference }, opts);
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as { error?: unknown } | null;
+    throw new ControlPlaneError(
+      res.status === 404
+        ? "There is no receipt for that invoice."
+        : friendly(res.status, json?.error),
+      res.status
+    );
+  }
+  const type = res.headers.get("content-type") ?? "";
+  const length = Number(res.headers.get("content-length") ?? 0);
+  if (!type.startsWith("application/pdf") || length > MAX_RECEIPT_BYTES) {
+    throw new ControlPlaneError(NOT_RESPONDING, 0);
+  }
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const magic = String.fromCharCode(...bytes.slice(0, 5));
+  if (bytes.byteLength > MAX_RECEIPT_BYTES || magic !== "%PDF-") {
+    throw new ControlPlaneError(NOT_RESPONDING, 0);
+  }
+  return bytes;
 }

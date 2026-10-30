@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { STATUS_LABELS } from "@/lib/license";
 import { getLicenseInfo } from "@/lib/licenseInfo";
 import { loadRenewalData } from "@/lib/renewalData";
+import { formatKobo } from "@/types/database";
 
 // Renewing the school's licence: the invoices the operator has issued, and how to pay
 // them. The bursar layout lets admins and bursars in. Nothing here is hidden when the
@@ -89,6 +90,35 @@ export default async function RenewalPage({
             proofEnabled={renewal.data.proof_enabled}
           />
         ))}
+
+      {renewal.state === "ready" && renewal.receipts.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="font-display text-lg font-semibold text-ink">Past payments</h2>
+          <ul className="divide-y divide-rule rounded-lg border border-rule bg-white text-sm">
+            {renewal.receipts.map((r) => (
+              <li
+                key={r.reference}
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5"
+              >
+                <span>
+                  <span className="font-medium">{r.session}</span>{" "}
+                  <span className="font-mono text-xs text-ink-soft">{r.reference}</span>
+                </span>
+                <span className="text-ink-soft">
+                  {formatKobo(r.total_kobo)} · {formatDate(r.paid_at)}
+                  {r.status === "refunded" ? " · refunded" : ""}
+                </span>
+                <a
+                  href={`/dashboard/bursar/renewal/receipt/${r.reference}`}
+                  className="text-xs font-medium text-ink underline"
+                >
+                  Receipt (PDF)
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
