@@ -6,33 +6,55 @@ import { z } from "zod";
 // development with an existing .env.local keeps working; the production image is
 // built without them, so a container missing SUPABASE_URL fails loudly instead
 // of running against a build-time value.
-const serverEnvSchema = z.object({
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_ANON_KEY: z.string().min(1),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
-  PAYSTACK_SECRET_KEY: z
-    .string()
-    .min(1)
-    .refine((k) => k.startsWith("sk_"), {
-      message: "PAYSTACK_SECRET_KEY should start with 'sk_'.",
-    }),
-  // This school's Cloudflare R2 bucket for uploaded files (lib/storage.ts).
-  // R2_ENDPOINT is the account endpoint, without the bucket name.
-  R2_ENDPOINT: z.string().url(),
-  R2_BUCKET: z.string().min(1),
-  R2_ACCESS_KEY_ID: z.string().min(1),
-  R2_SECRET_ACCESS_KEY: z.string().min(1),
-  // This school's short id (letters, digits, hyphens). A read-only support link
-  // is only accepted if it was issued for this exact slug.
-  SCHOOL_SLUG: z
-    .string()
-    .regex(/^[a-z0-9][a-z0-9-]*$/, "SCHOOL_SLUG: lowercase letters, digits and hyphens."),
-  // Signs read-only support links (lib/impersonation.ts). Unique per school,
-  // known only to this school's env file and the control plane.
-  IMPERSONATION_SIGNING_SECRET: z
-    .string()
-    .min(32, "IMPERSONATION_SIGNING_SECRET should be at least 32 characters."),
-});
+const serverEnvSchema = z
+  .object({
+    SUPABASE_URL: z.string().url(),
+    SUPABASE_ANON_KEY: z.string().min(1),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+    PAYSTACK_SECRET_KEY: z
+      .string()
+      .min(1)
+      .refine((k) => k.startsWith("sk_"), {
+        message: "PAYSTACK_SECRET_KEY should start with 'sk_'.",
+      }),
+    // This school's Cloudflare R2 bucket for uploaded files (lib/storage.ts).
+    // R2_ENDPOINT is the account endpoint, without the bucket name.
+    R2_ENDPOINT: z.string().url(),
+    R2_BUCKET: z.string().min(1),
+    R2_ACCESS_KEY_ID: z.string().min(1),
+    R2_SECRET_ACCESS_KEY: z.string().min(1),
+    // This school's short id (letters, digits, hyphens). A read-only support link
+    // is only accepted if it was issued for this exact slug.
+    SCHOOL_SLUG: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]*$/, "SCHOOL_SLUG: lowercase letters, digits and hyphens."),
+    // Signs read-only support links (lib/impersonation.ts). Unique per school,
+    // known only to this school's env file and the control plane.
+    IMPERSONATION_SIGNING_SECRET: z
+      .string()
+      .min(32, "IMPERSONATION_SIGNING_SECRET should be at least 32 characters."),
+    // Renewing this school's licence from the dashboard (lib/controlPlaneClient.ts).
+    // The control plane's address, and THIS school's private claim key (from
+    // `npm run claim-key`; its public half is registered on the control plane).
+    // Both or neither: without them the renewal screen says online renewal is not set up.
+    CONTROL_PLANE_URL: z.string().url().optional(),
+    CLAIM_SIGNING_KEY: z
+      .string()
+      .regex(
+        /^[A-Za-z0-9_-]{43}$/,
+        "CLAIM_SIGNING_KEY should be the 43-character private key from `npm run claim-key`."
+      )
+      .optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (Boolean(value.CONTROL_PLANE_URL) !== Boolean(value.CLAIM_SIGNING_KEY)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [value.CONTROL_PLANE_URL ? "CLAIM_SIGNING_KEY" : "CONTROL_PLANE_URL"],
+        message: "Set both CONTROL_PLANE_URL and CLAIM_SIGNING_KEY, or neither.",
+      });
+    }
+  });
 
 const parsed = serverEnvSchema.safeParse({
   SUPABASE_URL: process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -45,6 +67,8 @@ const parsed = serverEnvSchema.safeParse({
   R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
   SCHOOL_SLUG: process.env.SCHOOL_SLUG,
   IMPERSONATION_SIGNING_SECRET: process.env.IMPERSONATION_SIGNING_SECRET,
+  CONTROL_PLANE_URL: process.env.CONTROL_PLANE_URL || undefined,
+  CLAIM_SIGNING_KEY: process.env.CLAIM_SIGNING_KEY || undefined,
 });
 
 if (!parsed.success) {

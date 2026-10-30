@@ -95,6 +95,7 @@ const ADMIN_NAV_SECTIONS: { section: string; items: { label: string; href: strin
     items: [
       { label: "Fees", href: "/dashboard/admin/fees" },
       { label: "Payment claims", href: "/dashboard/bursar/payment-claims" },
+      { label: "School licence", href: "/dashboard/bursar/renewal" },
     ],
   },
   {
@@ -142,6 +143,7 @@ const BURSAR_NAV: { label: string; href: string }[] = [
   { label: "Invoices & payments", href: "/dashboard/bursar/invoices" },
   { label: "Payment claims", href: "/dashboard/bursar/payment-claims" },
   { label: "Payment history", href: "/dashboard/bursar/payments" },
+  { label: "School licence", href: "/dashboard/bursar/renewal" },
   { label: "Messages", href: "/dashboard/messages" },
   { label: "Announcements", href: "/dashboard/announcements" },
 ];

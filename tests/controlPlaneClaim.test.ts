@@ -62,3 +62,28 @@ describe("payment claim signing (shared with the control plane)", () => {
     expect(out.split(privateKey).length - 1).toBe(1);
   });
 });
+
+describe("purposes (shared with the control plane)", () => {
+  // The same literals are asserted in the control plane's tests/claim-signature.test.ts.
+  const PROOF_SIG =
+    "kSZ0ensSYC0nDd0T8v8qC8MvQZbt9LffYm3mI_Nj2qmiJn0PJud-qN0XxNuwX0Ydm9HyYNnSDv2MYxwmHkxDCg";
+  const CHECKOUT_SIG =
+    "chp09AkA3NLKR7OeTjM-Vyv4ZeB6s-11s7ktr_w8yoGP8_4qHyXpliZ5L0_tTlNLi7jlILuBOm8op7Eh5jpHDQ";
+  const base = { slug: "greenfield", timestamp: TS, body: BODY };
+
+  it("signs each purpose to its own agreed literal signature", () => {
+    expect(signClaim({ privateKey: SEED, ...base, purpose: "proof-v1" })).toBe(PROOF_SIG);
+    expect(signClaim({ privateKey: SEED, ...base, purpose: "checkout-v1" })).toBe(CHECKOUT_SIG);
+    expect(signClaim({ privateKey: SEED, ...base })).toBe(SIG);
+  });
+
+  it("accepts a signature only for the purpose it was made for", () => {
+    const v = (signature: string, purpose?: "claim-v1" | "proof-v1" | "checkout-v1") =>
+      verifyClaim({ publicKeys: [PUB], ...base, signature, purpose });
+    expect(v(PROOF_SIG, "proof-v1")).toBe(true);
+    expect(v(PROOF_SIG, "checkout-v1")).toBe(false);
+    expect(v(PROOF_SIG)).toBe(false);
+    expect(v(CHECKOUT_SIG, "checkout-v1")).toBe(true);
+    expect(v(SIG, "proof-v1")).toBe(false);
+  });
+});
